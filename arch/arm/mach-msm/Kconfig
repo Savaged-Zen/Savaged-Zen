@@ -162,4 +162,13 @@ config MSM_GPIOMUX
 
 config MSM_V2_TLMM
 	bool
+
+config MSM_ONCRPCROUTER
+	depends on MSM_SMD
+	default y
+	bool "MSM ONCRPC router support"
+	help
+	  Support for the MSM ONCRPC router for communication between
+	  the ARM9 and ARM11
+
 endif
