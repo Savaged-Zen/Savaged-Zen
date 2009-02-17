@@ -39,7 +39,6 @@ obj-$(CONFIG_MACH_TROUT) += board-trout-panel.o
 obj-$(CONFIG_MACH_TROUT) += htc_akm_cal.o htc_wifi_nvs.o htc_acoustic.o
 obj-$(CONFIG_MACH_TROUT) += board-trout-rfkill.o
 obj-$(CONFIG_MACH_TROUT) += board-trout-wifi.o
-obj-$(CONFIG_TROUT_H2W) += board-trout-h2w.o
 obj-$(CONFIG_TROUT_BATTCHG) += htc_battery.o
 obj-$(CONFIG_TROUT_PWRSINK) += htc_pwrsink.o
 obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
@@ -54,3 +53,5 @@ obj-$(CONFIG_ARCH_MSM8X60) += gpiomux-8x60.o gpiomux-v2.o gpiomux.o
 ifndef CONFIG_MSM_V2_TLMM
 obj-y	+= gpio.o
 endif
+
+obj-$(CONFIG_HTC_HEADSET) += htc_headset.o
