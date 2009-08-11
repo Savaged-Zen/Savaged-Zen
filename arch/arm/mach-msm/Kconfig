@@ -24,6 +24,7 @@ config ARCH_MSM7X30
 	select MSM_GPIOMUX
 	select MSM_PROC_COMM
 	select HAS_MSM_DEBUG_UART_PHYS
+	select VERIFY_PERMISSION_FAULT
 
 config ARCH_QSD8X50
 	bool "QSD8X50"
@@ -35,6 +36,7 @@ config ARCH_QSD8X50
 	select MSM_GPIOMUX
 	select MSM_PROC_COMM
 	select HAS_MSM_DEBUG_UART_PHYS
+	select VERIFY_PERMISSION_FAULT
 
 config ARCH_MSM8X60
 	bool "MSM8X60"
@@ -44,7 +46,7 @@ config ARCH_MSM8X60
 	select CPU_V7
 	select MSM_V2_TLMM
 	select MSM_GPIOMUX
-
+	select VERIFY_PERMISSION_FAULT
 endchoice
 
 config MSM_SOC_REV_A
