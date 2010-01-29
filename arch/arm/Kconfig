@@ -1410,6 +1410,13 @@ config SPARSE_IRQ
 	  number of off-chip IRQs will want to treat this as
 	  experimental until they have been independently verified.
 
+config VMALLOC_RESERVE
+	hex "Reserved vmalloc space"
+	default 0x08000000
+	depends on MMU
+	help
+	  Reserved vmalloc space if not specified on the kernel commandline.
+
 source "mm/Kconfig"
 
 config FORCE_MAX_ZONEORDER
