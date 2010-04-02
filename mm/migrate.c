@@ -847,10 +847,10 @@ static int unmap_and_move_huge_page(new_page_t get_new_page,
 	if (rc)
 		remove_migration_ptes(hpage, hpage);
 
-	if (anon_vma && atomic_dec_and_lock(&anon_vma->refcount,
+	if (anon_vma && atomic_dec_and_mutex_lock(&anon_vma->refcount,
 					    &anon_vma->lock)) {
 		int empty = list_empty(&anon_vma->head);
-		spin_unlock(&anon_vma->lock);
+		mutex_unlock(&anon_vma->lock);
 		if (empty)
 			put_anon_vma(anon_vma);
 	}
