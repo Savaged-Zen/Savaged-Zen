@@ -835,7 +835,7 @@ static int unmap_and_move_huge_page(new_page_t get_new_page,
 
 		if (page_mapped(hpage)) {
 			anon_vma = page_anon_vma(hpage);
-			atomic_inc(&anon_vma->external_refcount);
+			atomic_inc(&anon_vma->refcount);
 		}
 	}
 
@@ -847,7 +847,7 @@ static int unmap_and_move_huge_page(new_page_t get_new_page,
 	if (rc)
 		remove_migration_ptes(hpage, hpage);
 
-	if (anon_vma && atomic_dec_and_lock(&anon_vma->external_refcount,
+	if (anon_vma && atomic_dec_and_lock(&anon_vma->refcount,
 					    &anon_vma->lock)) {
 		int empty = list_empty(&anon_vma->head);
 		spin_unlock(&anon_vma->lock);
