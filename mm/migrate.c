@@ -852,7 +852,7 @@ static int unmap_and_move_huge_page(new_page_t get_new_page,
 		int empty = list_empty(&anon_vma->head);
 		spin_unlock(&anon_vma->lock);
 		if (empty)
-			anon_vma_free(anon_vma);
+			put_anon_vma(anon_vma);
 	}
 
 	if (rcu_locked)
