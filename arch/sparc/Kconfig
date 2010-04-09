@@ -50,6 +50,7 @@ config SPARC64
 	select RTC_DRV_STARFIRE
 	select HAVE_PERF_EVENTS
 	select PERF_USE_VMALLOC
+	select HAVE_RCU_TABLE_FREE
 
 config ARCH_DEFCONFIG
 	string
