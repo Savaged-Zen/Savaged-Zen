@@ -750,7 +750,7 @@ rcu_unlock:
 
 	/* Drop an anon_vma reference if we took one */
 	if (anon_vma)
-		drop_anon_vma(anon_vma);
+		put_anon_vma(anon_vma);
 
 	if (rcu_locked)
 		rcu_read_unlock();
