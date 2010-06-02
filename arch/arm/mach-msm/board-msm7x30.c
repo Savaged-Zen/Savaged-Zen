@@ -336,6 +336,14 @@ static void __init msm7x30_fixup(struct machine_desc *desc, struct tag *tags,
 	mi->bank[0].size = (51*1024*1024);
 }
 
+
+extern void __init msm7x30_allocate_fbmem(void);
+
+static void __init msm7x30_reserve(void)
+{
+	msm7x30_allocate_fbmem();
+}
+
 MACHINE_START(MSM7X30_SURF, "QCT MSM7X30 SURF")
 #ifdef CONFIG_MSM_DEBUG_UART
 #endif
@@ -345,6 +353,7 @@ MACHINE_START(MSM7X30_SURF, "QCT MSM7X30 SURF")
 	.init_irq = msm7x30_init_irq,
 	.init_machine = msm7x30_init,
 	.timer = &msm_timer,
+	.reserve = msm7x30_reserve,
 MACHINE_END
 
 MACHINE_START(MSM7X30_FFA, "QCT MSM7X30 FFA")
@@ -355,6 +364,7 @@ MACHINE_START(MSM7X30_FFA, "QCT MSM7X30 FFA")
 	.init_irq = msm7x30_init_irq,
 	.init_machine = msm7x30_init,
 	.timer = &msm_timer,
+	.reserve = msm7x30_reserve,
 MACHINE_END
 
 MACHINE_START(MSM7X30_FLUID, "QCT MSM7X30 FLUID")
@@ -365,4 +375,5 @@ MACHINE_START(MSM7X30_FLUID, "QCT MSM7X30 FLUID")
 	.init_irq = msm7x30_init_irq,
 	.init_machine = msm7x30_init,
 	.timer = &msm_timer,
+	.reserve = msm7x30_reserve,
 MACHINE_END
