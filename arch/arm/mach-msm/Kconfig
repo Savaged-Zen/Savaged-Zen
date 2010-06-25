@@ -242,6 +242,14 @@ config MACH_MAHIMAHI
 	help
 	  Select this to support the Mahi-Mahi device
 
+config MACH_BRAVO
+	depends on ARCH_QSD8X50
+	default y
+	bool "Bravo"
+	help
+	  Select this to support the Bravo device
+
+
 config MACH_QSD8X50_FFA
 	depends on ARCH_QSD8X50
 	default y
