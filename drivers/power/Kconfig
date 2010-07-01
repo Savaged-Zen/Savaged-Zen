@@ -191,4 +191,10 @@ config CHARGER_TWL4030
 	help
 	  Say Y here to enable support for TWL4030 Battery Charge Interface.
 
+config CHARGER_PM8058
+	bool "Qualcomm PM8058 pmic charger driver"
+	depends on PM8058
+	help
+	  Say Y to include support for the pm8058 charge controller
+
 endif # POWER_SUPPLY
