@@ -244,7 +244,7 @@ config MACH_MAHIMAHI
 
 config MACH_BRAVO
 	depends on ARCH_QSD8X50
-	default y
+	default n
 	bool "Bravo"
 	help
 	  Select this to support the Bravo device
