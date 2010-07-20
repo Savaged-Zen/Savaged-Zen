@@ -225,6 +225,7 @@ struct microp_i2c_client_data {
 	uint32_t als_gadc;
 	uint8_t als_calibrating;
 	uint32_t spi_devices_enabled;
+	struct mutex microp_i2c_rw_mutex;
 };
 
 static char *hex2string(uint8_t *data, int len)
@@ -244,51 +245,56 @@ static char *hex2string(uint8_t *data, int len)
 
 #define I2C_READ_RETRY_TIMES  10
 #define I2C_WRITE_RETRY_TIMES 10
+#define MICROP_I2C_WRITE_BLOCK_SIZE 80
 
 static int i2c_read_block(struct i2c_client *client, uint8_t addr,
 	uint8_t *data, int length)
 {
 	int retry;
-	int ret;
+	struct microp_i2c_client_data *cdata;
 	struct i2c_msg msgs[] = {
-	{
-		.addr = client->addr,
-		.flags = 0,
-		.len = 1,
-		.buf = &addr,
-	},
-	{
-		.addr = client->addr,
-		.flags = I2C_M_RD,
-		.len = length,
-		.buf = data,
-	}
+		{
+			.addr = client->addr,
+			.flags = 0,
+			.len = 1,
+			.buf = &addr,
+		},
+		{
+			.addr = client->addr,
+			.flags = I2C_M_RD,
+			.len = length,
+			.buf = data,
+		}
 	};
 
+	cdata = i2c_get_clientdata(client);
+	mutex_lock(&cdata->microp_i2c_rw_mutex);
 	mdelay(1);
 	for (retry = 0; retry <= I2C_READ_RETRY_TIMES; retry++) {
-		ret = i2c_transfer(client->adapter, msgs, 2);
-		if (ret == 2) {
-			dev_dbg(&client->dev, "R [%02X] = %s\n", addr,
-					hex2string(data, length));
-			return 0;
-		}
+		if (i2c_transfer(client->adapter, msgs, 2) == 2)
+			break;
 		msleep(10);
 	}
+	mutex_unlock(&cdata->microp_i2c_rw_mutex);
+	dev_dbg(&client->dev, "R [%02X] = %s\n",
+			addr, hex2string(data, length));
 
-	dev_err(&client->dev, "i2c_read_block retry over %d\n",
+	if (retry > I2C_READ_RETRY_TIMES) {
+		dev_err(&client->dev, "i2c_read_block retry over %d\n",
 			I2C_READ_RETRY_TIMES);
-	return -EIO;
+		return -EIO;
+	}
+
+	return 0;
 }
 
-#define MICROP_I2C_WRITE_BLOCK_SIZE 21
 static int i2c_write_block(struct i2c_client *client, uint8_t addr,
 	uint8_t *data, int length)
 {
 	int retry;
 	uint8_t buf[MICROP_I2C_WRITE_BLOCK_SIZE];
-	int ret;
-
+	int i;
+	struct microp_i2c_client_data *cdata;
 	struct i2c_msg msg[] = {
 		{
 			.addr = client->addr,
@@ -298,27 +304,35 @@ static int i2c_write_block(struct i2c_client *client, uint8_t addr,
 		}
 	};
 
-	dev_dbg(&client->dev, "W [%02X] = %s\n", addr,
-			hex2string(data, length));
+	dev_dbg(&client->dev, "W [%02X] = %s\n",
+			addr, hex2string(data, length));
 
+	cdata = i2c_get_clientdata(client);
 	if (length + 1 > MICROP_I2C_WRITE_BLOCK_SIZE) {
 		dev_err(&client->dev, "i2c_write_block length too long\n");
 		return -E2BIG;
 	}
 
 	buf[0] = addr;
-	memcpy((void *)&buf[1], (void *)data, length);
+	for (i = 0; i < length; i++)
+		buf[i+1] = data[i];
 
+	mutex_lock(&cdata->microp_i2c_rw_mutex);
 	mdelay(1);
 	for (retry = 0; retry <= I2C_WRITE_RETRY_TIMES; retry++) {
-		ret = i2c_transfer(client->adapter, msg, 1);
-		if (ret == 1)
-			return 0;
+		if (i2c_transfer(client->adapter, msg, 1) == 1)
+			break;
 		msleep(10);
 	}
-	dev_err(&client->dev, "i2c_write_block retry over %d\n",
+	if (retry > I2C_WRITE_RETRY_TIMES) {
+		dev_err(&client->dev, "i2c_write_block retry over %d\n",
 			I2C_WRITE_RETRY_TIMES);
-	return -EIO;
+		mutex_unlock(&cdata->microp_i2c_rw_mutex);
+		return -EIO;
+	}
+	mutex_unlock(&cdata->microp_i2c_rw_mutex);
+
+	return 0;
 }
 
 int microp_i2c_read(uint8_t addr, uint8_t *data, int length)
@@ -1389,7 +1403,7 @@ static int microp_spi_enable(uint8_t on)
 	msleep(10);
 	return ret;
 }
-
+static DEFINE_MUTEX(spi_lock);
 /* Lookup active SPI devices and only turn it off when no device
  * is using it
  * */
@@ -1398,6 +1412,7 @@ int microp_spi_vote_enable(int spi_device, uint8_t enable) {
 	struct i2c_client *client = private_microp_client;
 	struct microp_i2c_client_data *cdata = i2c_get_clientdata(client);
 	int ret;
+	mutex_lock (&spi_lock);
 
 	if (spi_device == SPI_OJ)
 		microp_oj_intr_enable(client, enable);
@@ -1414,6 +1429,8 @@ int microp_spi_vote_enable(int spi_device, uint8_t enable) {
 
 
 	ret = microp_spi_enable(enable);
+	mutex_unlock (&spi_lock);
+
 	return ret;
 }
 
@@ -2020,6 +2037,17 @@ static int microp_i2c_probe(struct i2c_client *client,
 	int j;
 
 	private_microp_client = client;
+	cdata = kzalloc(sizeof(struct microp_i2c_client_data), GFP_KERNEL);
+	if (!cdata) {
+		ret = -ENOMEM;
+		dev_err(&client->dev, "failed on allocat cdata\n");
+		goto err_cdata;
+	}
+
+	i2c_set_clientdata(client, cdata);
+
+	mutex_init(&cdata->microp_i2c_rw_mutex);
+
 	ret = i2c_read_block(client, MICROP_I2C_RCMD_VERSION, data, 2);
 	if (ret || !(data[0] && data[1])) {
 		ret = -ENODEV;
@@ -2041,14 +2069,6 @@ static int microp_i2c_probe(struct i2c_client *client,
 		goto err_gpio_reset;
 	}
 
-	cdata = kzalloc(sizeof(struct microp_i2c_client_data), GFP_KERNEL);
-	if (!cdata) {
-		ret = -ENOMEM;
-		dev_err(&client->dev, "failed on allocat cdata\n");
-		goto err_cdata;
-	}
-
-	i2c_set_clientdata(client, cdata);
 	cdata->version = data[0] << 8 | data[1];
 	cdata->microp_is_suspend = 0;
 	cdata->auto_backlight_enabled = 0;
