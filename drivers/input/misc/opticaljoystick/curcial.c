@@ -179,7 +179,6 @@ static int curcial_oj_late_init(void)
 	curcial_oj_register_read(OJ_DELTA_Y);
 	curcial_oj_register_read(OJ_DELTA_X);
 
-
 	id = curcial_oj_register_read(0x00);
 	if (id == OJ_DEVICE_ID) {
 		printk(KERN_INFO"OpticalJoystick Device ID: %02x\n", OJ_DEVICE_ID);
@@ -457,7 +456,6 @@ static void curcial_oj_work_func(struct work_struct *work)
 	else
 		curcial_oj_polling_mode(OJ_POLLING_DISABLE);
 }
-
 
 static ssize_t oj_show(struct device *dev,
 					struct device_attribute *attr, char *buf)

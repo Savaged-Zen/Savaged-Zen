@@ -134,8 +134,7 @@ static void report_key(struct gpio_kp *kp, int key_index, int out, int in)
 					out, in, mi->output_gpios[out],
 					mi->input_gpios[in], pressed);
 #ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
-			if (machine_is_bravo() && keycode == BTN_MOUSE);
-			else
+			if (!machine_is_bravo() || keycode != BTN_MOUSE)
 #endif
 			input_report_key(kp->input_devs->dev[dev], keycode, pressed);
 		}
