@@ -22,6 +22,11 @@
 #include <linux/slab.h>
 #include <linux/wakelock.h>
 
+#ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
+#include <asm/mach-types.h>
+#include <linux/curcial_oj.h>
+#endif
+
 enum {
 	DEBOUNCE_UNSTABLE     = BIT(0),	/* Got irq, while debouncing */
 	DEBOUNCE_PRESSED      = BIT(1),
@@ -127,6 +132,12 @@ static enum hrtimer_restart gpio_event_input_timer_func(struct hrtimer *timer)
 			pr_info("gpio_keys_scan_keys: key %x-%x, %d (%d) "
 				"changed to %d\n", ds->info->type,
 				key_entry->code, i, key_entry->gpio, pressed);
+#ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
+		if (key_entry->code == BTN_MOUSE) {
+			curcial_oj_send_key(BTN_MOUSE, pressed);
+		}
+		else
+#endif
 		input_event(ds->input_devs->dev[key_entry->dev], ds->info->type,
 			    key_entry->code, pressed);
 	}
