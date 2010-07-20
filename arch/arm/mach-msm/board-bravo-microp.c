@@ -1056,7 +1056,7 @@ static void microp_led_buttons_brightness_set_work(struct work_struct *work)
 	brightness = ldata->brightness;
 	spin_unlock_irqrestore(&ldata->brightness_lock, flags);
 
-	value = brightness >= 255 ? 0x20 : 0;
+	value = brightness >= 255 ? 0xFF : 0;
 
 	/* avoid a flicker that can occur when writing the same value */
 	if (cdata->button_led_value == value)
