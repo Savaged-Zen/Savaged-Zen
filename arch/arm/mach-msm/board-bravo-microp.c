@@ -49,10 +49,7 @@
 #include <linux/slab.h>
 
 #include <mach/board-bravo-microp-common.h>
-
 #include "board-bravo.h"
-
-
 
 #define READ_GPI_STATE_HPIN	(1<<2)
 #define READ_GPI_STATE_SDCARD	(1<<0)
@@ -154,7 +151,6 @@ static struct platform_device bravo_h35mm = {
 enum led_type {
 	GREEN_LED,
 	AMBER_LED,
-	RED_LED,
 	BLUE_LED,
 	JOGBALL_LED,
 	BUTTONS_LED,
@@ -680,14 +676,6 @@ static int microp_i2c_write_led_mode(struct i2c_client *client,
 		data[4] = mode;
 		data[5] = off_timer >> 8;
 		data[6] = off_timer & 0xFF;
-	} else if (ldata->type == RED_LED) {
-		data[0] = 0x02;
-		data[1] = 0x00;
-		data[2] = 0x00;
-		data[3] = 0x00;
-		data[4] = mode? 5: 0;
-		data[5] = off_timer >> 8;
-		data[6] = off_timer & 0xFF;
 	} else if (ldata->type == BLUE_LED) {
 		data[0] = 0x04;
 		data[1] = mode;
@@ -795,11 +783,7 @@ static ssize_t microp_i2c_led_off_timer_show(struct device *dev,
 				MICROP_I2C_RCMD_GREEN_LED_REMAIN_TIME, data, 2);
 	} else if (ldata->type == AMBER_LED) {
 		ret = i2c_read_block(client,
-				MICROP_I2C_RCMD_AMBER_RED_LED_REMAIN_TIME,
-				data, 2);
-	} else if (ldata->type == RED_LED) {
-		ret = i2c_read_block(client,
-				MICROP_I2C_RCMD_AMBER_RED_LED_REMAIN_TIME,
+				MICROP_I2C_RCMD_AMBER_LED_REMAIN_TIME,
 				data, 2);
 	} else if (ldata->type == BLUE_LED) {
 		ret = i2c_read_block(client,
@@ -1001,9 +985,6 @@ static void microp_led_brightness_gpo_set_work(struct work_struct *work)
 	unsigned long flags;
 	struct microp_led_data *ldata =
 		container_of(work, struct microp_led_data, brightness_work);
-	struct led_classdev *led_cdev = &ldata->ldev;
-
-	struct i2c_client *client = to_i2c_client(led_cdev->dev->parent);
 
 	enum led_brightness brightness;
 	int ret;
@@ -1999,12 +1980,6 @@ static struct {
 	},
 	[AMBER_LED] = {
 		.name		= "amber",
-		.led_set_work   = microp_led_brightness_set_work,
-		.attrs		= green_amber_attrs,
-		.attr_cnt	= ARRAY_SIZE(green_amber_attrs)
-	},
-	[RED_LED] = {
-		.name		= "red",
 		.led_set_work   = microp_led_brightness_set_work,
 		.attrs		= green_amber_attrs,
 		.attr_cnt	= ARRAY_SIZE(green_amber_attrs)
