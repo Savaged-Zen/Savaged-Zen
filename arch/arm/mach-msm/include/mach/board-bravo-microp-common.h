@@ -31,8 +31,8 @@
 
 #define MICROP_I2C_NAME "bravo-microp"
 
-#define MICROP_LSENSOR_ADC_CHAN		6
-#define MICROP_REMOTE_KEY_ADC_CHAN	7
+#define MICROP_LSENSOR_ADC_CHAN				6
+#define MICROP_REMOTE_KEY_ADC_CHAN			7
 
 #define MICROP_I2C_WCMD_MISC				0x20
 #define MICROP_I2C_WCMD_SPI_EN				0x21
@@ -45,10 +45,6 @@
 #define MICROP_I2C_RCMD_GREEN_LED_REMAIN_TIME		0x54
 #define MICROP_I2C_RCMD_AMBER_LED_REMAIN_TIME		0x55
 #define MICROP_I2C_RCMD_BLUE_LED_REMAIN_TIME		0x57
-#define MICROP_I2C_WCMD_JOGBALL_LED_MODE		0x5A
-#define MICROP_I2C_RCMD_JOGBALL_LED_REMAIN_TIME		0x5B
-#define MICROP_I2C_WCMD_JOGBALL_LED_PWM_SET		0x5C
-#define MICROP_I2C_WCMD_JOGBALL_LED_PERIOD_SET		0x5D
 #define MICROP_I2C_WCMD_READ_ADC_VALUE_REQ		0x60
 #define MICROP_I2C_RCMD_ADC_VALUE			0x62
 #define MICROP_I2C_WCMD_REMOTEKEY_TABLE			0x63
@@ -78,20 +74,19 @@
 #define MICROP_I2C_WCMD_SIMCARD_DEBN_TIME		0x8A
 #define MICROP_I2C_WCMD_GPO_LED_STATUS_EN		0x90
 #define MICROP_I2C_WCMD_GPO_LED_STATUS_DIS		0x91
-#define MICROP_I2C_WCMD_OJ_INT_STATUS		0xA8
-
+#define MICROP_I2C_WCMD_OJ_INT_STATUS			0xA8
 
 /* Desire - verified in 2.6.29 */
-#define IRQ_OJ			(1<<12)
-#define IRQ_GSENSOR     (1<<10)
-#define IRQ_LSENSOR     (1<<9)
-#define IRQ_REMOTEKEY   (1<<7)
-#define IRQ_HEADSETIN	(1<<2)
-#define IRQ_SDCARD      (1<<0)
+#define IRQ_OJ						(1<<12)
+#define IRQ_GSENSORi					(1<<10)
+#define IRQ_LSENSOR					(1<<9)
+#define IRQ_REMOTEKEY					(1<<7)
+#define IRQ_HEADSETIN					(1<<2)
+#define IRQ_SDCARD					(1<<0)
 
-#define SPI_GSENSOR				(1 << 0)
-#define SPI_LCM					(1 << 1)
-#define SPI_OJ					(1 << 2)
+#define SPI_GSENSOR					(1 << 0)
+#define SPI_LCM						(1 << 1)
+#define SPI_OJ						(1 << 2)
 
 /* Optical Joystick callbacks */
 struct microp_oj_callback {
