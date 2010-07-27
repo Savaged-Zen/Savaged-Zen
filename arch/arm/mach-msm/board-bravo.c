@@ -200,8 +200,8 @@ static struct android_usb_product usb_products[] = {
 
 static struct usb_mass_storage_platform_data mass_storage_pdata = {
 	.nluns		= 1,
-	.vendor		= "Google, Inc.",
-	.product	= "Nexus One",
+	.vendor		= "HTC",
+	.product	= "Desire",
 	.release	= 0x0100,
 };
 
@@ -234,7 +234,7 @@ static struct android_usb_platform_data android_usb_pdata = {
 	.product_id	= 0x0c02,
 	.version	= 0x0100,
 	.product_name		= "Android Phone",
-	.manufacturer_name	= "Google, Inc.",
+	.manufacturer_name	= "HTC",
 	.num_products = ARRAY_SIZE(usb_products),
 	.products = usb_products,
 	.num_functions = ARRAY_SIZE(usb_functions_all),
