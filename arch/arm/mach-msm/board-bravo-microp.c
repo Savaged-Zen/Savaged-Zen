@@ -219,8 +219,9 @@ struct microp_i2c_client_data {
 	uint32_t als_kadc;
 	uint32_t als_gadc;
 	uint8_t als_calibrating;
-	uint32_t spi_devices_enabled;
+	uint32_t spi_devices_vote;
 	struct mutex microp_i2c_rw_mutex;
+	struct mutex microp_adc_mutex;
 };
 
 static char *hex2string(uint8_t *data, int len)
@@ -369,25 +370,32 @@ EXPORT_SYMBOL(microp_i2c_write);
 static int microp_read_adc(uint8_t channel, uint16_t *value)
 {
 	struct i2c_client *client;
+	struct microp_i2c_client_data *cdata;
 	int ret;
 	uint8_t cmd[2], data[2];
 
 	client = private_microp_client;
+	cdata = i2c_get_clientdata(client);
 	cmd[0] = 0;
 	cmd[1] = channel;
+	mutex_lock(&cdata->microp_adc_mutex);
 	ret = i2c_write_block(client, MICROP_I2C_WCMD_READ_ADC_VALUE_REQ,
 			      cmd, 2);
 	if (ret < 0) {
 		dev_err(&client->dev, "%s: request adc fail\n", __func__);
+		mutex_unlock(&cdata->microp_adc_mutex);
 		return -EIO;
 	}
 
 	ret = i2c_read_block(client, MICROP_I2C_RCMD_ADC_VALUE, data, 2);
 	if (ret < 0) {
 		dev_err(&client->dev, "%s: read adc fail\n", __func__);
+		mutex_unlock(&cdata->microp_adc_mutex);
 		return -EIO;
 	}
+
 	*value = data[0] << 8 | data[1];
+	mutex_unlock(&cdata->microp_adc_mutex);
 	return 0;
 }
 
@@ -1251,7 +1259,7 @@ static int microp_spi_enable(uint8_t on)
 	msleep(10);
 	return ret;
 }
-static DEFINE_MUTEX(spi_lock);
+
 /* Lookup active SPI devices and only turn it off when no device
  * is using it
  * */
@@ -1259,26 +1267,44 @@ int microp_spi_vote_enable(int spi_device, uint8_t enable) {
 	//XXX need to check that all that crap in the HTC kernel is needed
 	struct i2c_client *client = private_microp_client;
 	struct microp_i2c_client_data *cdata = i2c_get_clientdata(client);
-	int ret;
-	mutex_lock (&spi_lock);
+	uint8_t data[2] = {0, 0};
+	int ret = 0;
+
+	if (!client)    {
+		printk(KERN_ERR "%s: dataset: client is empty\n", __func__);
+		return -EIO;
+	}
 
 	if (spi_device == SPI_OJ)
 		microp_oj_intr_enable(client, enable);
-
+	
+	mutex_lock(&cdata->microp_adc_mutex);
 	/* Add/remove it from the poll */
 	if (enable)
-		cdata->spi_devices_enabled |= spi_device;
+		cdata->spi_devices_vote |= spi_device;
 	else
-		cdata->spi_devices_enabled &= ~spi_device;
+		cdata->spi_devices_vote &= ~spi_device;
 
-	if (cdata->spi_devices_enabled)
+	ret = i2c_read_block(client, MICROP_I2C_RCMD_SPI_BL_STATUS, data, 2);
+	if (ret != 0) {
+		printk(KERN_ERR "%s: read SPI/BL status fail\n", __func__);
+		mutex_unlock(&cdata->microp_adc_mutex);
+		return ret;
+	}
+
+	if ((data[1] & 0x01) ==
+		(((SPI_OJ | SPI_GSENSOR) & cdata->spi_devices_vote) ? 1 : 0)) {
+			mutex_unlock(&cdata->microp_adc_mutex);
+			return ret;
+	}
+
+	if ((SPI_OJ | SPI_GSENSOR) & cdata->spi_devices_vote)
 		enable = 1;
-	else enable = 0;
+	else
+		enable = 0;
 
-
+	mutex_unlock(&cdata->microp_adc_mutex);
 	ret = microp_spi_enable(enable);
-	mutex_unlock (&spi_lock);
-
 	return ret;
 }
 
@@ -1882,6 +1908,7 @@ static int microp_i2c_probe(struct i2c_client *client,
 
 	i2c_set_clientdata(client, cdata);
 
+	mutex_init(&cdata->microp_adc_mutex);
 	mutex_init(&cdata->microp_i2c_rw_mutex);
 
 	ret = i2c_read_block(client, MICROP_I2C_RCMD_VERSION, data, 2);
@@ -1909,7 +1936,7 @@ static int microp_i2c_probe(struct i2c_client *client,
 	cdata->microp_is_suspend = 0;
 	cdata->auto_backlight_enabled = 0;
 	cdata->light_sensor_enabled = 0;
-	cdata->spi_devices_enabled = 0;
+	cdata->spi_devices_vote = 0;
 
 	wake_lock_init(&microp_i2c_wakelock, WAKE_LOCK_SUSPEND,
 			 "microp_i2c_present");
