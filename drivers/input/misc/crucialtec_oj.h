@@ -1,4 +1,4 @@
-/* drivers/input/opticaljoystick/curcial.h
+/* drivers/input/misc/crucialtec_oj.h
  *
  * Copyright (C) 2009 HTC Corporation.
  *
@@ -12,8 +12,8 @@
  * GNU General Public License for more details.
  *
  */
-#ifndef _CURCIAL_H
-#define _CURCIAL_H
+#ifndef _CRUCIALTEC_H
+#define _CRUCIALTEC_H
 
 #include <linux/input.h>
 
@@ -39,7 +39,7 @@ typedef struct {
 	int8_t	shtHi;
 	int8_t	shtLo;
 	uint8_t squal;
-	uint16_t	key;
+	uint16_t key;
 }OJData_T;
 
 enum {
@@ -52,7 +52,7 @@ enum {
 };
 
 extern OJTouchEvt_T 	OJ_SoftClick_Event(OJData_T* OJData);
-extern OJTouchEvt_T		gTouchEvt;
+extern OJTouchEvt_T	gTouchEvt;
 extern uint8_t  gSqRatio;
 extern uint8_t  gdeltamod;
 extern uint8_t	gPressBufCnt;

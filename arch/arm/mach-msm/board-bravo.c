@@ -26,8 +26,7 @@
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/usb/android_composite.h>
-#include <linux/curcial_oj.h>
-
+#include <linux/crucialtec_oj.h>
 #include <linux/android_pmem.h>
 #include <linux/synaptics_i2c_rmi.h>
 #include <linux/capella_cm3602.h>
@@ -36,12 +35,10 @@
 #include <linux/ds2784_battery.h>
 #include <../../../drivers/staging/android/timed_gpio.h>
 #include <../../../drivers/w1/w1.h>
-
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/setup.h>
-
 #include <mach/board.h>
 #include <mach/hardware.h>
 #include <mach/msm_hsusb.h>
@@ -52,7 +49,6 @@
 #include <mach/bcm_bt_lpm.h>
 #include <mach/msm_smd.h>
 #include <mach/vreg.h>
-
 #include <mach/board-bravo-microp-common.h>
 
 #include "board-bravo.h"
@@ -117,7 +113,6 @@ static void bravo_usb_hw_reset(bool enable)
 		pr_err("%s: Cannot set reset to %d (%d)\n", __func__, enable,
 		       ret);
 }
-
 
 static struct msm_hsusb_platform_data msm_hsusb_pdata = {
 	.phy_init_seq		= bravo_phy_init_seq,
@@ -458,17 +453,10 @@ static struct regulator_init_data tps65023_data[5] = {
 	},
 };
 
-
 static void ds2482_set_slp_n(unsigned n)
 {
 	gpio_direction_output(BRAVO_GPIO_DS2482_SLP_N, n);
 }
-
-/*
-static struct tpa2018d1_platform_data tpa2018_data = {
-	.gpio_tpa2018_spk_en = BRAVO_GPIO_AUD_SPK_AMP_EN,
-};
-*/
 
 static struct i2c_board_info base_i2c_devices[] = {
 	{
@@ -752,46 +740,50 @@ static int __init ds2784_battery_init(void)
 	return w1_register_family(&w1_ds2784_family);
 }
 
-static void curcial_oj_shutdown (int	enable)
+static void crucialtec_oj_shutdown (int enable)
 {
 	uint8_t cmd[3];
 	memset(cmd, 0x00, sizeof(uint8_t)*3);
 	/* microp firmware(v04) non-shutdown by default */
 	cmd[2] = 0x20;
-	microp_i2c_write(0x90, cmd,	3);
-
+	microp_i2c_write(0x90, cmd, 3);
+//	pr_err("%s", __func__);	
+	printk("%s\n", __func__);	
 }
 
-static int curcial_oj_poweron(int	on)
+static int crucialtec_oj_poweron(int on)
 {
 	uint8_t data[2];
-	struct vreg	*oj_power = vreg_get(0, "gp2");
+	struct vreg *oj_power = vreg_get(0, "gp2");
 	if (IS_ERR(oj_power)) {
-		printk(KERN_ERR"%s:Error power domain\n",__func__);
+//		pr_err("%s:Error power domain\n", __func__);
+		printk("%s:Error power domain\n", __func__);
 		return 0;
 	}
 
 	if (on) {
 		vreg_set_level(oj_power, 2750);
 		vreg_enable(oj_power);
-		printk(KERN_ERR "%s:OJ	power	enable(%d)\n", __func__, on);
+//		pr_err("%s:OJ power enable(%d)\n", __func__, on);
+		printk("%s:OJ power enable(%d)\n", __func__, on);
 	} else {
 	/* for microp firmware(v04) setting*/
 		microp_i2c_read(MICROP_I2C_RCMD_VERSION, data, 2);
 		if (data[0] < 4) {
-			printk("Microp firmware version:%d\n",data[0]);
+			printk("Microp firmware version:%d\n", data[0]);
 			return 1;
 		}
 		vreg_disable(oj_power);
-		printk(KERN_ERR "%s:OJ	power	enable(%d)\n", __func__, on);
-		}
+//		pr_err("%s:OJ power enable(%d)\n", __func__, on);
+		printk("%s:OJ power enable(%d)\n", __func__, on);
+	}
 	return 1;
 }
-static void curcial_oj_adjust_xy(uint8_t *data, int16_t *mSumDeltaX, int16_t *mSumDeltaY)
+
+static void crucialtec_oj_adjust_xy(uint8_t *data, int16_t *mSumDeltaX, int16_t *mSumDeltaY)
 {
 	int8_t 	deltaX;
 	int8_t 	deltaY;
-
 
 	if (data[2] == 0x80)
 		data[2] = 0x81;
@@ -807,12 +799,13 @@ static void curcial_oj_adjust_xy(uint8_t *data, int16_t *mSumDeltaX, int16_t *mS
 	*mSumDeltaX += -((int16_t)deltaX);
 	*mSumDeltaY += -((int16_t)deltaY);
 }
+
 #define BRAVO_MICROP_VER	0x03
 
-static struct curcial_oj_platform_data bravo_oj_data = {
-	.oj_poweron = curcial_oj_poweron,
-	.oj_shutdown = curcial_oj_shutdown,
-	.oj_adjust_xy = curcial_oj_adjust_xy,
+static struct crucialtec_oj_platform_data bravo_oj_data = {
+	.oj_poweron = crucialtec_oj_poweron,
+	.oj_shutdown = crucialtec_oj_shutdown,
+	.oj_adjust_xy = crucialtec_oj_adjust_xy,
 	.microp_version = BRAVO_MICROP_VER,
 	.mdelay_time = 0,
 	.msleep_time = 1,
@@ -838,13 +831,12 @@ static struct curcial_oj_platform_data bravo_oj_data = {
 };
 
 static struct platform_device bravo_oj = {
-	.name = CURCIAL_OJ_NAME,
+	.name = CRUCIALTEC_OJ_NAME,
 	.id = -1,
 	.dev = {
-		.platform_data	= &bravo_oj_data,
+		.platform_data = &bravo_oj_data,
 	}
 };
-
 
 static struct platform_device *devices[] __initdata = {
 #if !defined(CONFIG_MSM_SERIAL_DEBUGGER)
@@ -867,12 +859,11 @@ static struct platform_device *devices[] __initdata = {
 	&android_pmem_camera_device,
 	&msm_kgsl_device,
 	&msm_device_i2c,
-	&capella_cm3602,
 	&msm_camera_sensor_s5k3e2fx,
 	&bravo_flashlight_device,
 	&bravo_oj,
+	&capella_cm3602,
 };
-
 
 static uint32_t bt_gpio_table[] = {
 	PCOM_GPIO_CFG(BRAVO_GPIO_BT_UART1_RTS, 2, GPIO_OUTPUT,

@@ -131,104 +131,7 @@ struct platform_device bravo_reset_keys_device = {
 	},
 };
 
-/*
-static void curcial_oj_shutdown (int enable)
-{
-	uint8_t cmd[3];
-	memset(cmd, 0x00, sizeof(uint8_t)*3);
-	// microp firmware(v04) non-shutdown by default 
-	cmd[2] = 0x20;
-	microp_i2c_write(0x90, cmd, 3);
-}
-
-static int curcial_oj_poweron(int       on)
-{
-        uint8_t data[2];
-        struct vreg     *oj_power = vreg_get(0, "gp2");
-        if (IS_ERR(oj_power)) {
-                printk(KERN_ERR"%s:Error power domain\n",__func__);
-                return 0;
-        }
-
-
-        if (on) {
-                vreg_set_level(oj_power, 2750);
-                vreg_enable(oj_power);
-                printk(KERN_ERR "%s:OJ  power   enable(%d)\n", __func__, on);
-        } else {
-        // for microp firmware(v04) setting
-                microp_i2c_read(MICROP_I2C_RCMD_VERSION, data, 2);
-                if (data[0] < 4) {
-                        printk("Microp firmware version:%d\n",data[0]);
-                        return 1;
-                }
-                vreg_disable(oj_power);
-                printk(KERN_ERR "%s:OJ  power   enable(%d)\n", __func__, on);
-                }
-        return 1;
-}
-
-static void curcial_oj_adjust_xy(uint8_t *data, int16_t *mSumDeltaX, int16_t *mSumDeltaY)
-{
-        int8_t  deltaX;
-        int8_t  deltaY;
-
-
-        if (data[2] == 0x80)
-                data[2] = 0x81;
-        if (data[1] == 0x80)
-                data[1] = 0x81;
-        if (1) {
-                deltaX = (1)*((int8_t) data[2]); // X=2
-                deltaY = (-1)*((int8_t) data[1]); // Y=1
-        } else {
-                deltaX = (-1)*((int8_t) data[1]);
-                deltaY = (1)*((int8_t) data[2]);
-        }
-        *mSumDeltaX += -((int16_t)deltaX);
-        *mSumDeltaY += -((int16_t)deltaY);
-}
-
-#define BRAVO_MICROP_VER        0x03
-
-static struct curcial_oj_platform_data bravo_oj_data = {
-        .oj_poweron = curcial_oj_poweron,
-        .oj_shutdown = curcial_oj_shutdown,
-        .oj_adjust_xy = curcial_oj_adjust_xy,
-        .microp_version = BRAVO_MICROP_VER,
-        .mdelay_time = 0,
-        .msleep_time = 1,
-        .x_send_count = 4,
-        .y_send_count = 2,
-        .fast_th = 1,
-        .normal_th = 8,
-        .continue_th = 3,
-        .continue_max = 0,
-        .xy_ratio = 15,
-        .interval = 200,
-        .softclick = 0,
-        .swap = 0,
-        .x = 1,
-        .y = -1,
-        .share_power = false,
-        .Xsteps = {2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-                2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-                2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-        .Ysteps = {2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-                2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-                2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-};
-
-static struct platform_device bravo_oj = {
-        .name = CURCIAL_OJ_NAME,
-        .id = -1,
-        .dev = {
-                .platform_data  = &bravo_oj_data,
-        }
-};
-*/
-
-static int __init bravo_init_keypad_jogball(void)
+static int __init bravo_init_keypad(void)
 {
 	int ret;
 
@@ -243,11 +146,7 @@ static int __init bravo_init_keypad_jogball(void)
 	if (ret != 0)
 		return ret;
 
-//	ret = platform_device_register(&bravo_oj);
-//	if (ret != 0)
-//		return ret;
-
 	return 0;
 }
 
-device_initcall(bravo_init_keypad_jogball);
+device_initcall(bravo_init_keypad);

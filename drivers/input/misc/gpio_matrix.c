@@ -21,9 +21,9 @@
 #include <linux/slab.h>
 #include <linux/wakelock.h>
 
-#ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
+#ifdef CONFIG_INPUT_CRUCIALTEC_OJ
 #include <asm/mach-types.h>
-#include <linux/curcial_oj.h>
+#include <linux/crucialtec_oj.h>
 #endif
 
 struct gpio_kp {
@@ -116,7 +116,7 @@ static void report_key(struct gpio_kp *kp, int key_index, int out, int in)
 	unsigned short keyentry = mi->keymap[key_index];
 	unsigned short keycode = keyentry & MATRIX_KEY_MASK;
 	unsigned short dev = keyentry >> MATRIX_CODE_BITS;
-#ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
+#ifdef CONFIG_INPUT_CRUCIALTEC_OJ
 	static unsigned need_send_spec_key = 1;
 #endif
 
@@ -133,16 +133,16 @@ static void report_key(struct gpio_kp *kp, int key_index, int out, int in)
 					"changed to %d\n", keycode,
 					out, in, mi->output_gpios[out],
 					mi->input_gpios[in], pressed);
-#ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
+#ifdef CONFIG_INPUT_CRUCIALTEC_OJ
 			if (!machine_is_bravo() || keycode != BTN_MOUSE)
 #endif
 			input_report_key(kp->input_devs->dev[dev], keycode, pressed);
 		}
 	}
-#ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
+#ifdef CONFIG_INPUT_CRUCIALTEC_OJ
 	if (machine_is_bravo() && keycode == BTN_MOUSE) {
 		if (need_send_spec_key == pressed) {
-			curcial_oj_send_key(keycode, pressed);
+			crucialtec_oj_send_key(keycode, pressed);
 			need_send_spec_key = !pressed;
 			printk(KERN_DEBUG "%s: send key, pressed: %d\n",
 				__func__, need_send_spec_key);

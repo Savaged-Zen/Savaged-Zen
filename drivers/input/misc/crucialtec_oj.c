@@ -1,4 +1,4 @@
-/* drivers/input/opticaljoystick/curcial.c
+/* drivers/input/misc/crucialtec_oj.c
  *
  * Copyright (C) 2009 HTC Corporation.
  *
@@ -26,14 +26,14 @@
 #include <linux/gpio.h>
 #include <mach/board-bravo-microp-common.h>
 #include <linux/earlysuspend.h>
-#include <linux/curcial_oj.h>
+#include <linux/crucialtec_oj.h>
 #include <mach/vreg.h>
 #include <asm/mach-types.h>
-#include "curcial.h"
+#include "crucialtec_oj.h"
 
 #define OJ_POWERON                  1
 #define OJ_POWEROFF                 0
-#define CURCIAL_OJ_POWER            85
+#define CRUCIALTEC_OJ_POWER         85
 #define BURST_DATA_SIZE             7
 #define OJ_DEVICE_ID                0x0D
 #define OJ_REGISTER_WRITE           0x7B
@@ -76,8 +76,8 @@ enum {
 };
 extern unsigned int system_rev;
 static struct proc_dir_entry *oj_proc_entry;
-static struct workqueue_struct *curcial_wq;
-static struct curcial_oj_platform_data *my_oj;
+static struct workqueue_struct *crucialtec_wq;
+static struct crucialtec_oj_platform_data *my_oj;
 static uint32_t click_interval = 800;
 static uint8_t  polling_delay1;/* use mdelay*/
 static uint8_t  polling_delay2;/* use msleep*/
@@ -97,20 +97,19 @@ static bool suspend;
 
 uint8_t  softclick;
 
+static int __devinit crucialtec_oj_probe(struct platform_device *pdev);
+static int __devexit crucialtec_oj_remove(struct platform_device *pdev);
 
-static int __devinit curcial_oj_probe(struct platform_device *pdev);
-static int __devexit curcial_oj_remove(struct platform_device *pdev);
-
-static struct platform_driver curcial_oj_device_driver = {
-	.probe    = curcial_oj_probe,
-	.remove   = __devexit_p(curcial_oj_remove),
+static struct platform_driver crucialtec_oj_device_driver = {
+	.probe    = crucialtec_oj_probe,
+	.remove   = __devexit_p(crucialtec_oj_remove),
 	.driver   = {
-		.name   = CURCIAL_OJ_NAME,
+		.name   = CRUCIALTEC_OJ_NAME,
 		.owner  = THIS_MODULE,
 	}
 };
 
-static uint8_t curcial_oj_register_read(uint8_t reg)
+static uint8_t crucialtec_oj_register_read(uint8_t reg)
 {
 	uint8_t cmd[2];
 
@@ -122,7 +121,7 @@ static uint8_t curcial_oj_register_read(uint8_t reg)
 	return cmd[1];
 }
 
-static void curcial_oj_burst_read(uint8_t *data)
+static void crucialtec_oj_burst_read(uint8_t *data)
 {
 	uint8_t cmd[2];
 
@@ -131,7 +130,7 @@ static void curcial_oj_burst_read(uint8_t *data)
 	microp_i2c_read(OJ_REGISTER_BURST_READ, data, BURST_DATA_SIZE);
 }
 
-static void curcial_oj_polling_mode(uint8_t mode)
+static void crucialtec_oj_polling_mode(uint8_t mode)
 {
 	uint8_t cmd[2];
 
@@ -139,12 +138,12 @@ static void curcial_oj_polling_mode(uint8_t mode)
 	microp_i2c_write(OJ_REGISTER_OJ_POLLING, cmd, 1);
 }
 
-static void curcial_oj_irq_handler(void)
+static void crucialtec_oj_irq_handler(void)
 {
-	queue_work(curcial_wq, &my_oj->work);
+	queue_work(crucialtec_wq, &my_oj->work);
 }
 
-static int curcial_oj_late_init(void)
+static int crucialtec_oj_late_init(void)
 {
 	uint8_t data[BURST_DATA_SIZE];
 	uint8_t id;
@@ -152,7 +151,6 @@ static int curcial_oj_late_init(void)
 
 	microp_i2c_read(MICROP_I2C_RCMD_VERSION, data, 2);
 	version = my_oj->microp_version;
-
 
 	if (data[0] < version) {
 		printk("Microp firmware version:%d have to large than %d !\n\
@@ -175,14 +173,14 @@ static int curcial_oj_late_init(void)
 	mdelay(23);
 
 	/* Read from register 0x02,0x03 and 0x04 one time regardless the state of the motion pin */
-	curcial_oj_register_read(OJ_MOTION);
-	curcial_oj_register_read(OJ_DELTA_Y);
-	curcial_oj_register_read(OJ_DELTA_X);
+	crucialtec_oj_register_read(OJ_MOTION);
+	crucialtec_oj_register_read(OJ_DELTA_Y);
+	crucialtec_oj_register_read(OJ_DELTA_X);
 
-	id = curcial_oj_register_read(0x00);
+	id = crucialtec_oj_register_read(0x00);
 	if (id == OJ_DEVICE_ID) {
 		printk(KERN_INFO"OpticalJoystick Device ID: %02x\n", OJ_DEVICE_ID);
-		id = curcial_oj_register_read(0x01);
+		id = crucialtec_oj_register_read(0x01);
 		printk(KERN_INFO"OJ Driver: Revision : %02x\n", id);
 	} else {
 		printk("Can't probe OpticalJoystick Device: %02x!\n", id);
@@ -194,26 +192,26 @@ static int curcial_oj_late_init(void)
 	data[1] = 0x10;
 	microp_i2c_write(OJ_REGISTER_WRITE, data, 2);
 
-	curcial_oj_polling_mode(OJ_POLLING_ENABLE);
+	crucialtec_oj_polling_mode(OJ_POLLING_ENABLE);
 
 	return 1;
 }
 
-static void curcial_oj_init_callback(void)
+static void crucialtec_oj_init_callback(void)
 {
-	if (!curcial_oj_late_init())
-		platform_driver_unregister(&curcial_oj_device_driver);
+	if (!crucialtec_oj_late_init())
+		platform_driver_unregister(&crucialtec_oj_device_driver);
 }
 
 static struct microp_oj_callback oj_callback = {
-	.oj_init = curcial_oj_init_callback,
-	.oj_intr = curcial_oj_irq_handler
+	.oj_init = crucialtec_oj_init_callback,
+	.oj_intr = crucialtec_oj_irq_handler
 };
 
-static int curcial_oj_module_init(void)
+static int crucialtec_oj_module_init(void)
 {
 	if (!microp_register_oj_callback(&oj_callback))
-		return curcial_oj_late_init();
+		return crucialtec_oj_late_init();
 
 	return 1;
 }
@@ -238,9 +236,9 @@ static OJKeyEvt_T OJ_ProcessNavi(int Ratio, int DeltaMin)
 	return tmpKey;
 }
 
-static void curcial_oj_work_func(struct work_struct *work)
+static void crucialtec_oj_work_func(struct work_struct *work)
 {
-	struct curcial_oj_platform_data *oj = container_of(work, struct curcial_oj_platform_data, work);
+	struct crucialtec_oj_platform_data *oj = container_of(work, struct crucialtec_oj_platform_data, work);
 	OJData_T  OJData;
 	OJTouchEvt_T  OJTouchEvt;
 	uint16_t i, j;
@@ -251,8 +249,7 @@ static void curcial_oj_work_func(struct work_struct *work)
 	uint8_t	x_count = 0;
 	uint8_t	y_count = 0;
 
-
-	curcial_oj_polling_mode(OJ_POLLING_DISABLE);
+	crucialtec_oj_polling_mode(OJ_POLLING_DISABLE);
 	mSumDeltaX = 0;
 	mSumDeltaY = 0;
 	lastkey = OJ_KEY_NONE;
@@ -263,7 +260,7 @@ static void curcial_oj_work_func(struct work_struct *work)
 
 	if (oj->softclick == true && system_rev == i) {
 		for (i = 1; i < 31; i++) {
-			curcial_oj_burst_read(data);
+			crucialtec_oj_burst_read(data);
 			OJData.squal = data[SQUAL];
 			if (debugflag) {
 				printk(KERN_INFO"OJ:M=0x%02x Y=0x%02x X=0x%02x SQUAL=%d\n", data[0], data[1], data[2], data[SQUAL]);
@@ -359,7 +356,7 @@ static void curcial_oj_work_func(struct work_struct *work)
 			printk(KERN_INFO"OJ: BTN_MOUSE\n");
 		}
 	} else {
-			curcial_oj_burst_read(data);
+			crucialtec_oj_burst_read(data);
 			OJData.squal = data[SQUAL];
 			if (debugflag) {
 				printk(KERN_INFO"OJ:M=0x%02x Y=0x%02x X=0x%02x SQUAL=%d\n", data[0], data[1], data[2], data[SQUAL]);
@@ -452,9 +449,9 @@ static void curcial_oj_work_func(struct work_struct *work)
 	if (debugflag)
 		printk(KERN_INFO"%s:-\n", __func__);
 	if (suspend == false)
-		curcial_oj_polling_mode(OJ_POLLING_ENABLE);
+		crucialtec_oj_polling_mode(OJ_POLLING_ENABLE);
 	else
-		curcial_oj_polling_mode(OJ_POLLING_DISABLE);
+		crucialtec_oj_polling_mode(OJ_POLLING_DISABLE);
 }
 
 static ssize_t oj_show(struct device *dev,
@@ -462,9 +459,9 @@ static ssize_t oj_show(struct device *dev,
 {
 	uint8_t i,j = 20;
 	while(j--) {
-	i = curcial_oj_register_read(0x05);
+	i = crucialtec_oj_register_read(0x05);
 	printk("SQUAL = 0x%x\n",i);
-	i = curcial_oj_register_read(0x00);
+	i = crucialtec_oj_register_read(0x00);
 	printk("ID = 0x%x\n",i);
 	mdelay(10);
 	}
@@ -636,6 +633,7 @@ static ssize_t oj_ytable_show(struct device *dev,
 	return sprintf(buf,"Y_table:%s\n",log);
 
 }
+
 static DEVICE_ATTR(interval, 0644, oj_show, oj_interval_store);
 static DEVICE_ATTR(fast_th, 0644, oj_show, oj_fast_th_store);
 static DEVICE_ATTR(normal_th, 0644, oj_show, oj_normal_th_store);
@@ -651,48 +649,47 @@ static DEVICE_ATTR(xtable, 0644, oj_xtable_show, oj_xtable_store);
 static DEVICE_ATTR(ytable, 0644, oj_ytable_show, oj_ytable_store);
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
-static void curcial_oj_early_suspend(struct early_suspend *h)
+static void crucialtec_oj_early_suspend(struct early_suspend *h)
 {
-	struct curcial_oj_platform_data *oj;
+	struct crucialtec_oj_platform_data *oj;
 	suspend = true;
-	oj = container_of(h, struct curcial_oj_platform_data, early_suspend);
+	oj = container_of(h, struct crucialtec_oj_platform_data, early_suspend);
 	printk(KERN_ERR"%s: enter\n", __func__);
 	oj->oj_shutdown(1);
-	curcial_oj_polling_mode(OJ_POLLING_DISABLE);
+	crucialtec_oj_polling_mode(OJ_POLLING_DISABLE);
 	if (oj->share_power == false) {
 		oj->oj_poweron(OJ_POWEROFF);
 	}
 	microp_spi_vote_enable(SPI_OJ, 0);
-
 }
 
-static void curcial_oj_late_resume(struct early_suspend *h)
+static void crucialtec_oj_late_resume(struct early_suspend *h)
 {
-	struct curcial_oj_platform_data	*oj;
+	struct crucialtec_oj_platform_data *oj;
 	suspend = false;
-	oj = container_of(h, struct curcial_oj_platform_data, early_suspend);
+	oj = container_of(h, struct crucialtec_oj_platform_data, early_suspend);
 	printk(KERN_ERR"%s: enter\n", __func__);
-	curcial_oj_module_init();
+	crucialtec_oj_module_init();
 }
 #endif
 
-static int __devinit curcial_oj_probe(struct platform_device *pdev)
+static int __devinit crucialtec_oj_probe(struct platform_device *pdev)
 {
-	struct curcial_oj_platform_data *oj = pdev->dev.platform_data;
+	struct crucialtec_oj_platform_data *oj = pdev->dev.platform_data;
 	int err;
 	int i;
 
 	my_oj = oj;
-	if (!curcial_oj_module_init()) {
+	if (!crucialtec_oj_module_init()) {
 		printk(KERN_ERR "Unable to init OJ module\n");
 		err = -EINVAL;
 		goto fail;
 	}
 
-	INIT_WORK(&oj->work, curcial_oj_work_func);
+	INIT_WORK(&oj->work, crucialtec_oj_work_func);
 
-	curcial_wq = create_singlethread_workqueue("curcial_wq");
-	if (!curcial_wq) {
+	crucialtec_wq = create_singlethread_workqueue("crucialtec_wq");
+	if (!crucialtec_wq) {
 		err = -ENOMEM;
 		goto fail;
 	}
@@ -705,7 +702,7 @@ static int __devinit curcial_oj_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
-	oj->input_dev->name = "curcial-oj";
+	oj->input_dev->name = "crucialtec-oj";
 
 
 	oj->input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_REL);
@@ -723,8 +720,8 @@ static int __devinit curcial_oj_probe(struct platform_device *pdev)
 	}
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
-	oj->early_suspend.suspend = curcial_oj_early_suspend;
-	oj->early_suspend.resume = curcial_oj_late_resume;
+	oj->early_suspend.suspend = crucialtec_oj_early_suspend;
+	oj->early_suspend.resume = crucialtec_oj_late_resume;
 /*	oj->early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 1;*/
 	register_early_suspend(&oj->early_suspend);
 #endif
@@ -767,8 +764,8 @@ fail:
 		input_free_device(oj->input_dev);
 	}
 
-	if (curcial_wq)
-		destroy_workqueue(curcial_wq);
+	if (crucialtec_wq)
+		destroy_workqueue(crucialtec_wq);
 
 	if (oj_proc_entry)
 		remove_proc_entry("oj", NULL);
@@ -776,9 +773,9 @@ fail:
 	return err;
 }
 
-static int __devexit curcial_oj_remove(struct platform_device *pdev)
+static int __devexit crucialtec_oj_remove(struct platform_device *pdev)
 {
-	struct curcial_oj_platform_data *oj = pdev->dev.platform_data;
+	struct crucialtec_oj_platform_data *oj = pdev->dev.platform_data;
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	if (oj->early_suspend.suspend && oj->early_suspend.resume)
@@ -794,12 +791,11 @@ static int __devexit curcial_oj_remove(struct platform_device *pdev)
 		input_free_device(oj->input_dev);
 	}
 
-	if (curcial_wq)
-		destroy_workqueue(curcial_wq);
+	if (crucialtec_wq)
+		destroy_workqueue(crucialtec_wq);
 
 	if (oj_proc_entry)
 		remove_proc_entry("oj", NULL);
-
 
 	device_remove_file(&(pdev->dev), &dev_attr_interval);
 	device_remove_file(&(pdev->dev), &dev_attr_fast_th);
@@ -818,20 +814,20 @@ static int __devexit curcial_oj_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static int __init curcial_oj_init(void)
+static int __init crucialtec_oj_init(void)
 {
-	return platform_driver_register(&curcial_oj_device_driver);
+	return platform_driver_register(&crucialtec_oj_device_driver);
 }
 
-static void __exit curcial_oj_exit(void)
+static void __exit crucialtec_oj_exit(void)
 {
-	platform_driver_unregister(&curcial_oj_device_driver);
+	platform_driver_unregister(&crucialtec_oj_device_driver);
 }
 
-module_init(curcial_oj_init);
-module_exit(curcial_oj_exit);
+module_init(crucialtec_oj_init);
+module_exit(crucialtec_oj_exit);
 
-void curcial_oj_send_key(unsigned int code, int value)
+void crucialtec_oj_send_key(unsigned int code, int value)
 {
 	if ((my_oj != NULL) && (my_oj->input_dev != NULL))
 		input_report_key(my_oj->input_dev, code, value);
@@ -840,5 +836,5 @@ void curcial_oj_send_key(unsigned int code, int value)
 	printk(KERN_INFO "action_key\n");
 }
 
-MODULE_DESCRIPTION("Crucial OpticalJoystick Driver");
+MODULE_DESCRIPTION("CrucialTec OpticalJoystick Driver");
 MODULE_LICENSE("GPL");

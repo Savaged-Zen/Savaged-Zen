@@ -1,4 +1,4 @@
-/* drivers/input/opticaljoystick/curcial.c
+/* drivers/input/misc/crucialtec_softclick.c
  *
  * Copyright (C) 2009 HTC Corporation.
  *
@@ -16,10 +16,7 @@
 #include <linux/kernel.h>
 #include <linux/jiffies.h>
 #include <asm/mach-types.h>
-#include "curcial.h"
-
-
-
+#include "crucialtec_oj.h"
 
 #define DELTA_MIN_IN          50
 #define DELTA_MIN_OUT         100
@@ -44,28 +41,19 @@
 #define OJ_TRUE               1
 #define OJ_FALSE              0
 
-
-//---------------------------------------------------------------------------
-
 typedef struct {
 	uint8_t squal;
 	uint16_t	shutter;
 }OJFPD_T;
-
-
 
 //extern unsigned int system_rev;
 OJTouchEvt_T      gTouchEvt = OJ_TOUCH_NONE_EVT;
 uint8_t    gPressBufCnt = 0;
 uint8_t  gSqRatio;
 
-
-
 /* SoftClick */
 static uint16_t    gPressSqAve;
 static OJFPD_T    gOJQueue[OJ_QUEUE_MAX];
-
-
 
 uint16_t      gPressShtAve;
 uint16_t          gPress_SecondSht;
@@ -75,7 +63,6 @@ uint16_t          gPreShutter;
 uint8_t        gDeltaSum;
 uint8_t        gNaviKeyChk;
 uint8_t        gShPressChk;
-
 
 /* ---------------------------------------------------------------------------
 Funtion Name: OJ_Queue_Add
@@ -148,6 +135,7 @@ uint16_t Shutter_Ratio(void)
 
    return ShtRatio;
 }
+
 /* ---------------------------------------------------------------------------
 Funtion Name: OJ_FPD_Event
 Description: return current status after calculating output data of OJ.

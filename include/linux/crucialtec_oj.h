@@ -1,10 +1,10 @@
-#ifndef _CURCIAL_OJ_H
-#define _CURCIAL_OJ_H
+#ifndef _CRUCIALTEC_OJ_H
+#define _CRUCIALTEC_OJ_H
 #include<linux/earlysuspend.h>
 
-#define CURCIAL_OJ_NAME "curcial_oj"
+#define CRUCIALTEC_OJ_NAME "crucialtec_oj"
 
-struct curcial_oj_platform_data {
+struct crucialtec_oj_platform_data {
 	struct input_dev *input_dev;
 	struct work_struct work;
 	bool click;
@@ -34,6 +34,6 @@ struct curcial_oj_platform_data {
 	struct early_suspend early_suspend;
 #endif
 };
-void curcial_oj_send_key(unsigned int code, int value);
+void crucialtec_oj_send_key(unsigned int code, int value);
 
 #endif
