@@ -740,15 +740,31 @@ static int __init ds2784_battery_init(void)
 	return w1_register_family(&w1_ds2784_family);
 }
 
-static void crucialtec_oj_shutdown (int enable)
+
+/* <3 HTC
+static void crucialtec_oj_shutdown(int enable)
 {
 	uint8_t cmd[3];
 	memset(cmd, 0x00, sizeof(uint8_t)*3);
-	/* microp firmware(v04) non-shutdown by default */
+	// microp firmware(v04) non-shutdown by default
 	cmd[2] = 0x20;
 	microp_i2c_write(0x90, cmd, 3);
-//	pr_err("%s", __func__);	
+	pr_err("%s", __func__);	
 	printk("%s\n", __func__);	
+}
+*/
+
+static void crucialtec_oj_shutdown(int enable)
+{
+	uint8_t cmd[3];
+	memset(cmd, 0, sizeof(uint8_t)*3);
+
+	cmd[2] = 0x20;
+	printk("%s: enable = %d\n", __func__, enable);
+	if (enable)
+		microp_i2c_write(0x91, cmd, 3);
+	else
+		microp_i2c_write(0x90, cmd, 3);
 }
 
 static int crucialtec_oj_poweron(int on)
