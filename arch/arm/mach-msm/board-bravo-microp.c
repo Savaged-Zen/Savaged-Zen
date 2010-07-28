@@ -1233,14 +1233,17 @@ struct miscdevice lightsensor_misc = {
 	.fops = &lightsensor_fops
 };
 
-static int microp_oj_intr_enable(struct i2c_client *client, uint8_t enable)
+static int microp_oj_interrupt(struct i2c_client *client, uint8_t enable)
 {
 	int ret;
 
-	if (enable)
+	if (enable) {
 		ret = microp_interrupt_enable(client, IRQ_OJ);
-	else
+		printk("%s: microp_interrupt_enable called\n", __func__ );
+	} else {
 		ret = microp_interrupt_disable(client, IRQ_OJ);
+		printk("%s: microp_interrupt_disable called\n", __func__ );
+	}
 
 	return ret;
 }
@@ -1276,7 +1279,7 @@ int microp_spi_vote_enable(int spi_device, uint8_t enable) {
 	}
 
 	if (spi_device == SPI_OJ)
-		microp_oj_intr_enable(client, enable);
+		microp_oj_interrupt(client, enable);
 	
 	mutex_lock(&cdata->microp_adc_mutex);
 	/* Add/remove it from the poll */
