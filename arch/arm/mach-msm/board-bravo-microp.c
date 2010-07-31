@@ -445,7 +445,6 @@ static int microp_interrupt_disable(struct i2c_client *client,
 	return ret;
 }
 
-
 /*
  * SD slot card-detect support
  */
@@ -1259,6 +1258,7 @@ static int microp_spi_enable(uint8_t on)
 		dev_err(&client->dev,"%s: i2c_write_block fail\n", __func__);
 		return ret;
 	}
+
 	msleep(10);
 	return ret;
 }
@@ -1310,6 +1310,7 @@ int microp_spi_vote_enable(int spi_device, uint8_t enable) {
 	ret = microp_spi_enable(enable);
 	return ret;
 }
+EXPORT_SYMBOL(microp_spi_vote_enable);
 
 /*
  * OJ callback
@@ -1782,17 +1783,17 @@ static int microp_function_initialize(struct i2c_client *client)
 	microp_read_gpi_status(client, &stat);
 	bravo_microp_sdslot_update_status(stat);
 
-	if (oj_callback && oj_callback->oj_init) {
-		oj_callback->oj_init();
-		dev_err(&client->dev, "%s: OJ CALLBACK INIT\n",__func__);
+	/* OJ interrupt */
+	ret = microp_interrupt_enable(client, IRQ_OJ);
+	if (ret < 0) {
+		dev_err(&client->dev, "%s: failed to enable OJ irq\n",
+			__func__);
+		goto err_irq_oj;
 	}
-	else {
-		dev_err(&client->dev, "%s: OJ CALLBACK NOT SET\n",__func__);
-	}
-
 
 	return 0;
 
+err_irq_oj:
 err_irq_en:
 err_gpio_ls:
 	gpio_free(BRAVO_GPIO_LS_EN_N);

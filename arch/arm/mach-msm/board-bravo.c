@@ -73,7 +73,8 @@ static int bravo_phy_init_seq[] = {
 	0x31, 0x32,
 	0x1D, 0x0D,
 	0x1D, 0x10,
-	-1 };
+	-1 
+};
 
 static void bravo_usb_phy_reset(void)
 {
@@ -772,26 +773,26 @@ static int crucialtec_oj_poweron(int on)
 	uint8_t data[2];
 	struct vreg *oj_power = vreg_get(0, "gp2");
 	if (IS_ERR(oj_power)) {
-//		pr_err("%s:Error power domain\n", __func__);
-		printk("%s:Error power domain\n", __func__);
+//		pr_err("%s: Error power domain\n", __func__);
+		printk("%s: Error power domain\n", __func__);
 		return 0;
 	}
 
 	if (on) {
 		vreg_set_level(oj_power, 2750);
 		vreg_enable(oj_power);
-//		pr_err("%s:OJ power enable(%d)\n", __func__, on);
-		printk("%s:OJ power enable(%d)\n", __func__, on);
+//		pr_err("%s: OJ power enable(%d)\n", __func__, on);
+		printk("%s: OJ power enable(%d)\n", __func__, on);
 	} else {
 	/* for microp firmware(v04) setting*/
 		microp_i2c_read(MICROP_I2C_RCMD_VERSION, data, 2);
 		if (data[0] < 4) {
-			printk("Microp firmware version:%d\n", data[0]);
+			printk("Microp firmware version: %d\n", data[0]);
 			return 1;
 		}
 		vreg_disable(oj_power);
-//		pr_err("%s:OJ power enable(%d)\n", __func__, on);
-		printk("%s:OJ power enable(%d)\n", __func__, on);
+//		pr_err("%s: OJ power enable(%d)\n", __func__, on);
+		printk("%s: OJ power enable(%d)\n", __func__, on);
 	}
 	return 1;
 }
