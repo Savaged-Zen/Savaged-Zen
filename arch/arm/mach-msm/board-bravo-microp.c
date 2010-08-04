@@ -1783,6 +1783,7 @@ static int microp_function_initialize(struct i2c_client *client)
 	microp_read_gpi_status(client, &stat);
 	bravo_microp_sdslot_update_status(stat);
 
+#ifdef CONFIG_INPUT_CRUCIALTEC_OJ
 	/* OJ interrupt */
 	ret = microp_interrupt_enable(client, IRQ_OJ);
 	if (ret < 0) {
@@ -1790,6 +1791,7 @@ static int microp_function_initialize(struct i2c_client *client)
 			__func__);
 		goto err_irq_oj;
 	}
+#endif
 
 	return 0;
 

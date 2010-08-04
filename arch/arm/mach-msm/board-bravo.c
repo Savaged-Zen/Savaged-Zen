@@ -26,7 +26,6 @@
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/usb/android_composite.h>
-#include <linux/crucialtec_oj.h>
 #include <linux/android_pmem.h>
 #include <linux/synaptics_i2c_rmi.h>
 #include <linux/capella_cm3602.h>
@@ -55,6 +54,10 @@
 #include "devices.h"
 #include "proc_comm.h"
 #include "board-bravo-flashlight.h"
+
+#ifdef CONFIG_INPUT_CRUCIALTEC_OJ
+#include <linux/crucialtec_oj.h>
+#endif
 
 static uint debug_uart;
 
@@ -741,7 +744,7 @@ static int __init ds2784_battery_init(void)
 	return w1_register_family(&w1_ds2784_family);
 }
 
-
+#ifdef CONFIG_INPUT_CRUCIALTEC_OJ
 /* <3 HTC
 static void crucialtec_oj_shutdown(int enable)
 {
@@ -750,7 +753,7 @@ static void crucialtec_oj_shutdown(int enable)
 	// microp firmware(v04) non-shutdown by default
 	cmd[2] = 0x20;
 	microp_i2c_write(0x90, cmd, 3);
-	pr_err("%s", __func__);	
+//	pr_err("%s\n", __func__);	
 	printk("%s\n", __func__);	
 }
 */
@@ -818,7 +821,6 @@ static void crucialtec_oj_adjust_xy(uint8_t *data, int16_t *mSumDeltaX, int16_t 
 }
 
 #define BRAVO_MICROP_VER	0x03
-
 static struct crucialtec_oj_platform_data bravo_oj_data = {
 	.oj_poweron = crucialtec_oj_poweron,
 	.oj_shutdown = crucialtec_oj_shutdown,
@@ -854,6 +856,7 @@ static struct platform_device bravo_oj = {
 		.platform_data = &bravo_oj_data,
 	}
 };
+#endif
 
 static struct platform_device *devices[] __initdata = {
 #if !defined(CONFIG_MSM_SERIAL_DEBUGGER)
@@ -878,7 +881,9 @@ static struct platform_device *devices[] __initdata = {
 	&msm_device_i2c,
 	&msm_camera_sensor_s5k3e2fx,
 	&bravo_flashlight_device,
+#ifdef CONFIG_INPUT_CRUCIALTEC_OJ
 	&bravo_oj,
+#endif
 	&capella_cm3602,
 };
 
