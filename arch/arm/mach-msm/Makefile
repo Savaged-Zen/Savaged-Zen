@@ -94,7 +94,6 @@ obj-$(CONFIG_MACH_BRAVO) += board-bravo-wifi.o board-bravo-audio.o
 obj-$(CONFIG_MACH_BRAVO) += msm_vibrator.o
 obj-$(CONFIG_MACH_BRAVO) += board-bravo-microp.o
 obj-$(CONFIG_MACH_BRAVO) += htc_acoustic_qsd.o
-obj-$(CONFIG_MACH_BRAVO) += board-bravo-flashlight.o
 
 obj-$(CONFIG_HTC_PWRSINK) += htc_pwrsink.o
 obj-$(CONFIG_HTC_PWRSPLY) += htc_power_supply.o
