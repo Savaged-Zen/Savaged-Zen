@@ -92,7 +92,7 @@
 /* Compass */
 #define BRAVO_GPIO_COMPASS_INT_N	153
 #define BRAVO_GPIO_COMPASS_RST_N	107
-#define BRAVO_PROJECT_NAME"bravo"
+#define BRAVO_PROJECT_NAME		"bravo"
 #define BRAVO_LAYOUTS { 			   \
 	{ {-1,  0, 0}, { 0, -1,  0}, {0, 0,  1} }, \
 	{ { 0, -1, 0}, { 1,  0,  0}, {0, 0, -1} }, \
@@ -126,7 +126,7 @@
 
 #define BRAVO_GPIO_LED_3V3_EN		85
 #define BRAVO_GPIO_LCD_RST_N		29
-#define MAHIMAHI_GPIO_LCD_ID0		147
+#define BRAVO_GPIO_LCD_ID0		147
 
 /* 3.5mm remote control key interrupt shutdown signal */
 #define BRAVO_GPIO_35MM_KEY_INT_SHUTDOWN	19
@@ -138,29 +138,29 @@
 #define BRAVO_GPIO_BATTERY_CHARGER_CURRENT	16
 
 /* display relative */
-#define MAHIMAHI_LCD_SPI_CLK            (17)
-#define MAHIMAHI_LCD_SPI_DO             (18)
-#define MAHIMAHI_LCD_SPI_CSz            (20)
-#define MAHIMAHI_LCD_RSTz               (29)
-#define MAHIMAHI_LCD_R1                 (114)
-#define MAHIMAHI_LCD_R2                 (115)
-#define MAHIMAHI_LCD_R3                 (116)
-#define MAHIMAHI_LCD_R4                 (117)
-#define MAHIMAHI_LCD_R5                 (118)
-#define MAHIMAHI_LCD_G0                 (121)
-#define MAHIMAHI_LCD_G1                 (122)
-#define MAHIMAHI_LCD_G2                 (123)
-#define MAHIMAHI_LCD_G3                 (124)
-#define MAHIMAHI_LCD_G4                 (125)
-#define MAHIMAHI_LCD_G5                 (126)
-#define MAHIMAHI_LCD_B1                 (130)
-#define MAHIMAHI_LCD_B2                 (131)
-#define MAHIMAHI_LCD_B3                 (132)
-#define MAHIMAHI_LCD_B4                 (133)
-#define MAHIMAHI_LCD_B5                 (134)
-#define MAHIMAHI_LCD_PCLK               (135)
-#define MAHIMAHI_LCD_VSYNC              (136)
-#define MAHIMAHI_LCD_HSYNC              (137)
-#define MAHIMAHI_LCD_DE                 (138)
+#define BRAVO_LCD_SPI_CLK            (17)
+#define BRAVO_LCD_SPI_DO             (18)
+#define BRAVO_LCD_SPI_CSz            (20)
+#define BRAVO_LCD_RSTz               (29)
+#define BRAVO_LCD_R1                 (114)
+#define BRAVO_LCD_R2                 (115)
+#define BRAVO_LCD_R3                 (116)
+#define BRAVO_LCD_R4                 (117)
+#define BRAVO_LCD_R5                 (118)
+#define BRAVO_LCD_G0                 (121)
+#define BRAVO_LCD_G1                 (122)
+#define BRAVO_LCD_G2                 (123)
+#define BRAVO_LCD_G3                 (124)
+#define BRAVO_LCD_G4                 (125)
+#define BRAVO_LCD_G5                 (126)
+#define BRAVO_LCD_B1                 (130)
+#define BRAVO_LCD_B2                 (131)
+#define BRAVO_LCD_B3                 (132)
+#define BRAVO_LCD_B4                 (133)
+#define BRAVO_LCD_B5                 (134)
+#define BRAVO_LCD_PCLK               (135)
+#define BRAVO_LCD_VSYNC              (136)
+#define BRAVO_LCD_HSYNC              (137)
+#define BRAVO_LCD_DE                 (138)
 
 #endif /* __ARCH_ARM_MACH_MSM_BOARD_BRAVO_H */
