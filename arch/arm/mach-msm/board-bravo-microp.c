@@ -220,6 +220,7 @@ struct microp_i2c_client_data {
 	uint32_t als_gadc;
 	uint8_t als_calibrating;
 	uint32_t spi_devices_vote;
+	uint32_t spi_devices;
 	struct mutex microp_i2c_rw_mutex;
 	struct mutex microp_adc_mutex;
 };
@@ -1296,12 +1297,12 @@ int microp_spi_vote_enable(int spi_device, uint8_t enable) {
 	}
 
 	if ((data[1] & 0x01) ==
-		(((SPI_OJ | SPI_GSENSOR) & cdata->spi_devices_vote) ? 1 : 0)) {
+		((cdata->spi_devices & cdata->spi_devices_vote) ? 1 : 0)) {
 			mutex_unlock(&cdata->microp_adc_mutex);
 			return ret;
 	}
 
-	if ((SPI_OJ | SPI_GSENSOR) & cdata->spi_devices_vote)
+	if (cdata->spi_devices & cdata->spi_devices_vote)
 		enable = 1;
 	else
 		enable = 0;
@@ -1943,6 +1944,7 @@ static int microp_i2c_probe(struct i2c_client *client,
 	cdata->auto_backlight_enabled = 0;
 	cdata->light_sensor_enabled = 0;
 	cdata->spi_devices_vote = 0;
+	cdata->spi_devices = SPI_OJ | SPI_GSENSOR;
 
 	wake_lock_init(&microp_i2c_wakelock, WAKE_LOCK_SUSPEND,
 			 "microp_i2c_present");
