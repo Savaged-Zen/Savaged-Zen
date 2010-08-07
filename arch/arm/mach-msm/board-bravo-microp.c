@@ -1298,6 +1298,7 @@ int microp_spi_vote_enable(int spi_device, uint8_t enable) {
 
 	if ((data[1] & 0x01) ==
 		((cdata->spi_devices & cdata->spi_devices_vote) ? 1 : 0)) {
+			printk(KERN_ERR "%s: already in voted state, [spi_device %d,enable %d], [spi_status %d, spi_devices_vote %d]", __func__, spi_device, enable, data[1]&0x01, cdata->spi_devices_vote);
 			mutex_unlock(&cdata->microp_adc_mutex);
 			return ret;
 	}
