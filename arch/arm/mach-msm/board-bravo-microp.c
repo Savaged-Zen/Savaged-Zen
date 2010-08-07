@@ -1279,8 +1279,10 @@ int microp_spi_vote_enable(int spi_device, uint8_t enable) {
 		return -EIO;
 	}
 
-	if (spi_device == SPI_OJ)
+	if (spi_device == SPI_OJ) {
 		microp_oj_interrupt_mode(client, enable);
+		printk(KERN_ERR "%s: Changing OJ interrupt mode [%d]", __func__, enable);
+	}
 	
 	mutex_lock(&cdata->microp_adc_mutex);
 	/* Add/remove it from the poll */
@@ -1307,6 +1309,8 @@ int microp_spi_vote_enable(int spi_device, uint8_t enable) {
 		enable = 1;
 	else
 		enable = 0;
+
+		printk(KERN_ERR "%s: Changing SPI [%d]", __func__, enable);
 
 	mutex_unlock(&cdata->microp_adc_mutex);
 	ret = microp_spi_enable(enable);
