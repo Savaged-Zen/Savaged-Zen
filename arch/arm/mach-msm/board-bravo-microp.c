@@ -1232,7 +1232,7 @@ struct miscdevice lightsensor_misc = {
 	.fops = &lightsensor_fops
 };
 
-static int microp_oj_interrupt(struct i2c_client *client, uint8_t enable)
+static int microp_oj_interrupt_mode(struct i2c_client *client, uint8_t enable)
 {
 	int ret;
 
@@ -1279,7 +1279,7 @@ int microp_spi_vote_enable(int spi_device, uint8_t enable) {
 	}
 
 	if (spi_device == SPI_OJ)
-		microp_oj_interrupt(client, enable);
+		microp_oj_interrupt_mode(client, enable);
 	
 	mutex_lock(&cdata->microp_adc_mutex);
 	/* Add/remove it from the poll */
