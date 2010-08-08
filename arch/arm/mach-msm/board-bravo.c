@@ -811,11 +811,11 @@ static int crucialtec_oj_poweron(int on)
 		printk("%s: OJ power enable(%d)\n", __func__, on);
 	} else {
 	/* for microp firmware(v04) setting*/
-		microp_i2c_read(MICROP_I2C_RCMD_VERSION, data, 2);
+/*		microp_i2c_read(MICROP_I2C_RCMD_VERSION, data, 2);
 		if (data[0] < 4) {
 			printk("Microp firmware version: %d\n", data[0]);
 			return 1;
-		}
+		}*/
 		vreg_disable(oj_power);
 //		pr_err("%s: OJ power enable(%d)\n", __func__, on);
 		printk("%s: OJ power enable(%d)\n", __func__, on);
