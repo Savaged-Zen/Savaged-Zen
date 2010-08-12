@@ -50,4 +50,8 @@
 
 #define MSM_uP_TO_INT(n) (FIRST_MICROP_IRQ + (n))
 
+#define MSM_INT_TO_GPIO(n) ((n) - NR_MSM_IRQS)
+
+#define MSM_uP_TO_INT(n) (FIRST_MICROP_IRQ + (n))
+
 #endif

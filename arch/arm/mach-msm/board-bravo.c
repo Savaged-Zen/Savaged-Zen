@@ -781,6 +781,7 @@ static void curcial_oj_shutdown(int enable)
 static int curcial_oj_poweron(int on)
 {
 	uint8_t data[2];
+	uint16_t a, b;
 	struct vreg *oj_power = vreg_get(0, "gp2");
 	if (IS_ERR(oj_power)) {
 //		pr_err("%s: Error power domain\n", __func__);
@@ -796,6 +797,9 @@ static int curcial_oj_poweron(int on)
 		microp_i2c_read(MICROP_I2C_RCMD_VERSION, data, 2);
 		if (data[0] < 4) {
 			printk("Microp firmware version: %d\n", data[0]);
+//			a = MSM_GPIO_TO_INT(12);
+//			b = MSM_uP_TO_INT(12);
+//			printk("MSM_GPIO_TO_INT(12) = %d MSM_uP_TO_INT(12) = %d\n", a, b);
 			return 1;
 		}
 		vreg_disable(oj_power);
