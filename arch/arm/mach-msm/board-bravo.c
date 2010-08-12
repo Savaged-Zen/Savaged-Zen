@@ -55,8 +55,8 @@
 #include "devices.h"
 #include "proc_comm.h"
 
-#ifdef CONFIG_INPUT_CRUCIALTEC_OJ
-#include <linux/crucialtec_oj.h>
+#ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
+#include <linux/curcial_oj.h>
 #endif
 
 static uint debug_uart;
@@ -751,8 +751,8 @@ static int __init ds2784_battery_init(void)
 	return w1_register_family(&w1_ds2784_family);
 }
 
-#ifdef CONFIG_INPUT_CRUCIALTEC_OJ
-static void crucialtec_oj_shutdown(int enable)
+#ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
+static void curcial_oj_shutdown(int enable)
 {
 	uint8_t cmd[3];
 	memset(cmd, 0x00, sizeof(uint8_t)*3);
@@ -764,7 +764,7 @@ static void crucialtec_oj_shutdown(int enable)
 }
 
 /* <3 HTC
-static void crucialtec_oj_shutdown(int enable)
+static void curcial_oj_shutdown(int enable)
 {
 	uint8_t cmd[3];
 	memset(cmd, 0, sizeof(uint8_t)*3);
@@ -778,9 +778,10 @@ static void crucialtec_oj_shutdown(int enable)
 }
 */
 
-static int crucialtec_oj_poweron(int on)
+static int curcial_oj_poweron(int on)
 {
 	uint8_t data[2];
+	uint16_t a, b;
 	struct vreg *oj_power = vreg_get(0, "gp2");
 	if (IS_ERR(oj_power)) {
 //		pr_err("%s: Error power domain\n", __func__);
@@ -796,6 +797,9 @@ static int crucialtec_oj_poweron(int on)
 		microp_i2c_read(MICROP_I2C_RCMD_VERSION, data, 2);
 		if (data[0] < 4) {
 			printk("Microp firmware version: %d\n", data[0]);
+//			a = MSM_GPIO_TO_INT(12);
+//			b = MSM_uP_TO_INT(12);
+//			printk("MSM_GPIO_TO_INT(12) = %d MSM_uP_TO_INT(12) = %d\n", a, b);
 			return 1;
 		}
 		vreg_disable(oj_power);
@@ -805,7 +809,7 @@ static int crucialtec_oj_poweron(int on)
 	return 1;
 }
 
-static void crucialtec_oj_adjust_xy(uint8_t *data, int16_t *mSumDeltaX, int16_t *mSumDeltaY)
+static void curcial_oj_adjust_xy(uint8_t *data, int16_t *mSumDeltaX, int16_t *mSumDeltaY)
 {
 	int8_t 	deltaX;
 	int8_t 	deltaY;
@@ -826,36 +830,35 @@ static void crucialtec_oj_adjust_xy(uint8_t *data, int16_t *mSumDeltaX, int16_t 
 }
 
 #define BRAVO_MICROP_VER	0x03
-static struct crucialtec_oj_platform_data bravo_oj_data = {
-	.oj_poweron = crucialtec_oj_poweron,
-	.oj_shutdown = crucialtec_oj_shutdown,
-	.oj_adjust_xy = crucialtec_oj_adjust_xy,
+static struct curcial_oj_platform_data bravo_oj_data = {
+	.oj_poweron = curcial_oj_poweron,
+	.oj_shutdown = curcial_oj_shutdown,
+	.oj_adjust_xy = curcial_oj_adjust_xy,
 	.microp_version = BRAVO_MICROP_VER,
-	.mdelay_time = 0,
-	.msleep_time = 1,
-	.x_send_count = 4,
-	.y_send_count = 2,
-	.fast_th = 1,
-	.normal_th = 8,
-	.continue_th = 3,
-	.continue_max = 0,
-	.xy_ratio = 15,
-	.interval = 200,
-	.softclick = 0,
-	.swap = 0,
-	.x = 1,
-	.y = -1,
-	.share_power = false,
+        .debugflag = 0,
+        .mdelay_time = 0,
+        .normal_th = 8,
+        .xy_ratio = 15,
+        .interval = 20,
+        .swap           = false,
+        .ap_code = false,
+        .x              = 1,
+        .y              = 1,
+        .share_power    = false,
 	.Xsteps = {2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
 		2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
 		2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
 	.Ysteps = {2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
 		2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
 		2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+	.sht_tbl = {0, 2000, 2250, 2500, 2750, 3000},
+	.pxsum_tbl = {0, 0, 40, 50, 60, 70},
+	.degree = 6,
+	.irq = MSM_uP_TO_INT(12),
 };
 
 static struct platform_device bravo_oj = {
-	.name = CRUCIALTEC_OJ_NAME,
+	.name = CURCIAL_OJ_NAME,
 	.id = -1,
 	.dev = {
 		.platform_data = &bravo_oj_data,
@@ -888,7 +891,7 @@ static struct platform_device *devices[] __initdata = {
 	&msm_device_i2c,
 	&msm_camera_sensor_s5k3e2fx,
 	&bravo_flashlight_device,
-#ifdef CONFIG_INPUT_CRUCIALTEC_OJ
+#ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
 	&bravo_oj,
 #endif
 	&capella_cm3602,

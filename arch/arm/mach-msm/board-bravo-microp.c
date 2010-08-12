@@ -170,7 +170,7 @@ static uint32_t als_kadc;
 static struct wake_lock microp_i2c_wakelock;
 
 static struct i2c_client *private_microp_client;
-static struct microp_oj_callback *oj_callback;
+//static struct microp_oj_callback *oj_callback;
 
 struct microp_int_pin {
 	uint16_t int_gsensor;
@@ -1310,7 +1310,7 @@ int microp_spi_vote_enable(int spi_device, uint8_t enable) {
 	else
 		enable = 0;
 
-		printk(KERN_ERR "%s: Changing SPI [%d]", __func__, enable);
+	printk(KERN_ERR "%s: Changing SPI [%d]\n", __func__, enable);
 
 	mutex_unlock(&cdata->microp_adc_mutex);
 	ret = microp_spi_enable(enable);
@@ -1321,6 +1321,7 @@ EXPORT_SYMBOL(microp_spi_vote_enable);
 /*
  * OJ callback
  */
+/*
 int microp_register_oj_callback(struct microp_oj_callback *oj)
 {
 	oj_callback = oj;
@@ -1332,6 +1333,7 @@ int microp_register_oj_callback(struct microp_oj_callback *oj)
 
 	return 1;
 }
+*/
 
 /*
  * G-sensor
@@ -1637,15 +1639,17 @@ static void microp_i2c_intr_work_func(struct work_struct *work)
 	}
 	pr_debug("intr_status=0x%02x\n", intr_status);
 
+/*
 	if (intr_status & IRQ_OJ) {
 		data[0] = 0x00;
 		if (i2c_write_block(client, MICROP_I2C_WCMD_OJ_INT_STATUS,
 				data, 1) < 0)
 			dev_err(&client->dev, "%s: clear OJ interrupt status fail\n",
 				__func__);
-		if (oj_callback && oj_callback->oj_intr)
-			oj_callback->oj_intr();
+//		if (oj_callback && oj_callback->oj_intr)
+//			oj_callback->oj_intr();
 	}
+*/
 
 	if ((intr_status & IRQ_LSENSOR) || cdata->force_light_sensor_read) {
 		ret = microp_lightsensor_read(&adc_value, &adc_level);
@@ -1789,7 +1793,7 @@ static int microp_function_initialize(struct i2c_client *client)
 	microp_read_gpi_status(client, &stat);
 	bravo_microp_sdslot_update_status(stat);
 
-#ifdef CONFIG_INPUT_CRUCIALTEC_OJ
+#ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
 	/* OJ interrupt */
 	ret = microp_interrupt_enable(client, IRQ_OJ);
 	if (ret < 0) {
