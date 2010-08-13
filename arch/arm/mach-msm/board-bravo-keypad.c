@@ -79,10 +79,14 @@ static struct gpio_event_direct_entry bravo_keypad_key_map[] = {
 		.gpio	= BRAVO_GPIO_POWER_KEY,
 		.code	= KEY_POWER,
 	},
+/*
+#ifdef OPTICALJOYSTICK_CRUCIAL
 	{
 		.gpio	= BRAVO_GPIO_OJ_ACTION_XB,
 		.code	= BTN_MOUSE
 	},
+#endif
+*/
 };
 
 static struct gpio_event_input_info bravo_keypad_key_info = {
