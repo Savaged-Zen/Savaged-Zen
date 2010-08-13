@@ -1281,7 +1281,7 @@ int microp_spi_vote_enable(int spi_device, uint8_t enable) {
 
 	if (spi_device == SPI_OJ) {
 		microp_oj_interrupt_mode(client, enable);
-		printk(KERN_ERR "%s: Changing OJ interrupt mode [%d]", __func__, enable);
+		printk(KERN_ERR "%s: Changing OJ interrupt mode [%d]\n", __func__, enable);
 	}
 	
 	mutex_lock(&cdata->microp_adc_mutex);
@@ -1300,7 +1300,7 @@ int microp_spi_vote_enable(int spi_device, uint8_t enable) {
 
 	if ((data[1] & 0x01) ==
 		((cdata->spi_devices & cdata->spi_devices_vote) ? 1 : 0)) {
-			printk(KERN_ERR "%s: already in voted state, [spi_device %d,enable %d], [spi_status %d, spi_devices_vote %d]", __func__, spi_device, enable, data[1]&0x01, cdata->spi_devices_vote);
+			printk(KERN_ERR "%s: already in voted state, [spi_device %d,enable %d], [spi_status %d, spi_devices_vote %d]\n", __func__, spi_device, enable, data[1]&0x01, cdata->spi_devices_vote);
 			mutex_unlock(&cdata->microp_adc_mutex);
 			return ret;
 	}

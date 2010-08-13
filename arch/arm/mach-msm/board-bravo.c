@@ -314,14 +314,6 @@ static struct android_pmem_platform_data android_pmem_adsp_pdata = {
 	.cached		= 1,
 };
 
-static struct android_pmem_platform_data android_pmem_camera_pdata = {
-	.name		= "pmem_camera",
-	.start		= MSM_PMEM_CAMERA_BASE,
-	.size		= MSM_PMEM_CAMERA_SIZE,
-	.no_allocator	= 1,
-	.cached		= 1,
-};
-
 static struct android_pmem_platform_data android_pmem_venc_pdata = {
         .name           = "pmem_venc",
         .start          = MSM_PMEM_VENC_BASE,
@@ -343,14 +335,6 @@ static struct platform_device android_pmem_adsp_device = {
 	.id		= 1,
 	.dev		= {
 		.platform_data = &android_pmem_adsp_pdata,
-	},
-};
-
-static struct platform_device android_pmem_camera_device = {
-	.name		= "android_pmem",
-	.id		= 2,
-	.dev		= {
-		.platform_data = &android_pmem_camera_pdata,
 	},
 };
 
@@ -768,7 +752,6 @@ static int __init ds2784_battery_init(void)
 }
 
 #ifdef CONFIG_INPUT_CRUCIALTEC_OJ
-/* <3 HTC
 static void crucialtec_oj_shutdown(int enable)
 {
 	uint8_t cmd[3];
@@ -779,8 +762,8 @@ static void crucialtec_oj_shutdown(int enable)
 //	pr_err("%s\n", __func__);	
 	printk("%s\n", __func__);	
 }
-*/
 
+/* <3 HTC
 static void crucialtec_oj_shutdown(int enable)
 {
 	uint8_t cmd[3];
@@ -793,6 +776,7 @@ static void crucialtec_oj_shutdown(int enable)
 	else
 		microp_i2c_write(0x90, cmd, 3);
 }
+*/
 
 static int crucialtec_oj_poweron(int on)
 {
@@ -807,19 +791,17 @@ static int crucialtec_oj_poweron(int on)
 	if (on) {
 		vreg_set_level(oj_power, 2750);
 		vreg_enable(oj_power);
-//		pr_err("%s: OJ power enable(%d)\n", __func__, on);
-		printk("%s: OJ power enable(%d)\n", __func__, on);
 	} else {
-	/* for microp firmware(v04) setting*/
-/*		microp_i2c_read(MICROP_I2C_RCMD_VERSION, data, 2);
+		/* for microp firmware(v04) setting*/
+		microp_i2c_read(MICROP_I2C_RCMD_VERSION, data, 2);
 		if (data[0] < 4) {
 			printk("Microp firmware version: %d\n", data[0]);
 			return 1;
-		}*/
+		}
 		vreg_disable(oj_power);
-//		pr_err("%s: OJ power enable(%d)\n", __func__, on);
-		printk("%s: OJ power enable(%d)\n", __func__, on);
 	}
+//	pr_err("%s: OJ power enable(%d)\n", __func__, on);
+	printk("%s: OJ power enable(%d)\n", __func__, on);
 	return 1;
 }
 
@@ -899,7 +881,6 @@ static struct platform_device *devices[] __initdata = {
 	&android_usb_device,
 	&android_pmem_mdp_device,
 	&android_pmem_adsp_device,
-	&android_pmem_camera_device,
 #ifdef CONFIG_720P_CAMERA
         &android_pmem_venc_device,
 #endif
@@ -1030,11 +1011,6 @@ static void __init bravo_init(void)
 
 	printk("bravo_init() revision=%d\n", system_rev);
 
-	if (system_rev >= 2) {
-		mdp_pmem_pdata.start = MSM_PMEM_MDP_BASE + MSM_MEM_128MB_OFFSET;
-		android_pmem_adsp_pdata.start = MSM_PMEM_ADSP_BASE + MSM_MEM_128MB_OFFSET;
-	}
-
 	msm_hw_reset_hook = bravo_reset;
 
 	msm_acpu_clock_init(&bravo_clock_data);
@@ -1087,28 +1063,13 @@ static void __init bravo_init(void)
 static void __init bravo_fixup(struct machine_desc *desc, struct tag *tags,
 				 char **cmdline, struct meminfo *mi)
 {
-	int bravo_system_rev = 0, find = 0;
-	struct tag *t = (struct tag *)tags;
-
-	for (; t->hdr.size; t = tag_next(t)) {
-		if (t->hdr.tag == ATAG_REVISION) {
-			find = 1;
-			break;
-		}
-	}
-	if (find)
-		bravo_system_rev = t->u.revision.rev;
-
 	mi->nr_banks = 2;
-	mi->bank[0].start = MSM_EBI1_BANK0_BASE;
-	mi->bank[0].node = PHYS_TO_NID(MSM_EBI1_BANK0_BASE);
-	mi->bank[0].size = MSM_EBI1_BANK0_SIZE;
-	mi->bank[1].start = MSM_EBI1_BANK1_BASE;
-	mi->bank[1].node = PHYS_TO_NID(MSM_EBI1_BANK1_BASE);
-	mi->bank[1].size = MSM_EBI1_BANK1_SIZE;
-	if (bravo_system_rev >= 2) {
-		mi->bank[1].size = MSM_EBI1_BANK1_SIZE + MSM_MEM_128MB_OFFSET;
-	}
+        mi->bank[0].start = PHYS_OFFSET;
+        mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
+        mi->bank[0].size = MSM_EBI1_BANK0_SIZE;
+        mi->bank[1].start = MSM_EBI1_BANK1_BASE;
+        mi->bank[1].node = PHYS_TO_NID(MSM_EBI1_BANK1_BASE);
+        mi->bank[1].size = MSM_EBI1_BANK1_SIZE;
 }
 
 static void __init bravo_map_io(void)
