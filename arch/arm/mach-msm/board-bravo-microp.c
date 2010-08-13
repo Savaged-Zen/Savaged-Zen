@@ -47,6 +47,7 @@
 #include <linux/mutex.h>
 #include <linux/jiffies.h>
 #include <linux/slab.h>
+#include <linux/irq.h>
 
 #include <mach/board-bravo-microp-common.h>
 #include "board-bravo.h"
@@ -2190,8 +2191,38 @@ static struct i2c_driver microp_i2c_driver = {
 	.remove = __devexit_p(microp_i2c_remove),
 };
 
+static void microp_irq_ack(unsigned int irq)
+{
+	;
+}
+
+static void microp_irq_mask(unsigned int irq)
+{
+	;
+}
+
+static void microp_irq_unmask(unsigned int irq)
+{
+	;
+}
+
+static struct irq_chip microp_irq_chip = {
+	.name = "microp",
+	.disable = microp_irq_mask,
+	.ack = microp_irq_ack,
+	.mask = microp_irq_mask,
+	.unmask = microp_irq_unmask,
+};
+
 static int __init microp_i2c_init(void)
 {
+	int n, MICROP_IRQ_END = FIRST_MICROP_IRQ + NR_MICROP_IRQS;
+	for (n = FIRST_MICROP_IRQ; n < MICROP_IRQ_END; n++) {
+		set_irq_chip(n, &microp_irq_chip);
+		set_irq_handler(n, handle_level_irq);
+		set_irq_flags(n, IRQF_VALID);
+	}
+
 	return i2c_add_driver(&microp_i2c_driver);
 }
 
