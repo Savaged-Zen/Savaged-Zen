@@ -224,6 +224,8 @@ struct microp_i2c_client_data {
 	uint32_t spi_devices;
 	struct mutex microp_i2c_rw_mutex;
 	struct mutex microp_adc_mutex;
+	struct hrtimer gen_irq_timer;
+	uint16_t intr_status;
 };
 
 static char *hex2string(uint8_t *data, int len)
@@ -1612,6 +1614,30 @@ static irqreturn_t microp_i2c_intr_irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static void microp_int_dispatch(u32 status)
+{
+	unsigned int mask;
+	int irq;
+
+	while (status) {
+		mask = status & -status;
+		irq = fls(mask) - 1;
+		status &= ~mask;
+		generic_handle_irq(FIRST_MICROP_IRQ + irq);
+	}
+}
+
+static enum hrtimer_restart hr_dispath_irq_func(struct hrtimer *data)
+{
+	struct i2c_client *client = private_microp_client;
+	struct microp_i2c_client_data *cdata;
+
+	cdata = i2c_get_clientdata(client);
+	microp_int_dispatch(cdata->intr_status);
+	cdata->intr_status = 0;
+	return HRTIMER_NORESTART;
+}
+
 static void microp_i2c_intr_work_func(struct work_struct *work)
 {
 	struct microp_i2c_work *up_work;
@@ -1620,6 +1646,7 @@ static void microp_i2c_intr_work_func(struct work_struct *work)
 	uint8_t data[3], adc_level;
 	uint16_t intr_status = 0, adc_value, gpi_status = 0;
 	int keycode = 0, ret = 0;
+	ktime_t zero_debounce;
 
 	up_work = container_of(work, struct microp_i2c_work, work);
 	client = up_work->client;
@@ -1688,6 +1715,10 @@ static void microp_i2c_intr_work_func(struct work_struct *work)
 			htc_35mm_key_event(keycode, &cdata->is_hpin_pin_stable);
 		}
 	}
+
+	cdata->intr_status = intr_status;
+	zero_debounce = ktime_set(0, 0);  /* No debounce time */
+	hrtimer_start(&cdata->gen_irq_timer, zero_debounce, HRTIMER_MODE_REL);
 
 	enable_irq(client->irq);
 }
@@ -1955,6 +1986,10 @@ static int microp_i2c_probe(struct i2c_client *client,
 	cdata->light_sensor_enabled = 0;
 	cdata->spi_devices_vote = 0;
 	cdata->spi_devices = SPI_OJ | SPI_GSENSOR;
+
+	cdata->intr_status = 0;
+	hrtimer_init(&cdata->gen_irq_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	cdata->gen_irq_timer.function = hr_dispath_irq_func;
 
 	wake_lock_init(&microp_i2c_wakelock, WAKE_LOCK_SUSPEND,
 			 "microp_i2c_present");

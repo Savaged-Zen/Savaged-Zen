@@ -78,7 +78,7 @@
 
 /* Desire - verified in 2.6.29 */
 #define IRQ_OJ						(1<<12)
-#define IRQ_GSENSORi					(1<<10)
+#define IRQ_GSENSOR					(1<<10)
 #define IRQ_LSENSOR					(1<<9)
 #define IRQ_REMOTEKEY					(1<<7)
 #define IRQ_HEADSETIN					(1<<2)
