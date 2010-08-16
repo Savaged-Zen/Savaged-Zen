@@ -1814,6 +1814,11 @@ static int microp_function_initialize(struct i2c_client *client)
 		microp_i2c_write_led_mode(client, led_cdev, 0, 0xffff);
 	}
 
+#ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
+	/* OJ interrupt */
+	interrupts |= IRQ_OJ;
+#endif
+
 	/* enable the interrupts */
 	ret = microp_interrupt_enable(client, interrupts);
 	if (ret < 0) {
@@ -1825,19 +1830,8 @@ static int microp_function_initialize(struct i2c_client *client)
 	microp_read_gpi_status(client, &stat);
 	bravo_microp_sdslot_update_status(stat);
 
-#ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
-	/* OJ interrupt */
-	ret = microp_interrupt_enable(client, IRQ_OJ);
-	if (ret < 0) {
-		dev_err(&client->dev, "%s: failed to enable OJ irq\n",
-			__func__);
-		goto err_irq_oj;
-	}
-#endif
-
 	return 0;
 
-err_irq_oj:
 err_irq_en:
 err_gpio_ls:
 	gpio_free(BRAVO_GPIO_LS_EN_N);
