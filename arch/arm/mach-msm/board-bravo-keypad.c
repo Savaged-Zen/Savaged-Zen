@@ -68,7 +68,7 @@ static struct gpio_event_matrix_info bravo_keypad_matrix_info = {
 	.flags = (GPIOKPF_LEVEL_TRIGGERED_IRQ |
 		  GPIOKPF_REMOVE_PHANTOM_KEYS |
 		  GPIOKPF_PRINT_UNMAPPED_KEYS),
-#ifdef OPTICALJOYSTICK_CRUCIAL
+#ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
 	.info.oj_btn = true,
 #endif
 
