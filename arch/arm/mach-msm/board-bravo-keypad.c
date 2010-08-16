@@ -68,6 +68,10 @@ static struct gpio_event_matrix_info bravo_keypad_matrix_info = {
 	.flags = (GPIOKPF_LEVEL_TRIGGERED_IRQ |
 		  GPIOKPF_REMOVE_PHANTOM_KEYS |
 		  GPIOKPF_PRINT_UNMAPPED_KEYS),
+#ifdef OPTICALJOYSTICK_CRUCIAL
+	.info.oj_btn = true,
+#endif
+
 };
 
 static struct gpio_event_direct_entry bravo_keypad_key_map[] = {
@@ -88,9 +92,6 @@ static struct gpio_event_direct_entry bravo_keypad_key_map[] = {
 static struct gpio_event_input_info bravo_keypad_key_info = {
 	.info.func = gpio_event_input_func,
 	.info.no_suspend = true,
-#ifdef OPTICALJOYSTICK_CRUCIAL
-	.info.oj_btn = true,
-#endif
 	.flags = GPIOEDF_PRINT_KEYS,
 	.type = EV_KEY,
 	.debounce_time.tv.nsec = 5 * NSEC_PER_MSEC,
