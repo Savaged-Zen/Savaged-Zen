@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2008 Google, Inc.
  * Author: Mike Lockwood <lockwood@android.com>
- *         Brian Swetland <swetland@google.com>
+ *	 Brian Swetland <swetland@google.com>
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -50,7 +50,7 @@ static const char driver_name[] = "msm72k_udc";
 
 #define	DRIVER_DESC		"MSM 72K USB Peripheral Controller"
 
-#define EPT_FLAG_IN        0x0001
+#define EPT_FLAG_IN	0x0001
 
 #define SETUP_BUF_SIZE      4096
 
@@ -119,10 +119,10 @@ static void usb_do_work(struct work_struct *w);
 #define USB_STATE_ONLINE  1
 #define USB_STATE_OFFLINE 2
 
-#define USB_FLAG_START          0x0001
+#define USB_FLAG_START	  0x0001
 #define USB_FLAG_VBUS_ONLINE    0x0002
 #define USB_FLAG_VBUS_OFFLINE   0x0004
-#define USB_FLAG_RESET          0x0008
+#define USB_FLAG_RESET	  0x0008
 
 struct usb_info {
 	/* lock for register/queue/device state changes */
@@ -185,6 +185,9 @@ struct usb_info {
 	u16 test_mode;
 
 	u8 remote_wakeup;
+#ifdef CONFIG_USB_ACCESSORY_DETECT
+	u8 mfg_usb_carkit_enable;
+#endif
 };
 
 static const struct usb_ep_ops msm72k_ep_ops;
@@ -982,6 +985,16 @@ static void usb_prepare(struct usb_info *ui)
 		usb_ept_alloc_req(&ui->ep0in, SETUP_BUF_SIZE, GFP_KERNEL);
 
 	INIT_WORK(&ui->work, usb_do_work);
+#ifdef CONFIG_USB_ACCESSORY_DETECT
+	INIT_WORK(&ui->detect_work, accessory_detect_work);
+#endif
+
+#ifdef CONFIG_USB_ACCESSORY_DETECT
+	ret = device_create_file(&ui->pdev->dev,
+		&dev_attr_usb_mfg_carkit_enable);
+	if (ret != 0)
+		printk(KERN_WARNING "dev_attr_usb_mfg_carkit_enable failed\n");
+#endif
 }
 
 static void usb_suspend_phy(struct usb_info *ui)
@@ -1226,6 +1239,10 @@ static void usb_do_work(struct work_struct *w)
 				usb_reset(ui);
 
 				ui->state = USB_STATE_ONLINE;
+#ifdef CONFIG_USB_ACCESSORY_DETECT
+				if (ui->accessory_detect)
+					accessory_detect_init(ui);
+#endif
 				usb_do_work_check_vbus(ui);
 			}
 			break;
@@ -1308,6 +1325,164 @@ static void usb_do_work(struct work_struct *w)
 		}
 	}
 }
+
+#ifdef CONFIG_USB_ACCESSORY_DETECT
+static ssize_t show_mfg_carkit_enable(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	unsigned length;
+	struct usb_info *ui = the_usb_info;
+
+	length = sprintf(buf, "%d", ui->mfg_usb_carkit_enable);
+	printk(KERN_INFO "%s: %d\n", __func__,
+		ui->mfg_usb_carkit_enable);
+	return length;
+
+}
+
+static ssize_t store_mfg_carkit_enable(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct usb_info *ui = the_usb_info;
+	unsigned char uc;
+
+	if (buf[0] != '0' && buf[0] != '1') {
+		printk(KERN_ERR "Can't enable/disable carkit\n");
+		return -EINVAL;
+	}
+	uc = buf[0] - '0';
+	printk(KERN_INFO "%s: %d\n", __func__, uc);
+	ui->mfg_usb_carkit_enable = uc;
+	if (uc == 1 && ui->accessory_type == 1 &&
+		board_mfg_mode() == 1) {
+		switch_set_state(&dock_switch, DOCK_STATE_CAR);
+		printk(KERN_INFO "carkit: set state %d\n", DOCK_STATE_CAR);
+	}
+	return count;
+}
+
+static DEVICE_ATTR(usb_mfg_carkit_enable, 0644,
+	show_mfg_carkit_enable, store_mfg_carkit_enable);
+
+static ssize_t dock_status_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct usb_info *ui = the_usb_info;
+	if (ui->accessory_type == 1)
+		return sprintf(buf, "online\n");
+	else
+		return sprintf(buf, "offline\n");
+}
+static DEVICE_ATTR(status, S_IRUGO | S_IWUSR, dock_status_show, NULL);
+
+static void carkit_detect(struct usb_info *ui)
+{
+        unsigned n;
+        int value;
+        unsigned in_lpm;
+
+        msleep(100);
+        value = gpio_get_value(ui->usb_id_pin_gpio);
+        printk(KERN_INFO "usb: usb ID pin = %d\n", value);
+        in_lpm = ui->in_lpm;
+        if (value == 0) {
+                if (in_lpm)
+                        usb_lpm_exit(ui);
+
+                n = readl(USB_OTGSC);
+                /* ID pull-up register */
+                writel(n | OTGSC_IDPU, USB_OTGSC);
+
+                msleep(100);
+                n =  readl(USB_OTGSC);
+
+                if (n & OTGSC_ID) {
+                        printk(KERN_INFO "usb: carkit inserted\n");
+                        if ((board_mfg_mode() == 0) || (board_mfg_mode() == 1 &&
+                                ui->mfg_usb_carkit_enable == 1)) {
+                                switch_set_state(&dock_switch, DOCK_STATE_CAR);
+                                printk(KERN_INFO "carkit: set state %d\n", DOCK_STATE_CAR);
+                        }
+                        ui->accessory_type = 1;
+                } else
+                        ui->accessory_type = 0;
+                if (in_lpm)
+                        usb_lpm_enter(ui);
+        } else {
+                if (ui->accessory_type == 1)
+                        printk(KERN_INFO "usb: carkit removed\n");
+                switch_set_state(&dock_switch, DOCK_STATE_UNDOCKED);
+                printk(KERN_INFO "carkit: set state %d\n", DOCK_STATE_UNDOCKED);
+		ui->accessory_type = 0;
+        }
+}
+
+static void accessory_detect_work(struct work_struct *w)
+{
+        struct usb_info *ui = container_of(w, struct usb_info, detect_work);
+        int value;
+
+        if (!ui->accessory_detect)
+                return;
+
+        if (ui->accessory_detect == 1)
+                carkit_detect(ui);
+
+        value = gpio_get_value(ui->usb_id_pin_gpio);
+        if (value == 0)
+                set_irq_type(ui->idpin_irq, IRQF_TRIGGER_HIGH);
+        else
+                set_irq_type(ui->idpin_irq, IRQF_TRIGGER_LOW);
+        enable_irq(ui->idpin_irq);
+}
+
+static irqreturn_t usbid_interrupt(int irq, void *data)
+{
+        struct usb_info *ui = data;
+
+        disable_irq_nosync(ui->idpin_irq);
+        printk(KERN_INFO "usb: id interrupt\n");
+        queue_work(ui->usb_wq, &ui->detect_work);
+        return IRQ_HANDLED;
+}
+
+static void accessory_detect_init(struct usb_info *ui)
+{
+        int ret;
+        printk(KERN_INFO "%s: id pin %d\n", __func__,
+                ui->usb_id_pin_gpio);
+
+        if (ui->usb_id_pin_gpio == 0)
+                return;
+        ui->idpin_irq = gpio_to_irq(ui->usb_id_pin_gpio);
+
+        ret = request_irq(ui->idpin_irq, usbid_interrupt,
+                                IRQF_TRIGGER_LOW,
+                                "car_kit_irq", ui);
+        if (ret < 0) {
+                printk(KERN_ERR "%s: request_irq failed\n", __func__);
+                return;
+        }
+
+        ret = set_irq_wake(ui->idpin_irq, 1);
+        if (ret < 0) {
+                printk(KERN_ERR "%s: set_irq_wake failed\n", __func__);
+                goto err;
+        }
+
+        if (switch_dev_register(&dock_switch) < 0) {
+                printk(KERN_ERR "usb: fail to register dock switch!\n");
+                goto err;
+        }
+        ret = device_create_file(dock_switch.dev, &dev_attr_status);
+        if (ret != 0)
+                printk(KERN_WARNING "dev_attr_status failed\n");
+        return;
+err:
+        free_irq(ui->idpin_irq, 0);
+}
+
+#endif
 
 /* FIXME - the callers of this function should use a gadget API instead.
  * This is called from htc_battery.c and board-halibut.c
