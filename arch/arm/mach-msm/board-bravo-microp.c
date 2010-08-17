@@ -129,6 +129,9 @@ static struct file_operations gsensor_log_fops = {
 };
 #endif /* def DEBUG_BMA150 */
 
+static struct mutex gsensor_RW_mutex;
+static struct mutex gsensor_set_mode_mutex;
+
 static int microp_headset_has_mic(void);
 static int microp_enable_headset_plug_event(void);
 static int microp_enable_key_event(void);
@@ -158,7 +161,7 @@ enum led_type {
 };
 
 static uint16_t lsensor_adc_table[10] = {
-	0x000, 0x001, 0x00F, 0x01E, 0x03C, 0x121, 0x190, 0x2BA, 0x35C, 0x3FF
+	0x000, 0x001, 0x00F, 0x01E, 0x03C, 0x121, 0x190, 0x2BA, 0x26E, 0x3FF
 };
 
 static uint16_t remote_key_adc_table[6] = {
@@ -1343,15 +1346,17 @@ int microp_register_oj_callback(struct microp_oj_callback *oj)
  */
 static int gsensor_read_reg(uint8_t reg, uint8_t *data)
 {
-	struct i2c_client *client;
+	struct i2c_client *client = private_microp_client;
 	int ret;
 	uint8_t tmp[2];
 
-	client = private_microp_client;
+	mutex_lock(&gsensor_RW_mutex);
+
 	ret = i2c_write_block(client, MICROP_I2C_WCMD_GSENSOR_REG_DATA_REQ,
 			      &reg, 1);
 	if (ret < 0) {
 		dev_err(&client->dev,"%s: i2c_write_block fail\n", __func__);
+		mutex_unlock(&gsensor_RW_mutex);
 		return ret;
 	}
 	msleep(10);
@@ -1359,39 +1364,46 @@ static int gsensor_read_reg(uint8_t reg, uint8_t *data)
 	ret = i2c_read_block(client, MICROP_I2C_RCMD_GSENSOR_REG_DATA, tmp, 2);
 	if (ret < 0) {
 		dev_err(&client->dev,"%s: i2c_read_block fail\n", __func__);
+		mutex_unlock(&gsensor_RW_mutex);
 		return ret;
 	}
 	*data = tmp[1];
+	
+	mutex_unlock(&gsensor_RW_mutex);
+
 	return ret;
 }
 
 static int gsensor_write_reg(uint8_t reg, uint8_t data)
 {
-	struct i2c_client *client;
+	struct i2c_client *client = private_microp_client;
 	int ret;
 	uint8_t tmp[2];
 
-	client = private_microp_client;
+	mutex_lock(&gsensor_RW_mutex);
 
 	tmp[0] = reg;
 	tmp[1] = data;
 	ret = i2c_write_block(client, MICROP_I2C_WCMD_GSENSOR_REG, tmp, 2);
 	if (ret < 0) {
 		dev_err(&client->dev,"%s: i2c_write_block fail\n", __func__);
+		mutex_unlock(&gsensor_RW_mutex);
 		return ret;
 	}
+
+	mutex_unlock(&gsensor_RW_mutex);
 
 	return ret;
 }
 
 static int gsensor_read_acceleration(short *buf)
 {
-	struct i2c_client *client;
+	struct i2c_client *client = private_microp_client;
 	int ret;
 	uint8_t tmp[6];
 	struct microp_i2c_client_data *cdata;
 
-	client = private_microp_client;
+	mutex_lock(&gsensor_RW_mutex);
 
 	cdata = i2c_get_clientdata(client);
 
@@ -1400,6 +1412,7 @@ static int gsensor_read_acceleration(short *buf)
 			      tmp, 1);
 	if (ret < 0) {
 		dev_err(&client->dev,"%s: i2c_write_block fail\n", __func__);
+		mutex_unlock(&gsensor_RW_mutex);
 		return ret;
 	}
 
@@ -1410,6 +1423,7 @@ static int gsensor_read_acceleration(short *buf)
 	if (ret < 0) {
 		dev_err(&client->dev, "%s: i2c_read_block fail\n",
 			__func__);
+		mutex_unlock(&gsensor_RW_mutex);
 		return ret;
 	}
 	buf[0] = (short)(tmp[0] << 8 | tmp[1]);
@@ -1423,6 +1437,9 @@ static int gsensor_read_acceleration(short *buf)
 	/* Log this to debugfs */
 	gsensor_log_status(ktime_get(), buf[0], buf[1], buf[2]);
 #endif
+
+	mutex_unlock(&gsensor_RW_mutex);
+
 	return 1;
 }
 
@@ -1457,22 +1474,28 @@ static int bma150_set_mode(char mode)
 	uint8_t reg;
 	int ret;
 
+	mutex_lock(&gsensor_set_mode_mutex);
+
 	pr_debug("%s mode = %d\n", __func__, mode);
 	if (mode == BMA_MODE_NORMAL)
 		microp_spi_vote_enable(SPI_GSENSOR, 1);
 
-
 	ret = gsensor_read_reg(SMB150_CTRL_REG, &reg);
-	if (ret < 0 )
+	if (ret < 0 ) {
+		mutex_unlock(&gsensor_set_mode_mutex);
 		return -EIO;
+	}
 	reg = (reg & 0xfe) | mode;
 	ret = gsensor_write_reg(SMB150_CTRL_REG, reg);
 
 	if (mode == BMA_MODE_SLEEP)
 		microp_spi_vote_enable(SPI_GSENSOR, 0);
 
+	mutex_unlock(&gsensor_set_mode_mutex);
+
 	return ret;
 }
+
 static int gsensor_read(uint8_t *data)
 {
 	int ret;
@@ -2055,6 +2078,10 @@ static int microp_i2c_probe(struct i2c_client *client,
 				__func__);
 		goto err_register_bma150;
 	}
+	
+	mutex_init(&gsensor_RW_mutex);
+	mutex_init(&gsensor_set_mode_mutex);
+
 #ifdef DEBUG_BMA150
 	debugfs_create_file("gsensor_log", 0444, NULL, NULL, &gsensor_log_fops);
 #endif
