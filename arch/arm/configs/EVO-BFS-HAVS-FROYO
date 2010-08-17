@@ -1159,7 +1159,12 @@ CONFIG_TOUCHSCREEN_COMPATIBLE_REPORT=y
 # CONFIG_TOUCHSCREEN_PENMOUNT is not set
 # CONFIG_TOUCHSCREEN_QT602240 is not set
 # CONFIG_TOUCHSCREEN_MSM is not set
+<<<<<<< HEAD:arch/arm/configs/EVO-BFS-HAVS-FROYO
 # CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI is not set
+=======
+CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI=y
+CONFIG_TOUCHSCREEN_DUPLICATED_FILTER=y
+>>>>>>> d9a2b38... input: synaptics_i2c_rmi: duplicated_filter to throttle touch events:arch/arm/configs/cyanogen_msm_defconfig
 # CONFIG_TOUCHSCREEN_TOUCHRIGHT is not set
 # CONFIG_TOUCHSCREEN_TOUCHWIN is not set
 # CONFIG_TOUCHSCREEN_USB_COMPOSITE is not set
