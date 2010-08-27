@@ -416,12 +416,12 @@ static int microp_read_gpi_status(struct i2c_client *client, uint16_t *status)
 	uint8_t data[3];
 	int ret;
 
-	ret = i2c_read_block(client, MICROP_I2C_RCMD_GPI_STATUS, data, 2);
+	ret = i2c_read_block(client, MICROP_I2C_RCMD_GPI_STATUS, data, 3);
 	if (ret < 0) {
 		dev_err(&client->dev, "%s: read failed\n", __func__);
 		return -EIO;
 	}
-	*status = data[0] << 16 | data[1] << 8;
+	*status = (data[0] << 16 | data[1] << 8 | data[2]);
 	return 0;
 }
 
