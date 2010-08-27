@@ -402,7 +402,7 @@ static int microp_read_adc(uint8_t channel, uint16_t *value)
 
 static int microp_read_gpi_status(struct i2c_client *client, uint16_t *status)
 {
-	uint8_t data[2];
+	uint8_t data[3];
 	int ret;
 
 	ret = i2c_read_block(client, MICROP_I2C_RCMD_GPI_STATUS, data, 3);
