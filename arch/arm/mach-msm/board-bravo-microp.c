@@ -333,6 +333,11 @@ static int i2c_write_block(struct i2c_client *client, uint8_t addr,
 		mutex_unlock(&cdata->microp_i2c_rw_mutex);
 		return -EIO;
 	}
+	if (addr == MICROP_I2C_WCMD_LCM_BURST_EN) {
+		udelay(500);/*1.5ms for microp SPI write */
+		printk(KERN_ERR "%s: 1.5ms for microp SPI write\n", __func__);
+	}
+
 	mutex_unlock(&cdata->microp_i2c_rw_mutex);
 
 	return 0;
