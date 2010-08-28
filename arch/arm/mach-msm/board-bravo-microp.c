@@ -7,9 +7,9 @@
  *
  * The Microp on bravo is an i2c device that supports
  * the following functions
- *   - LEDs (Green, Amber, Jogball backlight)
+ *   - LEDs (Green, Amber, Blue, Button-backlight)
  *   - Lightsensor
- *   - Headset remotekeys
+ *   - Headset & Remotekeys
  *   - G-sensor
  *   - Interrupts
  *
