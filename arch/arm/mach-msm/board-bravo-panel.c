@@ -419,6 +419,56 @@ static struct lcm_tbl samsung_oled_gamma_table[][OLED_GAMMA_TABLE_SIZE] = {
 					  SAMSUNG_OLED_MIN_VAL) /	\
 					 (SAMSUNG_OLED_NUM_LEVELS - 1))
 
+#define LCM_GPIO_CFG(gpio, func) \
+PCOM_GPIO_CFG(gpio, func, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA)
+static uint32_t samsung_oled_on_gpio_table[] = {
+        LCM_GPIO_CFG(BRAVO_LCD_R1, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_R2, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_R3, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_R4, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_R5, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_G0, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_G1, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_G2, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_G3, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_G4, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_G5, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_B1, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_B2, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_B3, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_B4, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_B5, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_PCLK, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_VSYNC, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_HSYNC, 1),
+        LCM_GPIO_CFG(BRAVO_LCD_DE, 1),
+};
+
+
+static uint32_t samsung_oled_off_gpio_table[] = {
+        LCM_GPIO_CFG(BRAVO_LCD_R1, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_R2, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_R3, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_R4, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_R5, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_G0, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_G1, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_G2, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_G3, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_G4, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_G5, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_B1, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_B2, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_B3, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_B4, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_B5, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_PCLK, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_VSYNC, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_HSYNC, 0),
+        LCM_GPIO_CFG(BRAVO_LCD_DE, 0),
+};
+#undef LCM_GPIO_CFG
+
 
 #define SONY_TFT_DEF_USER_VAL         102
 #define SONY_TFT_MIN_USER_VAL         30
@@ -478,6 +528,25 @@ static void samsung_oled_set_gamma_val(int val)
 	last_val = val;
 }
 
+static void samsung_oled_panel_config_gpio_table(uint32_t *table, int len)
+{
+	int n;
+	unsigned id;
+	for (n = 0; n < len; n++) {
+		id = table[n];
+		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &id, 0);
+	}
+}
+
+static int samsung_oled_panel_gpio_switch (int on)
+{
+	samsung_oled_panel_config_gpio_table (
+			!!on ? samsung_oled_on_gpio_table : samsung_oled_off_gpio_table,
+			ARRAY_SIZE(samsung_oled_on_gpio_table));
+
+	return 0;
+}
+
 static int samsung_oled_panel_init(struct msm_lcdc_panel_ops *ops)
 {
 	pr_info("%s: +()\n", __func__);
@@ -500,6 +569,7 @@ static int samsung_oled_panel_unblank(struct msm_lcdc_panel_ops *ops)
 	pr_info("%s: +()\n", __func__);
 
 	mutex_lock(&panel_lock);
+	samsung_oled_panel_gpio_switch(1);
 
 	gpio_set_value(BRAVO_GPIO_LCD_RST_N, 1);
 	udelay(50);
@@ -541,6 +611,7 @@ static int samsung_oled_panel_blank(struct msm_lcdc_panel_ops *ops)
 	msleep(200);
 
 	gpio_set_value(BRAVO_GPIO_LCD_RST_N, 0);
+	samsung_oled_panel_gpio_switch(0);
 
 	mutex_unlock(&panel_lock);
 	pr_info("%s: -()\n", __func__);
