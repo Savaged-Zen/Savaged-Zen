@@ -101,7 +101,7 @@ static struct platform_device bravo_wifi_device = {
 extern unsigned char *get_wifi_nvs_ram(void);
 extern int wifi_calibration_size_set(void);
 
-static unsigned bravo_wifi_update_nvs(char *str)
+static unsigned bravo_wifi_update_nvs(char *str, int add_flag)
 {
 #define NVS_LEN_OFFSET		0x0C
 #define NVS_DATA_OFFSET		0x40
@@ -116,8 +116,13 @@ static unsigned bravo_wifi_update_nvs(char *str)
 	/* if the last byte in NVRAM is 0, trim it */
 	if (ptr[NVS_DATA_OFFSET + len - 1] == 0)
 		len -= 1;
-	strcpy(ptr + NVS_DATA_OFFSET + len, str);
-	len += strlen(str);
+	if (add_flag) {
+		strcpy(ptr + NVS_DATA_OFFSET + len, str);
+		len += strlen(str);
+	} else {
+		if (strnstr(ptr + NVS_DATA_OFFSET, str, len))
+			len -= strlen(str);
+	}
 	memcpy(ptr + NVS_LEN_OFFSET, &len, sizeof(len));
 	wifi_calibration_size_set();
 	return 0;
@@ -131,7 +136,8 @@ static int __init bravo_wifi_init(void)
 		return 0;
 
 	printk("%s: start\n", __func__);
-	bravo_wifi_update_nvs("sd_oobonly=1\r\n");
+	bravo_wifi_update_nvs("sd_oobonly=1\r\n", 0);
+	bravo_wifi_update_nvs("btc_params70=0x32\r\n", 1);
 	bravo_init_wifi_mem();
 	ret = platform_device_register(&bravo_wifi_device);
         return ret;
