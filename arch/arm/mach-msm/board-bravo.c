@@ -454,6 +454,44 @@ static void ds2482_set_slp_n(unsigned n)
 	gpio_direction_output(BRAVO_GPIO_DS2482_SLP_N, n);
 }
 
+static int capella_cm3602_power(int pwr_device, uint8_t enable);
+static struct microp_function_config microp_functions[] = {
+	{
+		.name = "light_sensor",
+		.category = MICROP_FUNCTION_LSENSOR,
+		.levels = { 0x000, 0x001, 0x00F, 0x01E, 0x03C, 0x121, 0x190, 0x2BA, 0x35C, 0x3FF },
+		.channel = 6,
+		.int_pin = IRQ_LSENSOR,
+		.golden_adc = 0xC0,
+		.ls_power = capella_cm3602_power,
+//		.ls_gpio_on = BRAVO_GPIO_LS_EN_N,
+	},
+};
+
+static struct lightsensor_platform_data lightsensor_data = {
+	.config = &microp_functions[0],
+	.irq = MSM_uP_TO_INT(9),
+};
+
+static struct platform_device microp_devices[] = {
+	{
+		.name = "lightsensor_microp",
+		.dev = {
+			.platform_data = &lightsensor_data,
+		},
+	},
+};
+
+static struct microp_i2c_platform_data microp_data = {
+	.num_functions   = ARRAY_SIZE(microp_functions),
+	.microp_function = microp_functions,
+	.num_devices = ARRAY_SIZE(microp_devices),
+	.microp_devices = microp_devices,
+	.gpio_reset = BRAVO_GPIO_UP_RESET_N,
+//	.microp_ls_on = LS_PWR_ON | PS_PWR_ON,
+	.spi_devices = SPI_OJ | SPI_GSENSOR,
+};
+
 static struct i2c_board_info base_i2c_devices[] = {
 	{
 		I2C_BOARD_INFO(SYNAPTICS_I2C_RMI_NAME, 0x40),
@@ -462,6 +500,7 @@ static struct i2c_board_info base_i2c_devices[] = {
 	},
 	{
 		I2C_BOARD_INFO("bravo-microp", 0xCC >> 1),
+		.platform_data = &microp_data,
 		.irq = MSM_GPIO_TO_INT(BRAVO_GPIO_UP_INT_N)
 	},
 	{
@@ -583,18 +622,46 @@ static struct platform_device msm_camera_sensor_s5k3e2fx = {
 	},
 };
 
-static int capella_cm3602_power(int on)
+static int __capella_cm3602_power(int on)
 {
-	/* TODO eolsen Add Voltage reg control */
+	printk(KERN_DEBUG "%s: Turn the capella_cm3602 power %s\n",
+		__func__, (on) ? "on" : "off");
 	if (on) {
+		gpio_direction_output(BRAVO_GPIO_LS_EN_N, 0);
 		gpio_direction_output(BRAVO_GPIO_PROXIMITY_EN, 0);
 	} else {
+		gpio_direction_output(BRAVO_GPIO_LS_EN_N, 1);
 		gpio_direction_output(BRAVO_GPIO_PROXIMITY_EN, 1);
 	}
-
 	return 0;
 }
 
+static DEFINE_MUTEX(capella_cm3602_lock);
+static int als_power_control;
+
+static int capella_cm3602_power(int pwr_device, uint8_t enable)
+{
+	/* TODO eolsen Add Voltage reg control */
+	unsigned int old_status = 0;
+	int ret = 0, on = 0;
+
+	mutex_lock(&capella_cm3602_lock);
+
+	old_status = als_power_control;
+	if (enable)
+		als_power_control |= pwr_device;
+	else
+		als_power_control &= ~pwr_device;
+
+	on = als_power_control ? 1 : 0;
+	if (old_status == 0 && on)
+		ret = __capella_cm3602_power(1);
+	else if (!on)
+		ret = __capella_cm3602_power(0);
+
+	mutex_unlock(&capella_cm3602_lock);
+	return ret;
+}
 
 static struct capella_cm3602_platform_data capella_cm3602_pdata = {
 	.power = capella_cm3602_power,

@@ -32,6 +32,7 @@
 #include <asm/uaccess.h>
 #include <mach/atmega_microp.h>
 #include <asm/mach-types.h>
+#include <asm/setup.h>
 
 struct microp_ls_info {
 	struct microp_function_config *ls_config;
@@ -61,7 +62,6 @@ static DECLARE_WORK(lightsensor_work, lightsensor_do_work);
 
 void set_ls_kvalue(struct microp_ls_info *li)
 {
-
 	if (!li) {
 		pr_err("%s: ls_info is empty\n", __func__);
 		return;
@@ -76,10 +76,11 @@ void set_ls_kvalue(struct microp_ls_info *li)
 		printk(KERN_INFO "%s: no ALS calibrated\n", __func__);
 	}
 
-	if (li->als_kadc && li->ls_config->golden_adc > 0) {
+	if (li->als_kadc && li->ls_config->golden_adc) {
 		li->als_kadc = (li->als_kadc > 0 && li->als_kadc < 0x400) ?
 				li->als_kadc : li->ls_config->golden_adc;
-		li->als_gadc = li->ls_config->golden_adc;
+		li->als_gadc = (li->ls_config->golden_adc > 0)
+				? li->ls_config->golden_adc : li->als_kadc;
 	} else {
 		li->als_kadc = 1;
 		li->als_gadc = 1;
@@ -136,7 +137,7 @@ static int get_ls_adc_level(uint8_t *data)
 			if (adc_value <=
 				li->ls_config->levels[i]) {
 				adc_level = i;
-				if (li->ls_config->levels[i])
+//				if (li->ls_config->levels[i])
 					break;
 			}
 		}
@@ -377,7 +378,7 @@ static ssize_t ls_adc_show(struct device *dev,
 	return ret;
 }
 
-static DEVICE_ATTR(ls_adc, 0666, ls_adc_show, NULL);
+static DEVICE_ATTR(ls_adc, 0644, ls_adc_show, NULL);
 
 static ssize_t ls_enable_show(struct device *dev,
 				  struct device_attribute *attr, char *buf)
@@ -424,7 +425,7 @@ static ssize_t ls_enable_store(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(ls_auto, 0666, ls_enable_show, ls_enable_store);
+static DEVICE_ATTR(ls_auto, 0644, ls_enable_show, ls_enable_store);
 
 static ssize_t ls_kadc_show(struct device *dev,
 				  struct device_attribute *attr, char *buf)
@@ -465,7 +466,7 @@ static ssize_t ls_kadc_store(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(ls_kadc, 0666, ls_kadc_show, ls_kadc_store);
+static DEVICE_ATTR(ls_kadc, 0644, ls_kadc_show, ls_kadc_store);
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void light_sensor_suspend(struct early_suspend *h)
@@ -590,6 +591,25 @@ static struct platform_driver lightsensor_driver = {
 	.probe = lightsensor_probe,
 	.driver = { .name = "lightsensor_microp", },
 };
+
+static int __init parse_tag_als_kadc(const struct tag *tags)
+{
+	int found = 0;
+	struct tag *t = (struct tag *)tags;
+
+	for (; t->hdr.size; t = tag_next(t)) {
+		if (t->hdr.tag == ATAG_ALS) {
+			found = 1;
+			break;
+		}
+	}
+
+	if (found)
+		als_kadc = t->u.revision.rev;
+	pr_debug("%s: als_kadc = 0x%x\n", __func__, als_kadc);
+	return 0;
+}
+__tagtable(ATAG_ALS, parse_tag_als_kadc);
 
 static int __init light_sensor_init(void)
 {

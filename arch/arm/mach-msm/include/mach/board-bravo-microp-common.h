@@ -77,7 +77,6 @@
 #define MICROP_I2C_WCMD_GPO_LED_STATUS_DIS		0x91
 #define MICROP_I2C_WCMD_OJ_INT_STATUS			0xA8
 
-/* Desire - verified in 2.6.29 */
 #define IRQ_OJ						(1<<12)
 #define IRQ_GSENSOR					(1<<10)
 #define IRQ_LSENSOR					(1<<9)
@@ -89,17 +88,80 @@
 #define SPI_LCM						(1 << 1)
 #define SPI_OJ						(1 << 2)
 
-/* Optical Joystick callbacks */
-struct microp_oj_callback {
-	void (*oj_init)(void);
-	void (*oj_intr)(void);
-};
-int microp_register_oj_callback(struct microp_oj_callback *oj);
+#define MICROP_FUNCTION_LSENSOR				1
+#define MICROP_FUNCTION_REMOTEKEY			2
+#define MICROP_FUNCTION_LCD_BL				3
+#define MICROP_FUNCTION_RMK_VALUE			4
+#define MICROP_FUNCTION_INTR				11
+#define MICROP_FUNCTION_GSENSOR				12
+#define MICROP_FUNCTION_LED				13
+#define MICROP_FUNCTION_HPIN				14
+#define MICROP_FUNCTION_RESET_INT			15
+#define MICROP_FUNCTION_SIM_CARD			16
+#define MICROP_FUNCTION_SDCARD				17
+#define MICROP_FUNCTION_OJ				18
+#define MICROP_FUNCTION_P				19
+
+#define LS_PWR_ON					(1 << 0)
+#define ALS_CALIBRATED					0x6DA5
+#define ATAG_ALS					0x5441001b
 
 /* I2C functions for drivers */
 int microp_i2c_read(uint8_t addr, uint8_t *data, int length);
 int microp_i2c_write(uint8_t addr, uint8_t *data, int length);
-
+int microp_read_adc(uint8_t channel, uint16_t *value);
 int microp_spi_vote_enable(int spi_device, uint8_t enable);
+int microp_write_interrupt(struct i2c_client *client,
+			uint16_t interrupt, uint8_t enable);
+struct i2c_client *get_microp_client(void);
+
+struct microp_function_config {
+	const char      *name;
+	uint8_t         category;
+	uint8_t         init_value;
+	uint8_t         channel;
+	uint8_t         fade_time;
+	uint32_t        sub_categ;
+	uint16_t        levels[10];
+	uint16_t        dutys[10];
+	uint16_t        int_pin;
+	uint16_t        golden_adc;
+	uint8_t         mask_r[3];
+	uint8_t         mask_w[3];
+	uint32_t        ls_gpio_on;
+	int (*ls_power)(int, uint8_t);
+};
+
+struct microp_i2c_platform_data {
+	struct microp_function_config   *microp_function;
+	struct platform_device *microp_devices;
+	int                     num_devices;
+	int                     num_functions;
+	uint32_t                gpio_reset;
+	uint32_t                microp_ls_on;
+	void                    *dev_id;
+	uint8_t                 microp_mic_status;
+	uint8_t                 function_node[20];
+	uint32_t                cmd_diff;
+	uint32_t                spi_devices;
+	uint32_t                spi_devices_init;
+};
+
+struct lightsensor_platform_data{
+	struct i2c_client *client;
+	struct microp_function_config   *config;
+	int irq;
+	int old_intr_cmd;
+};
+
+struct microp_ops {
+        int (*init_microp_func)(struct i2c_client *);
+        int (*als_pwr_enable)(int pwr_device, uint8_t en);
+        int (*als_intr_enable)(struct i2c_client *,
+                        uint32_t als_func, uint8_t en);
+        void (*als_level_change)(struct i2c_client *, uint8_t *data);
+        void (*headset_enable)(int en);
+        void (*spi_enable)(int en);
+};
 
 #endif /* _LINUX_BOARD_BRAVO_MICROP_COMMON_H */
