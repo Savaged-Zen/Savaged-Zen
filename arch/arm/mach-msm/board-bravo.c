@@ -383,23 +383,15 @@ static int bravo_ts_power(int on)
 
 static struct synaptics_i2c_rmi_platform_data bravo_synaptics_ts_data[] = {
 	{
-		.version = 0x105,
+		.version = 0x100,
 		.power = bravo_ts_power,
-		.flags = SYNAPTICS_FLIP_Y,
+		.flags = SYNAPTICS_FLIP_Y | SYNAPTICS_SNAP_TO_INACTIVE_EDGE,
 		.inactive_left = -1 * 0x10000 / 480,
 		.inactive_right = -1 * 0x10000 / 480,
 		.inactive_top = -5 * 0x10000 / 800,
 		.inactive_bottom = -5 * 0x10000 / 800,
 		.sensitivity_adjust = 12,
-	},
-	{
-		.flags = SYNAPTICS_FLIP_Y,
-		.inactive_left = -1 * 0x10000 / 480,
-		.inactive_right = -1 * 0x10000 / 480,
-		.inactive_top = -5 * 0x10000 / 800,
-		.inactive_bottom = -5 * 0x10000 / 800,
-		.sensitivity_adjust = 12,
-	},
+	}
 };
 
 static struct akm8973_platform_data compass_platform_data = {
