@@ -26,11 +26,12 @@
 #include <linux/errno.h>
 #include <linux/err.h>
 #include <linux/gpio.h>
+#include <linux/slab.h>
 
 #include <linux/miscdevice.h>
 #include <linux/lightsensor.h>
 #include <asm/uaccess.h>
-#include <mach/atmega_microp.h>
+#include <mach/board-bravo-microp-common.h>
 #include <asm/mach-types.h>
 #include <asm/setup.h>
 
@@ -53,6 +54,7 @@ struct microp_ls_info {
 struct microp_ls_info *ls_info;
 static int ls_enable_flag;
 static int ls_enable_num;
+static uint32_t als_kadc;
 
 static void enable_intr_do_work(struct work_struct *w);
 static DECLARE_DELAYED_WORK(enable_intr_work, enable_intr_do_work);
@@ -115,12 +117,18 @@ static int get_ls_adc_level(uint8_t *data)
 	uint8_t i, adc_level = 0;
 	uint16_t adc_value = 0;
 
+/* From HTC
 	data[0] = 0x00;
 	data[1] = li->ls_config->channel;
 	if (microp_read_adc(data))
 		return -1;
 
 	adc_value = data[0]<<8 | data[1];
+*/
+	/* new */
+	if (microp_read_adc(li->ls_config->channel, &adc_value))
+		return -1;
+
 	if (adc_value > 0x3FF) {
 		printk(KERN_WARNING "%s: get wrong value: 0x%X\n",
 			__func__, adc_value);
@@ -165,7 +173,6 @@ void report_lightseneor_data(void)
 
 static int ls_microp_intr_enable(uint8_t enable)
 {
-
 	int ret;
 	uint8_t data[2];
 	struct microp_ls_info *li = ls_info;
@@ -507,7 +514,12 @@ static int lightsensor_probe(struct platform_device *pdev)
 	if (!li)
 		return -ENOMEM;
 	ls_info = li;
+
+/* From HTC
 	li->client = dev_get_drvdata(&pdev->dev);
+*/
+	/* new */
+	li->client = get_microp_client();
 
 	if (!li->client) {
 		pr_err("%s: can't get microp i2c client\n", __func__);
