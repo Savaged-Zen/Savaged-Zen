@@ -74,6 +74,7 @@ static irqreturn_t capella_cm3602_irq_handler(int irq, void *data)
 
 static int capella_cm3602_enable(struct capella_cm3602_data *data)
 {
+	int rc;
 	D("%s\n", __func__);
 	if (data->enabled) {
 		D("%s: already enabled\n", __func__);
@@ -87,17 +88,14 @@ static int capella_cm3602_enable(struct capella_cm3602_data *data)
 	data->enabled = !rc;
 	if (!rc)
 		capella_cm3602_report(data);
-	}
 	return 0;
 }
 
 static int capella_cm3602_disable(struct capella_cm3602_data *data)
 {
+	int rc;
 	D("%s\n", __func__);
 	if (data->enabled) {
-		data->pdata->power(0);
-		data->enabled = 0;
-	} else {
 		D("%s: already disabled\n", __func__);
 	}
 #if defined(CONFIG_MACH_BRAVO)
