@@ -39,19 +39,6 @@ static int misc_opened;
 static int capella_cm3602_report(struct capella_cm3602_data *data)
 {
 	int val = gpio_get_value(data->pdata->p_out);
-#if defined(CONFIG_MACH_BRAVO)
-	int value1, value2;
-	int retry_limit = 10;
-	int irq = gpio_to_irq(data->pdata->p_out);
-
-	do {
-		value1 = gpio_get_value(data->pdata->p_out);
-		set_irq_type(irq, value1 ?
-				IRQF_TRIGGER_LOW : IRQF_TRIGGER_HIGH);
-		value2 = gpio_get_value(data->pdata->p_out);
-	} while (value1 != value2 && retry_limit-- > 0);
-#endif
-
 	if (val < 0) {
 		pr_err("%s: gpio_get_value error %d\n", __func__, val);
 		return val;
