@@ -238,15 +238,15 @@ int bravo_wifi_power(int on)
 	if (on) {
 		config_gpio_table(wifi_on_gpio_table,
 				  ARRAY_SIZE(wifi_on_gpio_table));
-		msleep(50);
+		mdelay(50);
 	} else {
 		config_gpio_table(wifi_off_gpio_table,
 				  ARRAY_SIZE(wifi_off_gpio_table));
 	}
 
-	msleep(100);
+	mdelay(100);
 	gpio_set_value(BRAVO_GPIO_WIFI_SHUTDOWN_N, on); /* WIFI_SHUTDOWN */
-	msleep(200);
+	mdelay(200);
 
 	bravo_wifi_power_state = on;
 	return 0;
