@@ -74,37 +74,36 @@ static irqreturn_t capella_cm3602_irq_handler(int irq, void *data)
 
 static int capella_cm3602_enable(struct capella_cm3602_data *data)
 {
-	int rc;
 	D("%s\n", __func__);
 	if (data->enabled) {
 		D("%s: already enabled\n", __func__);
 		return 0;
-	}
+	} else {
 #if defined(CONFIG_MACH_BRAVO)
-	data->pdata->power(PS_PWR_ON, 1);
+		data->pdata->power(PS_PWR_ON, 1);
 #else
-	data->pdata->power(1);
+		data->pdata->power(1);
 #endif
-	data->enabled = !rc;
-	if (!rc)
+		data->enabled = 1;
 		capella_cm3602_report(data);
+	}
 	return 0;
 }
 
 static int capella_cm3602_disable(struct capella_cm3602_data *data)
 {
-	int rc;
 	D("%s\n", __func__);
 	if (data->enabled) {
 		D("%s: already disabled\n", __func__);
-	}
+	} else {
 #if defined(CONFIG_MACH_BRAVO)
-	data->pdata->power(PS_PWR_ON ,0);
+		data->pdata->power(PS_PWR_ON ,0);
 #else
-	data->pdata->power(0);
+		data->pdata->power(0);
 #endif
-	data->enabled = 0;
-	return rc;
+		data->enabled = 0;
+	}
+	return 0;
 }
 
 static int capella_cm3602_setup(struct capella_cm3602_data *ip)
