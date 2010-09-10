@@ -33,6 +33,8 @@
 struct capella_cm3602_platform_data {
 #if defined(CONFIG_MACH_BRAVO)
 	int (*power)(int, uint8_t); /* power to the chip */
+#elif defined(CONFIG_MACH_BRAVOC)
+	int (*power)(int, uint8_t); /* power to the chip */
 #else
 	int (*power)(int); /* power to the chip */
 #endif
