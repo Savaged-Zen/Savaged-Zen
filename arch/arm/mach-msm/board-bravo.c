@@ -522,6 +522,16 @@ static struct i2c_board_info base_i2c_devices[] = {
 	},
 };
 
+static struct i2c_board_info rev_CX_i2c_devices[] = {
+	{
+		I2C_BOARD_INFO("tpa2018d1", 0x58),
+		.platform_data = &tpa2018_data,
+	},
+	{
+		I2C_BOARD_INFO("smb329", 0x6E >> 1),
+	},
+};
+
 static void config_gpio_table(uint32_t *table, int len);
 
 static uint32_t camera_off_gpio_table[] = {
@@ -993,6 +1003,25 @@ static uint32_t bt_gpio_table[] = {
 		      GPIO_PULL_DOWN, GPIO_4MA),
 };
 
+static uint32_t bt_gpio_table_rev_CX[] = {
+	PCOM_GPIO_CFG(BRAVO_GPIO_BT_UART1_RTS, 2, GPIO_OUTPUT,
+		      GPIO_PULL_UP, GPIO_8MA),
+	PCOM_GPIO_CFG(BRAVO_GPIO_BT_UART1_CTS, 2, GPIO_INPUT,
+		      GPIO_PULL_UP, GPIO_8MA),
+	PCOM_GPIO_CFG(BRAVO_GPIO_BT_UART1_RX, 2, GPIO_INPUT,
+		      GPIO_PULL_UP, GPIO_8MA),
+	PCOM_GPIO_CFG(BRAVO_GPIO_BT_UART1_TX, 2, GPIO_OUTPUT,
+		      GPIO_PULL_UP, GPIO_8MA),
+	PCOM_GPIO_CFG(BRAVO_GPIO_BT_RESET_N, 0, GPIO_OUTPUT,
+		      GPIO_PULL_DOWN, GPIO_4MA),
+	PCOM_GPIO_CFG(BRAVO_BT_SHUTDOWN_N, 0, GPIO_OUTPUT,
+		      GPIO_PULL_DOWN, GPIO_4MA),
+	PCOM_GPIO_CFG(BRAVO_CDMA_GPIO_BT_WAKE, 0, GPIO_OUTPUT,
+		      GPIO_PULL_DOWN, GPIO_4MA),
+	PCOM_GPIO_CFG(BRAVO_GPIO_BT_HOST_WAKE, 0, GPIO_INPUT,
+		      GPIO_PULL_DOWN, GPIO_4MA),
+};
+
 static uint32_t misc_gpio_table[] = {
 	PCOM_GPIO_CFG(BRAVO_GPIO_LCD_RST_N, 0, GPIO_OUTPUT,
 		      GPIO_NO_PULL, GPIO_2MA),
@@ -1080,6 +1109,15 @@ static struct msm_acpu_clock_platform_data bravo_clock_data = {
 	.mpll_khz		= 245000
 };
 
+static struct msm_acpu_clock_platform_data bravo_cdma_clock_data = {
+	.acpu_switch_time_us	= 20,
+	.max_speed_delta_khz	= 256000,
+	.vdd_switch_time_us	= 62,
+	.power_collapse_khz	= 235930,
+	.wait_for_irq_khz	= 235930,
+	.mpll_khz		= 235930
+};
+
 static void bravo_reset(void)
 {
 	gpio_set_value(BRAVO_GPIO_PS_HOLD, 0);
@@ -1093,16 +1131,29 @@ static void __init bravo_init(void)
 
 	printk("bravo_init() revision=%d\n", system_rev);
 
+	if (is_cdma_version(system_rev))
+		smd_set_channel_list(smd_cdma_default_channels,
+				ARRAY_SIZE(smd_cdma_default_channels));
+
 	msm_hw_reset_hook = bravo_reset;
 
-	msm_acpu_clock_init(&bravo_clock_data);
+	if (is_cdma_version(system_rev))
+		msm_acpu_clock_init(&bravo_cdma_clock_data);
+	else
+		msm_acpu_clock_init(&bravo_clock_data);
 
 	msm_serial_debug_init(MSM_UART1_PHYS, INT_UART1,
 			      &msm_device_uart1.dev, 1, MSM_GPIO_TO_INT(139));
 
 	config_gpio_table(misc_gpio_table, ARRAY_SIZE(misc_gpio_table));
 
-	config_gpio_table(bt_gpio_table, ARRAY_SIZE(bt_gpio_table));
+	if (is_cdma_version(system_rev)) {
+		bcm_bt_lpm_pdata.gpio_wake = BRAVO_CDMA_GPIO_BT_WAKE;
+		bravo_flashlight_data.torch = BRAVO_CDMA_GPIO_FLASHLIGHT_TORCH;
+		config_gpio_table(bt_gpio_table_rev_CX, ARRAY_SIZE(bt_gpio_table_rev_CX));
+	} else {
+		config_gpio_table(bt_gpio_table, ARRAY_SIZE(bt_gpio_table));
+	}
 
 	gpio_request(BRAVO_GPIO_TP_LS_EN, "tp_ls_en");
 	gpio_direction_output(BRAVO_GPIO_TP_LS_EN, 0);
@@ -1129,6 +1180,11 @@ static void __init bravo_init(void)
 
 	i2c_register_board_info(0, base_i2c_devices,
 		ARRAY_SIZE(base_i2c_devices));
+
+	if (is_cdma_version(system_rev)) {
+		i2c_register_board_info(0, rev_CX_i2c_devices,
+			ARRAY_SIZE(rev_CX_i2c_devices));
+	}
 
 	ret = bravo_init_mmc(system_rev, debug_uart);
 	if (ret != 0)
