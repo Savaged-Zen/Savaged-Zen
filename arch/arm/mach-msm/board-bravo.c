@@ -54,6 +54,7 @@
 #include "board-bravo.h"
 #include "devices.h"
 #include "proc_comm.h"
+#include "board-bravo-tpa2018d1.h"
 #include "board-bravo-smb329.h"
 
 #ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
@@ -491,6 +492,10 @@ static struct microp_i2c_platform_data microp_data = {
 	.gpio_reset = BRAVO_GPIO_UP_RESET_N,
 //	.microp_ls_on = LS_PWR_ON | PS_PWR_ON,
 	.spi_devices = SPI_OJ | SPI_GSENSOR,
+};
+
+static struct tpa2018d1_platform_data tpa2018_data = {
+	.gpio_tpa2018_spk_en = BRAVO_CDMA_GPIO_AUD_SPK_AMP_EN,
 };
 
 static struct i2c_board_info base_i2c_devices[] = {
