@@ -95,11 +95,36 @@ void bravo_speaker_enable(int en)
 
 		pmic_set_spkr_configuration(&scm);
 	}
+	if (is_cdma_version(system_rev))
+		tpa2018d1_set_speaker_amp(en);
 }
 
 void bravo_receiver_enable(int en)
 {
-	/* Do nothing for bravo. */
+	if (is_cdma_version(system_rev)) {
+		struct spkr_config_mode scm;
+		memset(&scm, 0, sizeof(scm));
+
+		D("%s %d\n", __func__, en);
+		if (en) {
+			scm.is_right_chan_en = 1;
+			scm.is_left_chan_en = 0;
+			scm.is_stereo_en = 0;
+			scm.is_hpf_en = 1;
+			pmic_spkr_en_mute(RIGHT_SPKR, 0);
+			pmic_set_spkr_configuration(&scm);
+			pmic_spkr_en(RIGHT_SPKR, 1);
+
+			/* unmute */
+			pmic_spkr_en_mute(RIGHT_SPKR, 1);
+		} else {
+			pmic_spkr_en_mute(RIGHT_SPKR, 0);
+
+			pmic_spkr_en(RIGHT_SPKR, 0);
+
+			pmic_set_spkr_configuration(&scm);
+		}
+	}
 }
 
 static void config_gpio_table(uint32_t *table, int len)
@@ -216,9 +241,14 @@ int bravo_get_rx_vol(uint8_t hw, int level)
 		level = 100;
 	else if (level < 0)
 		level = 0;
-
-	info = &q6_audio_hw[hw];
-	vol = info->min_gain + ((info->max_gain - info->min_gain) * level) / 100;
+	
+	if (is_cdma_version(system_rev) && hw == Q6_HW_HANDSET) {
+		int handset_volume[6] = { -1600, -1300, -1000, -600, -300, 0 };
+		vol = handset_volume[5 * level / 100];
+	} else {
+		info = &q6_audio_hw[hw];
+		vol = info->min_gain + ((info->max_gain - info->min_gain) * level) / 100;
+	}
 
 	D("%s %d\n", __func__, vol);
 	return vol;
@@ -245,4 +275,6 @@ void __init bravo_audio_init(void)
 	mutex_init(&bt_sco_lock);
 	q6audio_register_analog_ops(&ops);
 	acoustic_register_ops(&acoustic);
+	if (is_cdma_version(system_rev))
+		q6audio_set_acdb_file("default_PMIC.acdb");
 }
