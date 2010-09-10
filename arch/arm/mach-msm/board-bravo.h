@@ -86,6 +86,12 @@
 #define BRAVO_GPIO_DS2482_SLP_N		87
 #define BRAVO_GPIO_VIBRATOR_ON		89
 
+#define BRAVO_CDMA_GPIO_BT_WAKE		28
+#define BRAVO_CDMA_GPIO_FLASHLIGHT_TORCH	26
+
+#define BRAVO_CDMA_SD_2V85_EN		100
+#define BRAVO_CDMA_JOG_2V6_EN		150
+
 /* Compass */
 #define BRAVO_GPIO_COMPASS_INT_N	153
 #define BRAVO_GPIO_COMPASS_RST_N	107
@@ -159,5 +165,6 @@
 #define BRAVO_LCD_VSYNC              (136)
 #define BRAVO_LCD_HSYNC              (137)
 #define BRAVO_LCD_DE                 (138)
+#define is_cdma_version(rev) ((rev) != 0x81)
 
 #endif /* __ARCH_ARM_MACH_MSM_BOARD_BRAVO_H */
