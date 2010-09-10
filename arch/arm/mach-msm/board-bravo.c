@@ -683,10 +683,22 @@ static uint32_t flashlight_gpio_table[] = {
 						GPIO_NO_PULL, GPIO_2MA),
 };
 
+static uint32_t flashlight_gpio_table_rev_CX[] = {
+	PCOM_GPIO_CFG(BRAVO_CDMA_GPIO_FLASHLIGHT_TORCH, 0, GPIO_OUTPUT,
+						GPIO_NO_PULL, GPIO_2MA),
+	PCOM_GPIO_CFG(BRAVO_GPIO_FLASHLIGHT_FLASH, 0, GPIO_OUTPUT,
+						GPIO_NO_PULL, GPIO_2MA),
+};
+
 static int config_bravo_flashlight_gpios(void)
 {
-	config_gpio_table(flashlight_gpio_table,
-		ARRAY_SIZE(flashlight_gpio_table));
+	if (is_cdma_version(system_rev)) {
+		config_gpio_table(flashlight_gpio_table_rev_CX,
+				ARRAY_SIZE(flashlight_gpio_table_rev_CX));
+	} else {
+		config_gpio_table(flashlight_gpio_table,
+				ARRAY_SIZE(flashlight_gpio_table));
+	}
 	return 0;
 }
 
