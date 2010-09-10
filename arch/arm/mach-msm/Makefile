@@ -97,6 +97,16 @@ obj-$(CONFIG_MACH_BRAVO) += htc_acoustic_qsd.o
 obj-$(CONFIG_MACH_BRAVO) += board-bravo-tpa2018d1.o
 obj-$(CONFIG_MACH_BRAVO) += board-bravo-smb329.o
 
+obj-$(CONFIG_MACH_BRAVOC) += board-bravo.o board-bravo-panel.o
+obj-$(CONFIG_MACH_BRAVOC) += board-bravo-keypad.o board-bravo-mmc.o
+obj-$(CONFIG_MACH_BRAVOC) += board-bravo-rfkill.o htc_wifi_nvs.o htc_awb_cal.o
+obj-$(CONFIG_MACH_BRAVOC) += board-bravo-wifi.o board-bravo-audio.o
+obj-$(CONFIG_MACH_BRAVOC) += msm_vibrator.o
+obj-$(CONFIG_MACH_BRAVOC) += board-bravo-microp.o
+obj-$(CONFIG_MACH_BRAVOC) += htc_acoustic_qsd.o
+obj-$(CONFIG_MACH_BRAVOC) += board-bravo-tpa2018d1.o
+obj-$(CONFIG_MACH_BRAVOC) += board-bravo-smb329.o
+
 obj-$(CONFIG_HTC_PWRSINK) += htc_pwrsink.o
 obj-$(CONFIG_HTC_PWRSPLY) += htc_power_supply.o
 obj-$(CONFIG_HTC_HEADSET) += htc_headset.o

@@ -249,6 +249,14 @@ config MACH_BRAVO
 	help
 	  Select this to support the Bravo device
 
+config MACH_BRAVOC
+	depends on ARCH_QSD8X50
+	default n
+	bool "Bravo"
+	help
+	  Select this to support the Bravo device
+
+
 
 config MACH_QSD8X50_FFA
 	depends on ARCH_QSD8X50

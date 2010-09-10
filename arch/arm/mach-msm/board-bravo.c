@@ -1229,6 +1229,7 @@ static void __init bravo_map_io(void)
 
 extern struct sys_timer msm_timer;
 
+#if defined(CONFIG_MACH_BRAVO)
 MACHINE_START(BRAVO, "bravo")
 #ifdef CONFIG_MSM_DEBUG_UART
 	.phys_io        = MSM_DEBUG_UART_PHYS,
@@ -1241,3 +1242,17 @@ MACHINE_START(BRAVO, "bravo")
 	.init_machine	= bravo_init,
 	.timer		= &msm_timer,
 MACHINE_END
+#else
+MACHINE_START(BRAVO, "bravoc")
+#ifdef CONFIG_MSM_DEBUG_UART
+	.phys_io        = MSM_DEBUG_UART_PHYS,
+	.io_pg_offst    = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
+#endif
+	.boot_params	= 0x20000100,
+	.fixup		= bravo_fixup,
+	.map_io		= bravo_map_io,
+	.init_irq	= msm_init_irq,
+	.init_machine	= bravo_init,
+	.timer		= &msm_timer,
+MACHINE_END
+#endif
