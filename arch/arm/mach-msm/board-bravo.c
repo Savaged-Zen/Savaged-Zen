@@ -1130,6 +1130,12 @@ static void bravo_reset(void)
 
 int bravo_init_mmc(int sysrev, unsigned debug_uart);
 
+static const struct smd_tty_channel_desc smd_cdma_default_channels[] = {
+	{ .id = 0, .name = "SMD_DS" },
+	{ .id = 19, .name = "SMD_DATA3" },
+	{ .id = 27, .name = "SMD_GPSNMEA" }
+};
+
 static void __init bravo_init(void)
 {
 	int ret;
