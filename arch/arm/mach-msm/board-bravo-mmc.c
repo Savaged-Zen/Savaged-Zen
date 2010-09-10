@@ -146,13 +146,13 @@ static uint32_t bravo_cdma_sdslot_switchvdd(struct device *dev, unsigned int vdd
 	sdslot_vdd = vdd ? MMC_VDD_28_29 : 0;
 
 	if (vdd) {
-		gpio_set_value(MAHIMAHI_CDMA_SD_2V85_EN, 1);
+		gpio_set_value(BRAVO_CDMA_SD_2V85_EN, 1);
 		config_gpio_table(sdcard_on_gpio_table,
 				  ARRAY_SIZE(sdcard_on_gpio_table));
 	} else {
 		config_gpio_table(sdcard_off_gpio_table,
 				  ARRAY_SIZE(sdcard_off_gpio_table));
-		gpio_set_value(MAHIMAHI_CDMA_SD_2V85_EN, 0);
+		gpio_set_value(BRAVO_CDMA_SD_2V85_EN, 0);
 	}
 
 	sdslot_vreg_enabled = !!vdd;
@@ -315,13 +315,13 @@ int __init bravo_init_mmc(unsigned int sys_rev, unsigned debug_uart)
 
 	if (is_cdma_version(sys_rev)) {
 		/* In the CDMA version, sdslot is supplied by a gpio. */
-		int rc = gpio_request(MAHIMAHI_CDMA_SD_2V85_EN, "sdslot_en");
+		int rc = gpio_request(BRAVO_CDMA_SD_2V85_EN, "sdslot_en");
 		if (rc < 0) {
 			pr_err("%s: gpio_request(%d) failed: %d\n", __func__,
-				MAHIMAHI_CDMA_SD_2V85_EN, rc);
+				BRAVO_CDMA_SD_2V85_EN, rc);
 			return rc;
 		}
-		mahimahi_sdslot_data.translate_vdd = mahimahi_cdma_sdslot_switchvdd;
+		bravo_sdslot_data.translate_vdd = bravo_cdma_sdslot_switchvdd;
 	} else {
 		/* in UMTS version, sdslot is supplied by pmic */
 		sdslot_vreg = vreg_get(0, "gp6");
