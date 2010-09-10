@@ -22,7 +22,7 @@
 #include "board-bravo.h"
 #include "proc_comm.h"
 #include "pmic.h"
-//#include "board-bravo-tpa2018d1.h"
+#include "board-bravo-tpa2018d1.h"
 
 #if 0
 #define D(fmt, args...) printk(KERN_INFO "Audio: "fmt, ##args)
