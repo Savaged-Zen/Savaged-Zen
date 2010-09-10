@@ -54,6 +54,7 @@
 #include "board-bravo.h"
 #include "devices.h"
 #include "proc_comm.h"
+#include "board-bravo-smb329.h"
 
 #ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
 #include <linux/curcial_oj.h>
@@ -760,7 +761,14 @@ struct platform_device bcm_bt_lpm_device = {
 
 static int ds2784_charge(int on, int fast)
 {
-	gpio_direction_output(BRAVO_GPIO_BATTERY_CHARGER_CURRENT, !!fast);
+	if (is_cdma_version(system_rev)) {
+		if (!on)
+			smb329_set_charger_ctrl(SMB329_DISABLE_CHG);
+		else
+			smb329_set_charger_ctrl(fast ? SMB329_ENABLE_FAST_CHG : SMB329_ENABLE_SLOW_CHG);
+	}
+	else
+		gpio_direction_output(BRAVO_GPIO_BATTERY_CHARGER_CURRENT, !!fast);
 	gpio_direction_output(BRAVO_GPIO_BATTERY_CHARGER_EN, !on);
 	return 0;
 }
@@ -788,13 +796,15 @@ static int w1_ds2784_add_slave(struct w1_slave *sl)
 		return rc;
 	}
 
-	rc = gpio_request(BRAVO_GPIO_BATTERY_CHARGER_CURRENT, "charger_current");
-	if (rc < 0) {
-		pr_err("%s: gpio_request(%d) failed: %d\n", __func__,
-			BRAVO_GPIO_BATTERY_CHARGER_CURRENT, rc);
-		gpio_free(BRAVO_GPIO_BATTERY_CHARGER_EN);
-		kfree(p);
-		return rc;
+	if (!is_cdma_version(system_rev)) {
+		rc = gpio_request(BRAVO_GPIO_BATTERY_CHARGER_CURRENT, "charger_current");
+		if (rc < 0) {
+			pr_err("%s: gpio_request(%d) failed: %d\n", __func__,
+					BRAVO_GPIO_BATTERY_CHARGER_CURRENT, rc);
+			gpio_free(BRAVO_GPIO_BATTERY_CHARGER_EN);
+			kfree(p);
+			return rc;
+		}
 	}
 
 	p->pdev.name = "ds2784-battery";
