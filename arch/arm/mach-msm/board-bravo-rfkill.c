@@ -104,7 +104,7 @@ static struct platform_driver bravo_rfkill_driver = {
 
 static int __init bravo_rfkill_init(void)
 {
-	if (!machine_is_bravo())
+	if (!machine_is_bravo() && !machine_is_bravoc())
 		return 0;
 
 	return platform_driver_register(&bravo_rfkill_driver);

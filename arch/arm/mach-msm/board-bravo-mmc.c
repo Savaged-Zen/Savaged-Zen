@@ -431,7 +431,7 @@ static int __init bravommc_dbg_init(void)
 {
 	struct dentry *dent;
 
-	if (!machine_is_bravo())
+	if (!machine_is_bravo() && !machine_is_bravoc())
 		return 0;
 
 	dent = debugfs_create_dir("bravo_mmc_dbg", 0);

@@ -132,7 +132,7 @@ static int __init bravo_wifi_init(void)
 {
 	int ret;
 
-	if (!machine_is_bravo())
+	if (!machine_is_bravo() && !machine_is_bravoc())
 		return 0;
 
 	printk("%s: start\n", __func__);

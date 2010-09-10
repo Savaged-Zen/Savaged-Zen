@@ -1015,7 +1015,7 @@ int __init bravo_init_panel(void)
 {
 	int ret;
 
-	if (!machine_is_bravo())
+	if (!machine_is_bravo() && !machine_is_bravoc())
 		return 0;
 
 	if (system_rev > 0xC0) {

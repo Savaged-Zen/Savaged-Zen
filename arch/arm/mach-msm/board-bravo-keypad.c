@@ -147,7 +147,7 @@ static int __init bravo_init_keypad(void)
 {
 	int ret;
 
-	if (!machine_is_bravo())
+	if (!machine_is_bravo() && !machine_is_bravoc())
 		return 0;
 
 	ret = platform_device_register(&bravo_reset_keys_device);
