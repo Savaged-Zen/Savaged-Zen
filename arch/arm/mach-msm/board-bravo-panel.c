@@ -30,6 +30,7 @@
 #include <mach/msm_fb.h>
 #include <mach/msm_iomap.h>
 #include <mach/vreg.h>
+#include <mach/board-bravo-microp-common.h>
 #include "proc_comm.h"
 
 #include "board-bravo.h"
@@ -709,12 +710,22 @@ static void sony_tft_set_pwm_val(int val)
 			(SONY_TFT_MAX_USER_VAL - SONY_TFT_DEF_USER_VAL) +
 			SONY_TFT_DEF_PANEL_VAL;
 
+	#ifdef CONFIG_MACH_BRAVO
 	clk_enable(spi_clk);
 	qspi_send_9bit(0x0, 0x51);
 	qspi_send_9bit(0x1, val);
 	qspi_send_9bit(0x0, 0x53);
 	qspi_send_9bit(0x1, 0x24);
 	clk_disable(spi_clk);
+	#else
+	{
+		uint8_t data[4] = {0,0,0,0};
+		data[0] = 5;
+		data[1] = val;
+		data[3] = 1;
+		microp_i2c_write(0x25, data, 4);
+	}
+	#endif
 }
 
 #undef SONY_TFT_DEF_PANEL_DELTA
