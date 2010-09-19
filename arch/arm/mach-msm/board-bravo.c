@@ -850,6 +850,7 @@ static int __init ds2784_battery_init(void)
 #ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
 static void curcial_oj_shutdown(int enable)
 {
+#ifdef CONFIG_MACH_BRAVO
 	uint8_t cmd[3];
 	memset(cmd, 0x00, sizeof(uint8_t)*3);
 	// microp firmware(v04) non-shutdown by default
@@ -857,6 +858,15 @@ static void curcial_oj_shutdown(int enable)
 	microp_i2c_write(0x90, cmd, 3);
 //	pr_err("%s\n", __func__);	
 	printk("%s\n", __func__);	
+#else
+	memset(cmd, 0, sizeof(uint8_t)*3);
+
+	cmd[2] = 0x80;
+	if (enable)
+		microp_i2c_write(0x91, cmd, 3);
+	else
+		microp_i2c_write(0x90, cmd, 3);
+#endif
 }
 
 /* <3 HTC
@@ -876,6 +886,7 @@ static void curcial_oj_shutdown(int enable)
 
 static int curcial_oj_poweron(int on)
 {
+#ifdef CONFIG_MACH_BRAVO
 	uint8_t data[2];
 	struct vreg *oj_power = vreg_get(0, "gp2");
 	if (IS_ERR(oj_power)) {
@@ -899,7 +910,24 @@ static int curcial_oj_poweron(int on)
 //	pr_err("%s: OJ power enable(%d)\n", __func__, on);
 	printk("%s: OJ power enable(%d)\n", __func__, on);
 	return 1;
+#else
+	struct vreg *oj_power = vreg_get(0, "synt");
+	if (IS_ERR(oj_power)) {
+		printk(KERN_ERR "%s: Error power domain\n", __func__);
+		return 0;
+	}
+
+	if (on) {
+		vreg_set_level(oj_power, 2750);
+		vreg_enable(oj_power);
+	} else
+		vreg_disable(oj_power);
+
+	printk(KERN_INFO "%s: OJ power enable(%d)\n", __func__, on);
+	return 1;
+#endif
 }
+
 
 static void curcial_oj_adjust_xy(uint8_t *data, int16_t *mSumDeltaX, int16_t *mSumDeltaY)
 {
