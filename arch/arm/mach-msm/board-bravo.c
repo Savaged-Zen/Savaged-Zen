@@ -850,8 +850,8 @@ static int __init ds2784_battery_init(void)
 #ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
 static void curcial_oj_shutdown(int enable)
 {
-#ifdef CONFIG_MACH_BRAVO
 	uint8_t cmd[3];
+#ifdef CONFIG_MACH_BRAVO
 	memset(cmd, 0x00, sizeof(uint8_t)*3);
 	// microp firmware(v04) non-shutdown by default
 	cmd[2] = 0x20;
