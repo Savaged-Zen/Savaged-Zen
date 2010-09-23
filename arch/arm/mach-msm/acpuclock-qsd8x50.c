@@ -22,6 +22,7 @@
 #include <linux/errno.h>
 #include <linux/cpufreq.h>
 #include <linux/regulator/consumer.h>
+#include <linux/regulator/driver.h>
 
 #include <mach/board.h>
 #include <mach/msm_iomap.h>
@@ -59,6 +60,17 @@ struct clkctl_acpu_speed {
 };
 
 static unsigned long max_axi_rate;
+
+struct regulator {
+	struct device *dev;
+	struct list_head list;
+	int uA_load;
+	int min_uV;
+	int max_uV;
+	char *supply_name;
+	struct device_attribute dev_attr;
+	struct regulator_dev *rdev;
+};
 
 /* clock sources */
 #define CLK_TCXO	0 /* 19.2 MHz */
@@ -293,6 +305,8 @@ static void select_clock(unsigned src, unsigned config)
 
 static int acpuclk_set_vdd_level(int vdd)
 {
+	int rc = 0;
+
 	if (!drv_state.regulator || IS_ERR(drv_state.regulator)) {
 		drv_state.regulator = regulator_get(NULL, "acpu_vcore");
 		if (IS_ERR(drv_state.regulator)) {
@@ -304,8 +318,13 @@ static int acpuclk_set_vdd_level(int vdd)
 		}
 		pr_info("acpuclk_set_vdd_level got regulator\n");
 	}
-	vdd *= 1000; /* mV -> uV */
-	return regulator_set_voltage(drv_state.regulator, vdd, vdd);
+
+	rc = tps65023_set_dcdc1_level(drv_state.regulator->rdev, vdd);
+
+	if (rc == -ENODEV && vdd <= CONFIG_QSD_PMIC_DEFAULT_DCDC1)
+		return 0;
+
+	return rc;
 }
 
 int acpuclk_set_rate(unsigned long rate, enum setrate_reason reason)
