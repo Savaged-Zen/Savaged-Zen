@@ -31,11 +31,7 @@
 #define LS_PWR_ON				(1 << 0)
 #define PS_PWR_ON				(1 << 1)
 struct capella_cm3602_platform_data {
-#if defined(CONFIG_MACH_BRAVO) || defined(CONFIG_MACH_BRAVOC)
-	int (*power)(int, uint8_t); /* power to the chip */
-#else
 	int (*power)(int); /* power to the chip */
-#endif
 	int (*enable)(uint8_t); /* enable to the chip */
 	int p_out; /* proximity-sensor output */
 };

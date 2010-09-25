@@ -456,7 +456,7 @@ static void ds2482_set_slp_n(unsigned n)
 	gpio_direction_output(BRAVO_GPIO_DS2482_SLP_N, n);
 }
 
-static int capella_cm3602_power(int pwr_device, uint8_t enable);
+static int capella_cm3602_power(int on);
 static struct microp_function_config microp_functions[] = {
 	{
 		.name = "light_sensor",
@@ -638,45 +638,15 @@ static struct platform_device msm_camera_sensor_s5k3e2fx = {
 	},
 };
 
-static int __capella_cm3602_power(int on)
+static int capella_cm3602_power(int on)
 {
-	printk(KERN_DEBUG "%s: Turn the capella_cm3602 power %s\n",
-		__func__, (on) ? "on" : "off");
+	/* TODO eolsen Add Voltage reg control */
 	if (on) {
-		gpio_direction_output(BRAVO_GPIO_LS_EN_N, 0);
 		gpio_direction_output(BRAVO_GPIO_PROXIMITY_EN, 0);
 	} else {
-		gpio_direction_output(BRAVO_GPIO_LS_EN_N, 1);
 		gpio_direction_output(BRAVO_GPIO_PROXIMITY_EN, 1);
 	}
 	return 0;
-}
-
-static DEFINE_MUTEX(capella_cm3602_lock);
-static int als_power_control;
-
-static int capella_cm3602_power(int pwr_device, uint8_t enable)
-{
-	/* TODO eolsen Add Voltage reg control */
-	unsigned int old_status = 0;
-	int ret = 0, on = 0;
-
-	mutex_lock(&capella_cm3602_lock);
-
-	old_status = als_power_control;
-	if (enable)
-		als_power_control |= pwr_device;
-	else
-		als_power_control &= ~pwr_device;
-
-	on = als_power_control ? 1 : 0;
-	if (old_status == 0 && on)
-		ret = __capella_cm3602_power(1);
-	else if (!on)
-		ret = __capella_cm3602_power(0);
-
-	mutex_unlock(&capella_cm3602_lock);
-	return ret;
 }
 
 static struct capella_cm3602_platform_data capella_cm3602_pdata = {
