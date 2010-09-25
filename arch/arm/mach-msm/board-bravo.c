@@ -1,4 +1,4 @@
-/* linux/arch/arm/mach-msm/board-bravo.c
+/* arch/arm/mach-msm/board-bravo.c
  *
  * Copyright (C) 2009 Google, Inc.
  * Copyright (C) 2009 HTC Corporation.
@@ -851,17 +851,15 @@ static int __init ds2784_battery_init(void)
 static void curcial_oj_shutdown(int enable)
 {
 	uint8_t cmd[3];
-#ifdef CONFIG_MACH_BRAVO
-	memset(cmd, 0x00, sizeof(uint8_t)*3);
-	// microp firmware(v04) non-shutdown by default
-	cmd[2] = 0x20;
-	microp_i2c_write(0x90, cmd, 3);
-//	pr_err("%s\n", __func__);	
-	printk("%s\n", __func__);	
-#else
-	memset(cmd, 0, sizeof(uint8_t)*3);
 
-	cmd[2] = 0x80;
+	memset(cmd, 0x00, sizeof(uint8_t)*3);
+	cmd[2] = 0x20;
+
+#ifdef CONFIG_MACH_BRAVO
+	// microp firmware(v04) non-shutdown by default
+	microp_i2c_write(0x90, cmd, 3);
+	pr_err("%s\n", __func__);	
+#else
 	if (enable)
 		microp_i2c_write(0x91, cmd, 3);
 	else
@@ -869,29 +867,13 @@ static void curcial_oj_shutdown(int enable)
 #endif
 }
 
-/* <3 HTC
-static void curcial_oj_shutdown(int enable)
-{
-	uint8_t cmd[3];
-	memset(cmd, 0, sizeof(uint8_t)*3);
-
-	cmd[2] = 0x20;
-	printk("%s: enable = %d\n", __func__, enable);
-	if (enable)
-		microp_i2c_write(0x91, cmd, 3);
-	else
-		microp_i2c_write(0x90, cmd, 3);
-}
-*/
-
 static int curcial_oj_poweron(int on)
 {
 #ifdef CONFIG_MACH_BRAVO
 	uint8_t data[2];
 	struct vreg *oj_power = vreg_get(0, "gp2");
 	if (IS_ERR(oj_power)) {
-//		pr_err("%s: Error power domain\n", __func__);
-		printk("%s: Error power domain\n", __func__);
+		pr_err("%s: Error power domain\n", __func__);
 		return 0;
 	}
 
@@ -907,8 +889,7 @@ static int curcial_oj_poweron(int on)
 		}
 		vreg_disable(oj_power);
 	}
-//	pr_err("%s: OJ power enable(%d)\n", __func__, on);
-	printk("%s: OJ power enable(%d)\n", __func__, on);
+	pr_err("%s: OJ power enable(%d)\n", __func__, on);
 	return 1;
 #else
 	struct vreg *oj_power = vreg_get(0, "synt");

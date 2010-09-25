@@ -1,4 +1,4 @@
-/* linux/arch/arm/mach-msm/board-bravo-panel.c
+/* arch/arm/mach-msm/board-bravo-panel.c
  *
  * Copyright (c) 2009 Google Inc.
  * Author: Dima Zavin <dima@android.com>
@@ -689,6 +689,10 @@ static uint32_t sony_tft_display_off_gpio_table[] = {
 
 static void sony_tft_set_pwm_val(int val)
 {
+#ifndef CONFIG_MACH_BRAVO
+	uint8_t data[4] = {0,0,0,0};
+#endif
+
 	pr_info("%s: %d\n", __func__, val);
 
 	last_val = val;
@@ -704,28 +708,26 @@ static void sony_tft_set_pwm_val(int val)
 				(val - SONY_TFT_MIN_USER_VAL) /
 				SONY_TFT_DEF_USER_DELTA +
 				SONY_TFT_MIN_PANEL_VAL;
-	} else
+	} else {
 		val = (SONY_TFT_MAX_PANEL_VAL - SONY_TFT_DEF_PANEL_VAL) *
 			(val - SONY_TFT_DEF_USER_VAL) /
 			(SONY_TFT_MAX_USER_VAL - SONY_TFT_DEF_USER_VAL) +
 			SONY_TFT_DEF_PANEL_VAL;
+	}
 
-	#ifdef CONFIG_MACH_BRAVO
+#ifdef CONFIG_MACH_BRAVO
 	clk_enable(spi_clk);
 	qspi_send_9bit(0x0, 0x51);
 	qspi_send_9bit(0x1, val);
 	qspi_send_9bit(0x0, 0x53);
 	qspi_send_9bit(0x1, 0x24);
 	clk_disable(spi_clk);
-	#else
-	{
-		uint8_t data[4] = {0,0,0,0};
-		data[0] = 5;
-		data[1] = val;
-		data[3] = 1;
-		microp_i2c_write(0x25, data, 4);
-	}
-	#endif
+#else
+	data[0] = 5;
+	data[1] = val;
+	data[3] = 1;
+	microp_i2c_write(0x25, data, 4);
+#endif
 }
 
 #undef SONY_TFT_DEF_PANEL_DELTA
