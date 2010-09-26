@@ -242,19 +242,26 @@ config MACH_MAHIMAHI
 	help
 	  Select this to support the Mahi-Mahi device
 
-config MACH_BRAVO
-	depends on ARCH_QSD8X50
-	default n
-	bool "Bravo GSM"
+choice
+        depends on ARCH_QSD8X50
+        prompt "Bravo"
+        default MACH_BRAVO_NONE
 	help
-	  Select this to support the Bravo GSM device
+	  Select this to support the Bravo GSM or CDMA device
 
-config MACH_BRAVOC
-	depends on ARCH_QSD8X50
-	default n
-	bool "Bravo CDMA"
-	help
-	  Select this to support the Bravo CDMA device
+	config MACH_BRAVO_NONE
+		bool "None"
+
+        config MACH_BRAVO
+                bool "GSM"
+		help
+		  Select this to support the Bravo GSM device
+
+	config MACH_BRAVOC
+		bool "CDMA"
+		help
+		  Select this to support the Bravo CDMA device
+endchoice
 
 config MACH_QSD8X50_FFA
 	depends on ARCH_QSD8X50
