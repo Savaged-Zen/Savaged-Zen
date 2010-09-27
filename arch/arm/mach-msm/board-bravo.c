@@ -616,7 +616,7 @@ static struct msm_camera_device_platform_data msm_camera_device_data = {
 static struct camera_flash_cfg msm_camera_sensor_flash_cfg = {
 	.camera_flash		= flashlight_control,
 	.num_flash_levels	= FLASHLIGHT_NUM,
-	.low_temp_limiti	= 5,
+	.low_temp_limit		= 5,
 	.low_cap_limit		= 15,
 };
 
