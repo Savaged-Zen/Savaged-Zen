@@ -317,11 +317,11 @@ static struct android_pmem_platform_data android_pmem_adsp_pdata = {
 };
 
 static struct android_pmem_platform_data android_pmem_venc_pdata = {
-        .name           = "pmem_venc",
-        .start          = MSM_PMEM_VENC_BASE,
-        .size           = MSM_PMEM_VENC_SIZE,
-        .no_allocator   = 0,
-        .cached         = 1,
+	.name		= "pmem_venc",
+	.start		= MSM_PMEM_VENC_BASE,
+	.size		= MSM_PMEM_VENC_SIZE,
+	.no_allocator	= 0,
+	.cached		= 1,
 };
 
 static struct platform_device android_pmem_mdp_device = {
@@ -341,11 +341,11 @@ static struct platform_device android_pmem_adsp_device = {
 };
 
 static struct platform_device android_pmem_venc_device = {
-        .name           = "android_pmem",
-        .id             = 3,
-        .dev            = {
-                .platform_data = &android_pmem_venc_pdata,
-        },
+	.name		= "android_pmem",
+	.id		= 3,
+	.dev		= {
+		.platform_data = &android_pmem_venc_pdata,
+	},
 };
 
 static struct resource ram_console_resources[] = {
@@ -485,7 +485,7 @@ static struct platform_device microp_devices[] = {
 };
 
 static struct microp_i2c_platform_data microp_data = {
-	.num_functions   = ARRAY_SIZE(microp_functions),
+	.num_functions = ARRAY_SIZE(microp_functions),
 	.microp_function = microp_functions,
 	.num_devices = ARRAY_SIZE(microp_devices),
 	.microp_devices = microp_devices,
@@ -614,26 +614,26 @@ static struct msm_camera_device_platform_data msm_camera_device_data = {
 };
 
 static struct camera_flash_cfg msm_camera_sensor_flash_cfg = {
-        .camera_flash           = flashlight_control,
-        .num_flash_levels       = FLASHLIGHT_NUM,
-	.low_temp_limit    = 5,
-	.low_cap_limit    = 15,
+	.camera_flash		= flashlight_control,
+	.num_flash_levels	= FLASHLIGHT_NUM,
+	.low_temp_limiti	= 5,
+	.low_cap_limit		= 15,
 };
 
 static struct msm_camera_sensor_info msm_camera_sensor_s5k3e2fx_data = {
-	.sensor_name = "s5k3e2fx",
-	.sensor_reset = 144, /* CAM1_RST */
-	.sensor_pwd = 143,  /* CAM1_PWDN, enabled in a9 */
-	/*.vcm_pwd = 31, */  /* CAM1_VCM_EN, enabled in a9 */
-	.pdata = &msm_camera_device_data,
-	.resource = msm_camera_resources,
-	.num_resources = ARRAY_SIZE(msm_camera_resources),
-	.flash_cfg      = &msm_camera_sensor_flash_cfg,
+	.sensor_name 	= "s5k3e2fx",
+	.sensor_reset 	= 144,  /* CAM1_RST */
+	.sensor_pwd 	= 143,  /* CAM1_PWDN, enabled in a9 */
+	/*.vcm_pwd 	= 31,*/ /* CAM1_VCM_EN, enabled in a9 */
+	.pdata 		= &msm_camera_device_data,
+	.resource 	= msm_camera_resources,
+	.num_resources 	= ARRAY_SIZE(msm_camera_resources),
+	.flash_cfg	= &msm_camera_sensor_flash_cfg,
 };
 
 static struct platform_device msm_camera_sensor_s5k3e2fx = {
-	.name      = "msm_camera_s5k3e2fx",
-	.dev      = {
+	.name	= "msm_camera_s5k3e2fx",
+	.dev	= {
 		.platform_data = &msm_camera_sensor_s5k3e2fx_data,
 	},
 };
@@ -689,7 +689,7 @@ static int config_bravo_flashlight_gpios(void)
 }
 
 static struct flashlight_platform_data bravo_flashlight_data = {
-	.gpio_init  = config_bravo_flashlight_gpios,
+	.gpio_init = config_bravo_flashlight_gpios,
 	.torch = BRAVO_GPIO_FLASHLIGHT_TORCH,
 	.flash = BRAVO_GPIO_FLASHLIGHT_FLASH,
 	.flash_duration_ms = 600
@@ -698,7 +698,7 @@ static struct flashlight_platform_data bravo_flashlight_data = {
 static struct platform_device bravo_flashlight_device = {
 	.name = "flashlight",
 	.dev = {
-		.platform_data  = &bravo_flashlight_data,
+		.platform_data = &bravo_flashlight_data,
 	},
 };
 
@@ -902,30 +902,30 @@ static void curcial_oj_adjust_xy(uint8_t *data, int16_t *mSumDeltaX, int16_t *mS
 
 #define BRAVO_MICROP_VER	0x03
 static struct curcial_oj_platform_data bravo_oj_data = {
-	.oj_poweron = curcial_oj_poweron,
-	.oj_shutdown = curcial_oj_shutdown,
-	.oj_adjust_xy = curcial_oj_adjust_xy,
-	.microp_version = BRAVO_MICROP_VER,
-        .debugflag = 0,
-        .mdelay_time = 0,
-        .normal_th = 8,
-        .xy_ratio = 15,
-        .interval = 20,
-        .swap           = false,
-        .ap_code = false,
-        .x              = 1,
-        .y              = 1,
-        .share_power    = false,
+	.oj_poweron	= curcial_oj_poweron,
+	.oj_shutdown	= curcial_oj_shutdown,
+	.oj_adjust_xy	= curcial_oj_adjust_xy,
+	.microp_version	= BRAVO_MICROP_VER,
+	.debugflag	= 0,
+	.mdelay_time	= 0,
+	.normal_th	= 8,
+	.xy_ratio	= 15,
+	.interval	= 20,
+	.swap		= false,
+	.ap_code	= false,
+	.x		= 1,
+	.y		= 1,
+	.share_power	= false,
 	.Xsteps = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
 		9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
 		9, 9, 9, 9, 9, 9, 9, 9, 9, 9},
 	.Ysteps = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
 		9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
 		9, 9, 9, 9, 9, 9, 9, 9, 9, 9},
-	.sht_tbl = {0, 2000, 2250, 2500, 2750, 3000},
-	.pxsum_tbl = {0, 0, 40, 50, 60, 70},
-	.degree = 6,
-	.irq = MSM_uP_TO_INT(12),
+	.sht_tbl	= {0, 2000, 2250, 2500, 2750, 3000},
+	.pxsum_tbl	= {0, 0, 40, 50, 60, 70},
+	.degree		= 6,
+	.irq		= MSM_uP_TO_INT(12),
 };
 
 static struct platform_device bravo_oj = {
@@ -956,7 +956,7 @@ static struct platform_device *devices[] __initdata = {
 	&android_pmem_mdp_device,
 	&android_pmem_adsp_device,
 #ifdef CONFIG_720P_CAMERA
-        &android_pmem_venc_device,
+	&android_pmem_venc_device,
 #endif
 	&msm_kgsl_device,
 	&msm_device_i2c,
@@ -1048,7 +1048,7 @@ static int __init parse_tag_bdaddr(const struct tag *tag)
 	snprintf(bdaddr, BDADDR_STR_SIZE, "%02X:%02X:%02X:%02X:%02X:%02X",
 			b[0], b[1], b[2], b[3], b[4], b[5]);
 
-        return 0;
+	return 0;
 }
 
 __tagtable(ATAG_BDADDR, parse_tag_bdaddr);
@@ -1192,12 +1192,12 @@ static void __init bravo_fixup(struct machine_desc *desc, struct tag *tags,
 				 char **cmdline, struct meminfo *mi)
 {
 	mi->nr_banks = 2;
-        mi->bank[0].start = PHYS_OFFSET;
-        mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
-        mi->bank[0].size = MSM_EBI1_BANK0_SIZE;
-        mi->bank[1].start = MSM_EBI1_BANK1_BASE;
-        mi->bank[1].node = PHYS_TO_NID(MSM_EBI1_BANK1_BASE);
-        mi->bank[1].size = MSM_EBI1_BANK1_SIZE;
+	mi->bank[0].start = PHYS_OFFSET;
+	mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
+	mi->bank[0].size = MSM_EBI1_BANK0_SIZE;
+	mi->bank[1].start = MSM_EBI1_BANK1_BASE;
+	mi->bank[1].node = PHYS_TO_NID(MSM_EBI1_BANK1_BASE);
+	mi->bank[1].size = MSM_EBI1_BANK1_SIZE;
 }
 
 static void __init bravo_map_io(void)
@@ -1214,8 +1214,8 @@ MACHINE_START(BRAVO, "bravo")
 MACHINE_START(BRAVOC, "bravoc")
 #endif
 #ifdef CONFIG_MSM_DEBUG_UART
-	.phys_io        = MSM_DEBUG_UART_PHYS,
-	.io_pg_offst    = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
+	.phys_io	= MSM_DEBUG_UART_PHYS,
+	.io_pg_offst	= ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
 #endif
 	.boot_params	= 0x20000100,
 	.fixup		= bravo_fixup,

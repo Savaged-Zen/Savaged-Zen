@@ -137,10 +137,10 @@ static struct h35mm_platform_data bravo_h35mm_data = {
 };
 
 static struct platform_device bravo_h35mm = {
-	.name           = "htc_headset",
-	.id                     = -1,
-	.dev            = {
-		.platform_data  = &bravo_h35mm_data,
+	.name	= "htc_headset",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &bravo_h35mm_data,
 	},
 };
 
@@ -578,7 +578,7 @@ static int microp_enable_key_event(void)
 	if (!is_cdma_version(system_rev)) 
 		gpio_set_value(BRAVO_GPIO_35MM_KEY_INT_SHUTDOWN, 1);
 
-	/* turn on  key interrupt */
+	/* turn on key interrupt */
 	/* enable microp interrupt to detect changes */
 	ret = microp_interrupt_enable(client, IRQ_REMOTEKEY);
 	if (ret < 0) {
@@ -933,8 +933,8 @@ static void microp_led_brightness_gpo_set_work(struct work_struct *work)
 		addr = MICROP_I2C_WCMD_GPO_LED_STATUS_DIS;
 
 	ret = microp_i2c_write (addr, data, 3);
-        if (ret < 0)
-                pr_err("%s failed on set gpo led mode:%d\n", __func__, brightness);
+	if (ret < 0)
+		pr_err("%s failed on set gpo led mode:%d\n", __func__, brightness);
 }
 
 struct device_attribute *green_amber_attrs[] = {
@@ -1023,7 +1023,7 @@ int microp_spi_vote_enable(int spi_device, uint8_t enable) {
 	uint8_t data[2] = {0, 0};
 	int ret = 0;
 
-	if (!client)    {
+	if (!client) {
 		printk(KERN_ERR "%s: dataset: client is empty\n", __func__);
 		return -EIO;
 	}
@@ -1567,19 +1567,19 @@ static struct {
 } microp_leds[] = {
 	[GREEN_LED] = {
 		.name		= "green",
-		.led_set_work   = microp_led_brightness_set_work,
+		.led_set_work	= microp_led_brightness_set_work,
 		.attrs		= green_amber_attrs,
 		.attr_cnt	= ARRAY_SIZE(green_amber_attrs)
 	},
 	[AMBER_LED] = {
 		.name		= "amber",
-		.led_set_work   = microp_led_brightness_set_work,
+		.led_set_work	= microp_led_brightness_set_work,
 		.attrs		= green_amber_attrs,
 		.attr_cnt	= ARRAY_SIZE(green_amber_attrs)
 	},
 	[BLUE_LED] = {
 		.name		= "blue",
-		.led_set_work   = microp_led_brightness_gpo_set_work,
+		.led_set_work	= microp_led_brightness_gpo_set_work,
 		.attrs		= NULL,
 		.attr_cnt	= 0
 	},
