@@ -26,6 +26,7 @@
 
 #include <asm/io.h>
 #include <asm/mach-types.h>
+#include <asm/setup.h>
 
 #include <mach/msm_fb.h>
 #include <mach/msm_iomap.h>
@@ -36,17 +37,62 @@
 #include "board-bravo.h"
 #include "devices.h"
 
-#define SPI_CONFIG              (0x00000000)
-#define SPI_IO_CONTROL          (0x00000004)
-#define SPI_OPERATIONAL         (0x00000030)
-#define SPI_ERROR_FLAGS_EN      (0x00000038)
-#define SPI_ERROR_FLAGS         (0x00000038)
-#define SPI_OUTPUT_FIFO         (0x00000100)
+#define SPI_CONFIG		(0x00000000)
+#define SPI_IO_CONTROL		(0x00000004)
+#define SPI_OPERATIONAL		(0x00000030)
+#define SPI_ERROR_FLAGS_EN	(0x00000038)
+#define SPI_ERROR_FLAGS		(0x00000038)
+#define SPI_OUTPUT_FIFO		(0x00000100)
 
 static void __iomem *spi_base;
 static struct clk *spi_clk ;
 static struct vreg *vreg_lcm_rftx_2v6;
 static struct vreg *vreg_lcm_aux_2v6;
+
+enum {
+	SAMSUNG_PANEL = 0,
+	/*old sony panel without GAMMA by default*/
+	SONY_PANEL_MICROP = 1,
+	/*old sony panel without GAMMA by default*/
+	SONY_PANEL_SPI = 2,
+	/*new sony panel with GAMMA in its NVM*/
+	SONY_PANEL_SPI_GAMMA = 3,
+	/*new sony panel with GAMMA in its NVM*/
+	SONY_PANEL_MICROP_GAMMA = 4,
+};
+
+#define ATAG_HERO_PANEL_TYPE 0x4d534D74
+int panel_type;
+int __init tag_panel_parsing(const struct tag *tags)
+{
+	panel_type = tags->u.revision.rev;
+
+	printk(KERN_DEBUG "%s: panel type = %d\n", __func__,
+		panel_type);
+
+	return panel_type;
+}
+__tagtable(ATAG_HERO_PANEL_TYPE, tag_panel_parsing);
+
+static int is_sony_spi()
+{
+	int ret = 0;
+
+	if(panel_type == SONY_PANEL_SPI || panel_type == SONY_PANEL_SPI_GAMMA)
+		ret = 1;
+
+	return ret;
+}
+
+static int is_sony_with_gamma()
+{
+	int ret = 0;
+
+	if(panel_type == SONY_PANEL_SPI_GAMMA || panel_type == SONY_PANEL_MICROP_GAMMA)
+		ret = 1;
+
+	return ret;
+}
 
 static int qspi_send(uint32_t id, uint8_t data)
 {
@@ -470,12 +516,12 @@ static uint32_t samsung_oled_off_gpio_table[] = {
 #undef LCM_GPIO_CFG
 
 
-#define SONY_TFT_DEF_USER_VAL         102
-#define SONY_TFT_MIN_USER_VAL         30
-#define SONY_TFT_MAX_USER_VAL         255
-#define SONY_TFT_DEF_PANEL_VAL        155
-#define SONY_TFT_MIN_PANEL_VAL        26
-#define SONY_TFT_MAX_PANEL_VAL        255
+#define SONY_TFT_DEF_USER_VAL	 102
+#define SONY_TFT_MIN_USER_VAL	 30
+#define SONY_TFT_MAX_USER_VAL	 255
+#define SONY_TFT_DEF_PANEL_VAL	155
+#define SONY_TFT_MIN_PANEL_VAL	26
+#define SONY_TFT_MAX_PANEL_VAL	255
 
 
 static DEFINE_MUTEX(panel_lock);
