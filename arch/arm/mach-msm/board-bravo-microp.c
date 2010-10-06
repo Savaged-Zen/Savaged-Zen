@@ -1176,8 +1176,6 @@ static int gsensor_init_hw(void)
 
 	pr_debug("%s\n", __func__);
 
-	microp_spi_vote_enable(SPI_GSENSOR, 1);
-
 	ret = gsensor_read_reg(RANGE_BWIDTH_REG, &reg);
 	if (ret < 0 )
 		return -EIO;
@@ -1696,6 +1694,8 @@ static int microp_i2c_probe(struct i2c_client *client,
 	
 	mutex_init(&gsensor_RW_mutex);
 	mutex_init(&gsensor_set_mode_mutex);
+
+	microp_spi_vote_enable(SPI_GSENSOR, 1);
 
 #ifdef DEBUG_BMA150
 	debugfs_create_file("gsensor_log", 0444, NULL, NULL, &gsensor_log_fops);
