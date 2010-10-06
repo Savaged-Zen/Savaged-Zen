@@ -393,8 +393,6 @@ static struct synaptics_i2c_rmi_platform_data bravo_synaptics_ts_data[] = {
 		.inactive_top = -5 * 0x10000 / 800,
 		.inactive_bottom = -5 * 0x10000 / 800,
 		.sensitivity_adjust = 12,
-		.display_width = 480,
-		.display_height = 800,
 		.dup_threshold = 10,
 		.margin_inactive_pixel = {8, 32, 32, 8},
 	}
