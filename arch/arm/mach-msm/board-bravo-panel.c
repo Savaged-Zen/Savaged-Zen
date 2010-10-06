@@ -480,7 +480,6 @@ static uint32_t samsung_oled_on_gpio_table[] = {
 	LCM_GPIO_CFG(BRAVO_LCD_DE, 1),
 };
 
-
 static uint32_t samsung_oled_off_gpio_table[] = {
 	LCM_GPIO_CFG(BRAVO_LCD_R1, 0),
 	LCM_GPIO_CFG(BRAVO_LCD_R2, 0),
@@ -505,14 +504,15 @@ static uint32_t samsung_oled_off_gpio_table[] = {
 };
 #undef LCM_GPIO_CFG
 
-
-#define SONY_TFT_DEF_USER_VAL	 102
-#define SONY_TFT_MIN_USER_VAL	 30
-#define SONY_TFT_MAX_USER_VAL	 255
-#define SONY_TFT_DEF_PANEL_VAL	155
-#define SONY_TFT_MIN_PANEL_VAL	26
-#define SONY_TFT_MAX_PANEL_VAL	255
-
+#define SONY_TFT_DEF_USER_VAL		102
+#define SONY_TFT_MIN_USER_VAL		 30
+#define SONY_TFT_MAX_USER_VAL		255
+#define SONY_TFT_DEF_PANEL_VAL		120
+#define SONY_TFT_MIN_PANEL_VAL		  8
+#define SONY_TFT_MAX_PANEL_VAL		255
+#define SONY_TFT_DEF_PANEL_UP_VAL	132
+#define SONY_TFT_MIN_PANEL_UP_VAL	  9
+#define SONY_TFT_MAX_PANEL_UP_VAL	255
 
 static DEFINE_MUTEX(panel_lock);
 static struct work_struct brightness_delayed_work;
@@ -724,9 +724,8 @@ static uint32_t sony_tft_display_off_gpio_table[] = {
 
 static void sony_tft_set_pwm_val(int val)
 {
-#ifndef CONFIG_MACH_BRAVO
 	uint8_t data[4] = {0,0,0,0};
-#endif
+	unsigned int min_pwm, def_pwm, max_pwm;
 
 	pr_info("%s: %d\n", __func__, val);
 
@@ -735,34 +734,44 @@ static void sony_tft_set_pwm_val(int val)
 	if (!tft_panel_on)
 		return;
 
-	if (val <= SONY_TFT_DEF_USER_VAL) {
-		if (val <= SONY_TFT_MIN_USER_VAL)
-			val = SONY_TFT_MIN_PANEL_VAL;
-		else
-			val = SONY_TFT_DEF_PANEL_DELTA *
-				(val - SONY_TFT_MIN_USER_VAL) /
-				SONY_TFT_DEF_USER_DELTA +
-				SONY_TFT_MIN_PANEL_VAL;
+	if(!is_sony_spi()) {
+		min_pwm = SONY_TFT_MIN_PANEL_UP_VAL;
+		def_pwm = SONY_TFT_DEF_PANEL_UP_VAL;
+		max_pwm = SONY_TFT_MAX_PANEL_UP_VAL;
 	} else {
-		val = (SONY_TFT_MAX_PANEL_VAL - SONY_TFT_DEF_PANEL_VAL) *
-			(val - SONY_TFT_DEF_USER_VAL) /
-			(SONY_TFT_MAX_USER_VAL - SONY_TFT_DEF_USER_VAL) +
-			SONY_TFT_DEF_PANEL_VAL;
+		min_pwm = SONY_TFT_MIN_PANEL_VAL;
+		def_pwm = SONY_TFT_DEF_PANEL_VAL;
+		max_pwm = SONY_TFT_MAX_PANEL_VAL;
 	}
 
-#ifdef CONFIG_MACH_BRAVO
-	clk_enable(spi_clk);
-	qspi_send_9bit(0x0, 0x51);
-	qspi_send_9bit(0x1, val);
-	qspi_send_9bit(0x0, 0x53);
-	qspi_send_9bit(0x1, 0x24);
-	clk_disable(spi_clk);
-#else
-	data[0] = 5;
-	data[1] = val;
-	data[3] = 1;
-	microp_i2c_write(0x25, data, 4);
-#endif
+	if (val <= SONY_TFT_DEF_USER_VAL) {
+		if (val <= SONY_TFT_MIN_USER_VAL)
+			val = min_pwm;
+		else
+			val = (def_pwm - min_pwm) *
+				(val - SONY_TFT_MIN_USER_VAL) /
+				SONY_TFT_DEF_USER_DELTA +
+				min_pwm;
+	} else {
+		val = (max_pwm - def_pwm) *
+			(val - SONY_TFT_DEF_USER_VAL) /
+			(SONY_TFT_MAX_USER_VAL - SONY_TFT_DEF_USER_VAL) +
+			def_pwm;
+	}
+
+	if (!is_sony_spi()) {
+		data[0] = 5;
+		data[1] = val;
+		data[3] = 1;
+		microp_i2c_write(0x25, data, 4);
+	} else {
+		clk_enable(spi_clk);
+		qspi_send_9bit(0x0, 0x51);
+		qspi_send_9bit(0x1, val);
+		qspi_send_9bit(0x0, 0x53);
+		qspi_send_9bit(0x1, 0x24);
+		clk_disable(spi_clk);
+	}
 }
 
 #undef SONY_TFT_DEF_PANEL_DELTA
@@ -777,7 +786,6 @@ static void sony_tft_panel_config_gpio_table(uint32_t *table, int len)
 		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &id, 0);
 	}
 }
-
 
 static int sony_tft_panel_power(int on)
 {
@@ -849,23 +857,28 @@ static int sony_tft_panel_unblank(struct msm_lcdc_panel_ops *ops)
 	qspi_send_9bit(0x0, 0x11);
 	msleep(5);
 	qspi_send_9bit(0x0, 0x3a);
-	qspi_send_9bit(0x1, 0x05);
+	if (is_sony_RGB666())
+		qspi_send_9bit(0x1, 0x06);
+	else
+		qspi_send_9bit(0x1, 0x05);
 	msleep(100);
 	qspi_send_9bit(0x0, 0x29);
 	/* unlock register page for pwm setting */
-	qspi_send_9bit(0x0, 0xf0);
-	qspi_send_9bit(0x1, 0x5a);
-	qspi_send_9bit(0x1, 0x5a);
-	qspi_send_9bit(0x0, 0xf1);
-	qspi_send_9bit(0x1, 0x5a);
-	qspi_send_9bit(0x1, 0x5a);
-	qspi_send_9bit(0x0, 0xd0);
-	qspi_send_9bit(0x1, 0x5a);
-	qspi_send_9bit(0x1, 0x5a);
+	if (is_sony_spi()) {
+		qspi_send_9bit(0x0, 0xf0);
+		qspi_send_9bit(0x1, 0x5a);
+		qspi_send_9bit(0x1, 0x5a);
+		qspi_send_9bit(0x0, 0xf1);
+		qspi_send_9bit(0x1, 0x5a);
+		qspi_send_9bit(0x1, 0x5a);
+		qspi_send_9bit(0x0, 0xd0);
+		qspi_send_9bit(0x1, 0x5a);
+		qspi_send_9bit(0x1, 0x5a);
 
-	qspi_send_9bit(0x0, 0xc2);
-	qspi_send_9bit(0x1, 0x53);
-	qspi_send_9bit(0x1, 0x12);
+		qspi_send_9bit(0x0, 0xc2);
+		qspi_send_9bit(0x1, 0x53);
+		qspi_send_9bit(0x1, 0x12);
+	}
 	clk_disable(spi_clk);
 	msleep(100);
 	tft_panel_on = 1;
@@ -879,6 +892,7 @@ done:
 
 static int sony_tft_panel_blank(struct msm_lcdc_panel_ops *ops)
 {
+	uint8_t data[4] = {0, 0, 0, 0};
 	pr_info("%s: +()\n", __func__);
 
 	mutex_lock(&panel_lock);
@@ -893,6 +907,13 @@ static int sony_tft_panel_blank(struct msm_lcdc_panel_ops *ops)
 	tft_panel_on = 0;
 
 	mutex_unlock(&panel_lock);
+
+	if (!is_sony_spi()) {
+		data[0] = 5;
+		data[1] = 0;
+		data[3] = 1;
+		microp_i2c_write(0x25, data, 4);
+	}
 
 	pr_info("%s: -()\n", __func__);
 	return 0;
