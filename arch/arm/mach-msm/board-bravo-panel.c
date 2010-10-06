@@ -49,17 +49,12 @@ static struct clk *spi_clk ;
 static struct vreg *vreg_lcm_rftx_2v6;
 static struct vreg *vreg_lcm_aux_2v6;
 
-enum {
-	SAMSUNG_PANEL = 0,
-	/*old sony panel without GAMMA by default*/
-	SONY_PANEL_MICROP = 1,
-	/*old sony panel without GAMMA by default*/
-	SONY_PANEL_SPI = 2,
-	/*new sony panel with GAMMA in its NVM*/
-	SONY_PANEL_SPI_GAMMA = 3,
-	/*new sony panel with GAMMA in its NVM*/
-	SONY_PANEL_MICROP_GAMMA = 4,
-};
+#define SAMSUNG_PANEL		0
+/*Bitwise mask for SONY PANEL ONLY*/
+#define SONY_PANEL		0x1		/*Set bit 0 as 1 when it is SONY PANEL*/
+#define SONY_PWM_SPI		0x2		/*Set bit 1 as 1 as PWM_SPI mode, otherwise it is PWM_MICROP mode*/
+#define SONY_GAMMA		0x4		/*Set bit 2 as 1 when panel contains GAMMA table in its NVM*/
+#define SONY_RGB666		0x8		/*Set bit 3 as 1 when panel is 18 bit, otherwise it is 16 bit*/
 
 #define ATAG_HERO_PANEL_TYPE 0x4d534D74
 int panel_type;
@@ -76,22 +71,17 @@ __tagtable(ATAG_HERO_PANEL_TYPE, tag_panel_parsing);
 
 static int is_sony_spi()
 {
-	int ret = 0;
-
-	if(panel_type == SONY_PANEL_SPI || panel_type == SONY_PANEL_SPI_GAMMA)
-		ret = 1;
-
-	return ret;
+	return (panel_type & SONY_PWM_SPI ? 1 : 0);
 }
 
 static int is_sony_with_gamma()
 {
-	int ret = 0;
+	return (panel_type & SONY_GAMMA ? 1 : 0);
+}
 
-	if(panel_type == SONY_PANEL_SPI_GAMMA || panel_type == SONY_PANEL_MICROP_GAMMA)
-		ret = 1;
-
-	return ret;
+static int is_sony_RGB666()
+{
+	return (panel_type & SONY_RGB666 ? 1 : 0);
 }
 
 static int qspi_send(uint32_t id, uint8_t data)
