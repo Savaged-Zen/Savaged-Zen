@@ -824,23 +824,17 @@ static void curcial_oj_shutdown(int enable)
 
 	memset(cmd, 0x00, sizeof(uint8_t)*3);
 	cmd[2] = 0x20;
-
-#ifdef CONFIG_MACH_BRAVO
 	// microp firmware(v04) non-shutdown by default
 	microp_i2c_write(0x90, cmd, 3);
 	pr_err("%s\n", __func__);	
-#else
-	if (enable)
-		microp_i2c_write(0x91, cmd, 3);
-	else
-		microp_i2c_write(0x90, cmd, 3);
-#endif
 }
 
+#define CURCIAL_OJ_POWER		150
 static int curcial_oj_poweron(int on)
 {
-#ifdef CONFIG_MACH_BRAVO
 	uint8_t data[2];
+
+#ifdef CONFIG_MACH_BRAVO
 	struct vreg *oj_power = vreg_get(0, "gp2");
 	if (IS_ERR(oj_power)) {
 		pr_err("%s: Error power domain\n", __func__);
@@ -860,25 +854,26 @@ static int curcial_oj_poweron(int on)
 		vreg_disable(oj_power);
 	}
 	pr_err("%s: OJ power enable(%d)\n", __func__, on);
-	return 1;
 #else
-	struct vreg *oj_power = vreg_get(0, "synt");
-	if (IS_ERR(oj_power)) {
-		printk(KERN_ERR "%s: Error power domain\n", __func__);
-		return 0;
+	/* for microp firmware(v04) setting*/
+	if (on == 0) {
+		microp_i2c_read(MICROP_I2C_RCMD_VERSION, data, 2);
+		if (data[0] < 4) {
+			printk("Microp firmware version:%d\n",data[0]);
+			return 1;
+		}
 	}
 
-	if (on) {
-		vreg_set_level(oj_power, 2750);
-		vreg_enable(oj_power);
-	} else
-		vreg_disable(oj_power);
+	gpio_set_value(CURCIAL_OJ_POWER, on);
 
-	printk(KERN_INFO "%s: OJ power enable(%d)\n", __func__, on);
-	return 1;
+	if (gpio_get_value(CURCIAL_OJ_POWER) != on) {
+		printk(KERN_ERR "%s:OJ:power status fail \n", __func__);
+		return 0;
+	}
+	printk(KERN_ERR "%s:OJ:power status ok \n", __func__);
 #endif
+	return 1;
 }
-
 
 static void curcial_oj_adjust_xy(uint8_t *data, int16_t *mSumDeltaX, int16_t *mSumDeltaY)
 {
