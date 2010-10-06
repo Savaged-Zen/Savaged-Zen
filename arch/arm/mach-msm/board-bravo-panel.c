@@ -758,7 +758,7 @@ static int sony_tft_panel_power(int on)
 
 		id = PM_VREG_PDOWN_RFTX_ID;
 		msm_proc_comm(PCOM_VREG_PULLDOWN, &on_off, &id);
-		mdelay(10);
+
 		gpio_set_value(BRAVO_GPIO_LCD_RST_N, 1);
 		mdelay(10);
 		gpio_set_value(BRAVO_GPIO_LCD_RST_N, 0);
@@ -1052,9 +1052,14 @@ int __init bravo_init_panel(void)
 			return PTR_ERR(vreg_lcm_rftx_2v6);
 		vreg_set_level(vreg_lcm_rftx_2v6, 2600);
 
+#if defined(CONFIG_MACH_BRAVO)
 		vreg_lcm_aux_2v6 = vreg_get(0, "gp4");
+#else
+		vreg_lcm_aux_2v6 = vreg_get(0, "gp6");
+#endif
 		if (IS_ERR(vreg_lcm_aux_2v6))
 			return PTR_ERR(vreg_lcm_aux_2v6);
+		vreg_set_level(vreg_lcm_aux_2v6, 2600);
 
 		if (gpio_get_value(BRAVO_GPIO_LCD_RST_N))
 			tft_panel_on = 1;
