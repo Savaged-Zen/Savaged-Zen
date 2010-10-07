@@ -97,7 +97,11 @@ static struct gpio_event_info *bravo_input_info[] = {
 
 static struct gpio_event_platform_data bravo_input_data = {
 	.names = {
+#if defined(CONFIG_MACH_BRAVO)
 		"bravo-keypad",
+#else
+		"bravoc-keypad",
+#endif
 		NULL,
 	},
 	.info = bravo_input_info,
