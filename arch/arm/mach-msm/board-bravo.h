@@ -95,7 +95,11 @@
 /* Compass */
 #define BRAVO_GPIO_COMPASS_INT_N	153
 #define BRAVO_GPIO_COMPASS_RST_N	107
+#ifdef CONFIG_MACH_BRAVO
 #define BRAVO_PROJECT_NAME		"bravo"
+#else
+#define BRAVO_PROJECT_NAME		"bravoc"
+#endif
 #define BRAVO_LAYOUTS { 			   \
 	{ {-1,  0, 0}, { 0, -1,  0}, {0, 0,  1} }, \
 	{ { 0, -1, 0}, { 1,  0,  0}, {0, 0, -1} }, \
@@ -171,8 +175,9 @@
 /* know revisio
    0x81 = GSM amoled
    0x83 = GSM lcd
-   ???? = CDMA lcd
+   0x05 = CDMA lcd
 */
+
 #define is_cdma_version(rev) ((rev) != 0x81 && (rev) != 0x83)
 
 #endif /* __ARCH_ARM_MACH_MSM_BOARD_BRAVO_H */
