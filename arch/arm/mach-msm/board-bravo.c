@@ -906,7 +906,7 @@ static struct curcial_oj_platform_data bravo_oj_data = {
 	.mdelay_time	= 0,
 	.normal_th	= 8,
 	.xy_ratio	= 15,
-#if defined(CONFIG_MACH_BRAVO)
+#ifdef CONFIG_MACH_BRAVO
 	.interval	= 0,
 	.swap		= false,
 	.y		= -1,
@@ -1211,7 +1211,7 @@ static void __init bravo_map_io(void)
 
 extern struct sys_timer msm_timer;
 
-#if defined(CONFIG_MACH_BRAVO)
+#ifdef CONFIG_MACH_BRAVO
 MACHINE_START(BRAVO, "bravo")
 #else
 MACHINE_START(BRAVOC, "bravoc")

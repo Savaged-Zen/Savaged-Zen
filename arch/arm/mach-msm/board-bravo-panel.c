@@ -1109,7 +1109,7 @@ int __init bravo_init_panel(void)
 			return PTR_ERR(vreg_lcm_rftx_2v6);
 		vreg_set_level(vreg_lcm_rftx_2v6, 2600);
 
-#if defined(CONFIG_MACH_BRAVO)
+#ifdef CONFIG_MACH_BRAVO
 		vreg_lcm_aux_2v6 = vreg_get(0, "gp4");
 #else
 		vreg_lcm_aux_2v6 = vreg_get(0, "gp6");
