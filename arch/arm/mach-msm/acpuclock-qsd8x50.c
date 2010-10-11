@@ -430,9 +430,6 @@ int acpuclk_set_rate(unsigned long rate, enum setrate_reason reason)
 #endif
 	if (reason == SETRATE_CPUFREQ) {
 #ifdef CONFIG_MSM_CPU_AVS
-		/* Wait for frequency change to finish completely using worst case scenario value. */
-		mdelay(2);
-
 		/* notify avs after changing frequency */
 		rc = avs_adjust_freq(freq_index, 0);
 		if (rc)
