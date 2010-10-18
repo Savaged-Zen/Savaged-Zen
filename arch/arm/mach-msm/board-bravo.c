@@ -415,7 +415,7 @@ static struct regulator_init_data tps65023_data[5] = {
 	{
 		.constraints = {
 			.name = "dcdc1", /* VREG_MSMC2_1V29 */
-			.min_uV = 950000,
+			.min_uV = 975000,
 			.max_uV = 1275000,
 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
 		},
