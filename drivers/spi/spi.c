@@ -38,7 +38,7 @@ static void spidev_release(struct device *dev)
 		spi->master->cleanup(spi);
 
 	spi_master_put(spi->master);
-	kfree(spi);
+	kfree(dev);
 }
 
 static ssize_t
@@ -263,7 +263,6 @@ int spi_add_device(struct spi_device *spi)
 {
 	static DEFINE_MUTEX(spi_add_lock);
 	struct device *dev = spi->master->dev.parent;
-	struct device *d;
 	int status;
 
 	/* Chipselects are numbered 0..max; validate. */
@@ -285,11 +284,10 @@ int spi_add_device(struct spi_device *spi)
 	 */
 	mutex_lock(&spi_add_lock);
 
-	d = bus_find_device_by_name(&spi_bus_type, NULL, dev_name(&spi->dev));
-	if (d != NULL) {
+	if (bus_find_device_by_name(&spi_bus_type, NULL, dev_name(&spi->dev))
+			!= NULL) {
 		dev_err(dev, "chipselect %d already in use\n",
 				spi->chip_select);
-		put_device(d);
 		status = -EBUSY;
 		goto done;
 	}
@@ -1024,6 +1022,27 @@ int spi_write_then_read(struct spi_device *spi,
 	return status;
 }
 EXPORT_SYMBOL_GPL(spi_write_then_read);
+
+static DEFINE_MUTEX(spi_lock);
+int
+spi_read_write_lock(struct spi_device *spidev, struct spi_msg *msg, char *buf, int size, int func)
+{
+        int i = 0, err = 0;
+        mutex_lock(&spi_lock);
+	if(func) {
+		if(!msg) return -EINVAL;
+
+		for(i = 0; i < msg->len + 1; i++) {
+			err = spi_write(spidev, &msg->buffer[size * i], size);
+		}
+	} else {
+		if(!buf) return -EINVAL;
+
+		err = spi_read(spidev, buf, size);
+	}
+	mutex_unlock(&spi_lock);
+        return err;
+}
 
 /*-------------------------------------------------------------------------*/
 
