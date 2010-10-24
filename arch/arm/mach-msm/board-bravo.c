@@ -28,7 +28,7 @@
 #include <linux/usb/android_composite.h>
 #include <linux/android_pmem.h>
 #include <linux/synaptics_i2c_rmi.h>
-#include <linux/capella_cm3602.h>
+#include <linux/capella_cm3602_htc.h>
 #include <linux/akm8973.h>
 #include <linux/regulator/machine.h>
 #include <linux/ds2784_battery.h>
@@ -458,7 +458,8 @@ static void ds2482_set_slp_n(unsigned n)
 	gpio_direction_output(BRAVO_GPIO_DS2482_SLP_N, n);
 }
 
-static int capella_cm3602_power(int on);
+//static int capella_cm3602_power(int on);
+static int capella_cm3602_power(int pwr_device, uint8_t enable);
 static struct microp_function_config microp_functions[] = {
 	{
 		.name = "light_sensor",
@@ -468,7 +469,6 @@ static struct microp_function_config microp_functions[] = {
 		.int_pin = IRQ_LSENSOR,
 		.golden_adc = 0xC0,
 		.ls_power = capella_cm3602_power,
-//		.ls_gpio_on = BRAVO_GPIO_LS_EN_N,
 	},
 };
 
@@ -492,7 +492,6 @@ static struct microp_i2c_platform_data microp_data = {
 	.num_devices = ARRAY_SIZE(microp_devices),
 	.microp_devices = microp_devices,
 	.gpio_reset = BRAVO_GPIO_UP_RESET_N,
-//	.microp_ls_on = LS_PWR_ON | PS_PWR_ON,
 	.spi_devices = SPI_OJ | SPI_GSENSOR,
 };
 
@@ -640,20 +639,50 @@ static struct platform_device msm_camera_sensor_s5k3e2fx = {
 	},
 };
 
-static int capella_cm3602_power(int on)
+static int __capella_cm3602_power(int on)
 {
-	/* TODO eolsen Add Voltage reg control */
+	printk(KERN_DEBUG "%s: Turn the capella_cm3602 power %s\n",
+		__func__, (on) ? "on" : "off");
 	if (on) {
-		gpio_direction_output(BRAVO_GPIO_PROXIMITY_EN, 0);
-	} else {
+		gpio_direction_output(BRAVO_GPIO_LS_EN_N, 0);
 		gpio_direction_output(BRAVO_GPIO_PROXIMITY_EN, 1);
+	} else {
+		gpio_direction_output(BRAVO_GPIO_LS_EN_N, 1);
 	}
 	return 0;
-}
+};
+
+static DEFINE_MUTEX(capella_cm3602_lock);
+static int als_power_control;
+
+static int capella_cm3602_power(int pwr_device, uint8_t enable)
+{
+	/* TODO eolsen Add Voltage reg control */
+	unsigned int old_status = 0;
+	int ret = 0, on = 0;
+	mutex_lock(&capella_cm3602_lock);
+
+	old_status = als_power_control;
+	if (enable)
+		als_power_control |= pwr_device;
+	else
+		als_power_control &= ~pwr_device;
+
+	on = als_power_control ? 1 : 0;
+	if (old_status == 0 && on)
+		ret = __capella_cm3602_power(1);
+	else if (!on)
+		ret = __capella_cm3602_power(0);
+
+	mutex_unlock(&capella_cm3602_lock);
+	return ret;
+};
 
 static struct capella_cm3602_platform_data capella_cm3602_pdata = {
 	.power = capella_cm3602_power,
-	.p_out = BRAVO_GPIO_PROXIMITY_INT_N
+	.p_en = BRAVO_GPIO_PROXIMITY_EN,
+	.p_out = BRAVO_GPIO_PROXIMITY_INT_N,
+	.irq = MSM_GPIO_TO_INT(BRAVO_GPIO_PROXIMITY_INT_N),
 };
 
 static struct platform_device capella_cm3602 = {
@@ -1152,8 +1181,9 @@ static void __init bravo_init(void)
 	gpio_direction_output(BRAVO_GPIO_TP_LS_EN, 0);
 	gpio_request(BRAVO_GPIO_TP_EN, "tp_en");
 	gpio_direction_output(BRAVO_GPIO_TP_EN, 0);
-	gpio_request(BRAVO_GPIO_PROXIMITY_EN, "proximity_en");
-	gpio_direction_output(BRAVO_GPIO_PROXIMITY_EN, 1);
+//	gpio_request(BRAVO_GPIO_PROXIMITY_EN, "proximity_en");
+//	gpio_direction_output(BRAVO_GPIO_PROXIMITY_EN, 1);
+	gpio_request(BRAVO_GPIO_LS_EN_N, "ls_en");
 	gpio_request(BRAVO_GPIO_COMPASS_RST_N, "compass_rst");
 	gpio_direction_output(BRAVO_GPIO_COMPASS_RST_N, 1);
 	gpio_request(BRAVO_GPIO_COMPASS_INT_N, "compass_int");
