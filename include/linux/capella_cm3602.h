@@ -28,12 +28,9 @@
 
 #ifdef __KERNEL__
 #define CAPELLA_CM3602 "capella_cm3602"
-#define LS_PWR_ON				(1 << 0)
-#define PS_PWR_ON				(1 << 1)
 struct capella_cm3602_platform_data {
 	int (*power)(int); /* power to the chip */
-	int (*enable)(uint8_t); /* enable to the chip */
-	int p_out; /* proximity-sensor output */
+	int p_out; /* proximity-sensor outpuCAPELLA_CM3602_IOCTL_ENABLE,t */
 };
 #endif /* __KERNEL__ */
 
