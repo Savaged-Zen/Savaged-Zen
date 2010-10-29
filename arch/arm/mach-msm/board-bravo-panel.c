@@ -69,17 +69,17 @@ int __init tag_panel_parsing(const struct tag *tags)
 }
 __tagtable(ATAG_HERO_PANEL_TYPE, tag_panel_parsing);
 
-static int is_sony_spi()
+static int is_sony_spi(void)
 {
 	return (panel_type & SONY_PWM_SPI ? 1 : 0);
 }
 
-static int is_sony_with_gamma()
+static int is_sony_with_gamma(void)
 {
 	return (panel_type & SONY_GAMMA ? 1 : 0);
 }
 
-static int is_sony_RGB666()
+static int is_sony_RGB666(void)
 {
 	return (panel_type & SONY_RGB666 ? 1 : 0);
 }
@@ -654,12 +654,6 @@ static int samsung_oled_panel_blank(struct msm_lcdc_panel_ops *ops)
 	return 0;
 }
 
-struct lcm_cmd {
-	int reg;
-	uint32_t val;
-	unsigned delay;
-};
-
 #define LCM_GPIO_CFG(gpio, func, str) \
 		PCOM_GPIO_CFG(gpio, func, GPIO_OUTPUT, GPIO_NO_PULL, str)
 
@@ -839,6 +833,145 @@ static int sony_tft_panel_init(struct msm_lcdc_panel_ops *ops)
 	return 0;
 }
 
+static void sony_tft_panel_without_gamma_init(void)
+{
+	pr_info("%s: init gamma setting", __func__);
+
+	qspi_send_9bit(0x0, 0xF1);
+	qspi_send_9bit(0x1, 0x5A);
+	qspi_send_9bit(0x1, 0x5A);
+	// FAh RGB
+	qspi_send_9bit(0x0, 0xFA);
+	// Red
+	qspi_send_9bit(0x1, 0x32);
+	qspi_send_9bit(0x1, 0x3F);
+	qspi_send_9bit(0x1, 0x3F);
+	qspi_send_9bit(0x1, 0x29);
+	qspi_send_9bit(0x1, 0x3E);
+	qspi_send_9bit(0x1, 0x3C);
+	qspi_send_9bit(0x1, 0x3D);
+	qspi_send_9bit(0x1, 0x2C);
+	qspi_send_9bit(0x1, 0x27);
+	qspi_send_9bit(0x1, 0x3D);
+	qspi_send_9bit(0x1, 0x2E);
+	qspi_send_9bit(0x1, 0x31);
+	qspi_send_9bit(0x1, 0x3A);
+	qspi_send_9bit(0x1, 0x34);
+	qspi_send_9bit(0x1, 0x36);
+	// Green
+	qspi_send_9bit(0x1, 0x1A);
+	qspi_send_9bit(0x1, 0x3F);
+	qspi_send_9bit(0x1, 0x3F);
+	qspi_send_9bit(0x1, 0x2E);
+	qspi_send_9bit(0x1, 0x40);
+	qspi_send_9bit(0x1, 0x3C);
+	qspi_send_9bit(0x1, 0x3C);
+	qspi_send_9bit(0x1, 0x2B);
+	qspi_send_9bit(0x1, 0x25);
+	qspi_send_9bit(0x1, 0x39);
+	qspi_send_9bit(0x1, 0x25);
+	qspi_send_9bit(0x1, 0x23);
+	qspi_send_9bit(0x1, 0x2A);
+	qspi_send_9bit(0x1, 0x20);
+	qspi_send_9bit(0x1, 0x22);
+	// Blue
+	qspi_send_9bit(0x1, 0x00);
+	qspi_send_9bit(0x1, 0x3F);
+	qspi_send_9bit(0x1, 0x3F);
+	qspi_send_9bit(0x1, 0x2F);
+	qspi_send_9bit(0x1, 0x3E);
+	qspi_send_9bit(0x1, 0x3C);
+	qspi_send_9bit(0x1, 0x3C);
+	qspi_send_9bit(0x1, 0x2A);
+	qspi_send_9bit(0x1, 0x23);
+	qspi_send_9bit(0x1, 0x35);
+	qspi_send_9bit(0x1, 0x1E);
+	qspi_send_9bit(0x1, 0x18);
+	qspi_send_9bit(0x1, 0x1C);
+	qspi_send_9bit(0x1, 0x0C);
+	qspi_send_9bit(0x1, 0x0E);
+	// FBh RGB
+	qspi_send_9bit(0x0, 0xFB);
+	// Red
+	qspi_send_9bit(0x1, 0x00);
+	qspi_send_9bit(0x1, 0x0D);
+	qspi_send_9bit(0x1, 0x09);
+	qspi_send_9bit(0x1, 0x0C);
+	qspi_send_9bit(0x1, 0x26);
+	qspi_send_9bit(0x1, 0x2E);
+	qspi_send_9bit(0x1, 0x31);
+	qspi_send_9bit(0x1, 0x22);
+	qspi_send_9bit(0x1, 0x19);
+	qspi_send_9bit(0x1, 0x33);
+	qspi_send_9bit(0x1, 0x22);
+	qspi_send_9bit(0x1, 0x23);
+	qspi_send_9bit(0x1, 0x21);
+	qspi_send_9bit(0x1, 0x17);
+	qspi_send_9bit(0x1, 0x00);
+	// Green
+	qspi_send_9bit(0x1, 0x00);
+	qspi_send_9bit(0x1, 0x25);
+	qspi_send_9bit(0x1, 0x1D);
+	qspi_send_9bit(0x1, 0x1F);
+	qspi_send_9bit(0x1, 0x35);
+	qspi_send_9bit(0x1, 0x3C);
+	qspi_send_9bit(0x1, 0x3A);
+	qspi_send_9bit(0x1, 0x26);
+	qspi_send_9bit(0x1, 0x1B);
+	qspi_send_9bit(0x1, 0x34);
+	qspi_send_9bit(0x1, 0x23);
+	qspi_send_9bit(0x1, 0x23);
+	qspi_send_9bit(0x1, 0x1F);
+	qspi_send_9bit(0x1, 0x12);
+	qspi_send_9bit(0x1, 0x00);
+	// Blue
+	qspi_send_9bit(0x1, 0x00);
+	qspi_send_9bit(0x1, 0x3F);
+	qspi_send_9bit(0x1, 0x31);
+	qspi_send_9bit(0x1, 0x33);
+	qspi_send_9bit(0x1, 0x43);
+	qspi_send_9bit(0x1, 0x48);
+	qspi_send_9bit(0x1, 0x41);
+	qspi_send_9bit(0x1, 0x2A);
+	qspi_send_9bit(0x1, 0x1D);
+	qspi_send_9bit(0x1, 0x35);
+	qspi_send_9bit(0x1, 0x23);
+	qspi_send_9bit(0x1, 0x23);
+	qspi_send_9bit(0x1, 0x21);
+	qspi_send_9bit(0x1, 0x10);
+	qspi_send_9bit(0x1, 0x00);
+	// F3h Power control
+	qspi_send_9bit(0x0, 0xF3);
+	qspi_send_9bit(0x1, 0x00);
+	qspi_send_9bit(0x1, 0x10);
+	qspi_send_9bit(0x1, 0x25);
+	qspi_send_9bit(0x1, 0x01);
+	qspi_send_9bit(0x1, 0x2D);
+	qspi_send_9bit(0x1, 0x2D);
+	qspi_send_9bit(0x1, 0x24);
+	qspi_send_9bit(0x1, 0x2D);
+	qspi_send_9bit(0x1, 0x10);
+	qspi_send_9bit(0x1, 0x10);
+	qspi_send_9bit(0x1, 0x0A);
+	qspi_send_9bit(0x1, 0x37);
+	// F4h VCOM Control
+	qspi_send_9bit(0x0, 0xF4);
+	qspi_send_9bit(0x1, 0x88);
+	qspi_send_9bit(0x1, 0x20);
+	qspi_send_9bit(0x1, 0x00);
+	qspi_send_9bit(0x1, 0xAF);
+	qspi_send_9bit(0x1, 0x64);
+	qspi_send_9bit(0x1, 0x00);
+	qspi_send_9bit(0x1, 0xAA);
+	qspi_send_9bit(0x1, 0x64);
+	qspi_send_9bit(0x1, 0x00);
+	qspi_send_9bit(0x1, 0x00);
+	//Change to level 1
+	qspi_send_9bit(0x0, 0xF0);
+	qspi_send_9bit(0x1, 0x5A);
+	qspi_send_9bit(0x1, 0x5A);
+}
+
 static int sony_tft_panel_unblank(struct msm_lcdc_panel_ops *ops)
 {
 	pr_info("%s: +()\n", __func__);
@@ -863,6 +996,12 @@ static int sony_tft_panel_unblank(struct msm_lcdc_panel_ops *ops)
 		qspi_send_9bit(0x1, 0x05);
 	msleep(100);
 	qspi_send_9bit(0x0, 0x29);
+	msleep(20);
+
+	//init gamma setting
+	if(!is_sony_with_gamma())
+		sony_tft_panel_without_gamma_init();
+
 	/* unlock register page for pwm setting */
 	if (is_sony_spi()) {
 		qspi_send_9bit(0x0, 0xf0);
