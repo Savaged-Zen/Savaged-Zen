@@ -172,12 +172,13 @@
 #define BRAVO_LCD_HSYNC              (137)
 #define BRAVO_LCD_DE                 (138)
 
-/* know revisio
+/* know revision
+   0x05 = CDMA lcd
    0x81 = GSM amoled
    0x83 = GSM lcd
-   0x05 = CDMA lcd
+   0x84 = GSM lcd
 */
 
-#define is_cdma_version(rev) ((rev) != 0x81 && (rev) != 0x83)
+#define is_cdma_version(rev) (rev < 0x80)
 
 #endif /* __ARCH_ARM_MACH_MSM_BOARD_BRAVO_H */
