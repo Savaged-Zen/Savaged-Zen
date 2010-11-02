@@ -27,8 +27,6 @@
 #include <linux/android_pmem.h>
 // #include <linux/synaptics_t1007.h>
 #include <linux/input.h>
-#include <mach/htc_headset.h>
-#include <mach/audio_jack.h>
 #include <linux/akm8973.h>
 #include <linux/bma150.h>
 #include <linux/capella_cm3602_htc.h>
@@ -58,15 +56,22 @@
 #include <mach/msm_flashlight.h>
 #include <linux/atmel_qt602240.h>
 #include <mach/vreg.h>
+
+#include <mach/htc_headset_mgr.h>
+#include <mach/htc_headset_gpio.h>
+#include <mach/htc_headset_microp.h>
+
+
 #ifdef CONFIG_MICROP_COMMON
 #include <mach/atmega_microp.h>
 #endif
 
+#include <mach/msm_hdmi.h>
 #include <mach/msm_hsusb.h>
 
 #include "board-supersonic-tpa2018d1.h"
 
-#define SMEM_SPINLOCK_I2C      6
+#define SMEM_SPINLOCK_I2C	   6
 
 #ifdef CONFIG_ARCH_QSD8X50
 extern unsigned char *get_bt_bd_ram(void);
@@ -91,6 +96,8 @@ static struct htc_battery_platform_data htc_battery_pdev_data = {
 	.guage_driver = GUAGE_MODEM,
 	.m2a_cable_detect = 1,
 	.charger = SWITCH_CHARGER,
+	/* After the state of SUC XA, MCHG_EN is chanage to CHG_INT*/
+	.int_data.chg_int = MSM_GPIO_TO_INT(SUPERSONIC_GPIO_MCHG_EN_N),
 };
 
 static struct platform_device htc_battery_pdev = {
@@ -105,14 +112,7 @@ static struct platform_device htc_battery_pdev = {
 static int capella_cm3602_power(int pwr_device, uint8_t enable);
 static struct microp_function_config microp_functions[] = {
 	{
-		.name   = "remote-key",
-		.category = MICROP_FUNCTION_REMOTEKEY,
-		.levels = {0, 33, 50, 110, 160, 220},
-		.channel = 1,
-		.int_pin = 1 << 7,
-	},
-	{
-		.name   = "reset-int",
+		.name	= "reset-int",
 		.category = MICROP_FUNCTION_RESET_INT,
 		.int_pin = 1 << 8,
 	},
@@ -161,7 +161,7 @@ static struct bma150_platform_data supersonic_g_sensor_pdata = {
 static int __capella_cm3602_power(int on)
 {
 	int ret;
-	struct vreg *vreg = vreg_get(0, "gp1");;
+	struct vreg *vreg = vreg_get(0, "gp1");
 	if (!vreg) {
 		printk(KERN_ERR "%s: vreg error\n", __func__);
 		return -EIO;
@@ -215,6 +215,13 @@ static struct capella_cm3602_platform_data capella_cm3602_pdata = {
 };
 /* End Proximity Sensor (Capella_CM3602)*/
 
+static struct htc_headset_microp_platform_data htc_headset_microp_data = {
+	.remote_int   = 1 << 7,
+	.remote_irq   = MSM_uP_TO_INT(7),
+	.remote_enable_pin	= 0,
+	.adc_channel	= 0x01,
+	.adc_remote   = {0, 33, 50, 110, 160, 220},
+};
 
 static struct platform_device microp_devices[] = {
 	{
@@ -243,10 +250,17 @@ static struct platform_device microp_devices[] = {
 			.platform_data = &capella_cm3602_pdata,
 		},
 	},
+  {
+		.name = "HTC_HEADSET_MICROP",
+		.id = -1,
+		.dev  = {
+			.platform_data	= &htc_headset_microp_data,
+		},
+	},
 };
 
 static struct microp_i2c_platform_data microp_data = {
-	.num_functions   = ARRAY_SIZE(microp_functions),
+	.num_functions	 = ARRAY_SIZE(microp_functions),
 	.microp_function = microp_functions,
 	.num_devices = ARRAY_SIZE(microp_devices),
 	.microp_devices = microp_devices,
@@ -277,15 +291,40 @@ static struct platform_device supersonic_leds = {
 	},
 };
 
-extern void msm_hsusb_8x50_phy_reset(void);
 static int supersonic_phy_init_seq[] = { 0xC, 0x31, 0x30, 0x32, 0x1D, 0x0D, 0x1D, 0x10, -1 };
+
+
+// USB cable out: supersonic_uart_usb_switch(1)
+// USB cable in: supersonic_uart_usb_switch(0)
+static void supersonic_uart_usb_switch(int uart)
+{
+		printk(KERN_INFO "%s:uart:%d\n", __func__, uart);
+		gpio_set_value(SUPERSONIC_USB_UARTz_SW, uart?1:0); // XA and for USB cable in to reset wimax UART
+
+		if(system_rev && uart) // XB
+		{
+				if (gpio_get_value(SUPERSONIC_WIMAX_CPU_UARTz_SW))	// Wimax UART
+			{
+						printk(KERN_INFO "%s:Wimax UART\n", __func__);
+						gpio_set_value(SUPERSONIC_USB_UARTz_SW,1);
+						gpio_set_value(SUPERSONIC_WIMAX_CPU_UARTz_SW,1);
+				}
+				else // USB, CPU UART
+				{
+						printk(KERN_INFO "%s:Non wimax UART\n", __func__);
+						gpio_set_value(SUPERSONIC_WIMAX_CPU_UARTz_SW, uart==2?1:0);
+				}
+		}
+}
+
+extern void msm_hsusb_8x50_phy_reset(void);
 
 static struct msm_hsusb_platform_data msm_hsusb_pdata = {
 	.phy_init_seq = supersonic_phy_init_seq,
-	.usb_connected = notify_usb_connected,
-// XXX: Car kit
-//	.usb_id_pin_gpio = SUPERSONIC_GPIO_USB_ID_PIN,
-//	.config_usb_id_gpios = config_supersonic_usb_id_gpios,
+	.phy_reset = msm_hsusb_8x50_phy_reset,
+	.usb_id_pin_gpio =	SUPERSONIC_GPIO_USB_ID_PIN,
+	.accessory_detect = 1, /* detect by ID pin gpio */
+	.usb_uart_switch = supersonic_uart_usb_switch,
 };
 
 
@@ -405,7 +444,7 @@ static struct android_usb_platform_data android_usb_pdata = {
 static struct platform_device android_usb_device = {
 	.name = "android_usb",
 	.id   = -1,
-	.dev    = {
+	.dev	= {
 		.platform_data = &android_usb_pdata,
 	},
 };
@@ -416,36 +455,13 @@ CPU_WIMAX_SW -> GPIO160
 USB_UART#_SW -> GPIO33
 
 XA : GPIO33 = 0 -> USB
-    GPIO33 = 1 -> CPU UART
+	GPIO33 = 1 -> CPU UART
 
 XB : GPIO33 = 0 -> USB
-    GPIO33 = 1 , GPIO160 = 0 -> CPU UART     // SUPERSONIC_WIMAX_CPU_UARTz_SW (GPIO160)
-    GPIO33 = 1 , GPIO160 = 1 -> Wimax UART   // SUPERSONIC_USB_UARTz_SW (GPIO33)
+	GPIO33 = 1 , GPIO160 = 0 -> CPU UART	 // SUPERSONIC_WIMAX_CPU_UARTz_SW (GPIO160)
+	GPIO33 = 1 , GPIO160 = 1 -> Wimax UART	 // SUPERSONIC_USB_UARTz_SW (GPIO33)
 */
 
-
-// USB cable out: supersonic_uart_usb_switch(1)
-// USB cable in: supersonic_uart_usb_switch(0)
-static void supersonic_uart_usb_switch(int uart)
-{
-	printk(KERN_INFO "%s:uart:%d\n", __func__, uart);
-	gpio_set_value(SUPERSONIC_USB_UARTz_SW, uart?1:0); // XA and for USB cable in to reset wimax UART
-
-	if(system_rev && uart) // XB
-	{
-		if (gpio_get_value(SUPERSONIC_WIMAX_CPU_UARTz_SW))  // Wimax UART
-	    {
-			printk(KERN_INFO "%s:Wimax UART\n", __func__);
-			gpio_set_value(SUPERSONIC_USB_UARTz_SW,1);
-			gpio_set_value(SUPERSONIC_WIMAX_CPU_UARTz_SW,1);
-		}
-		else // USB, CPU UART
-		{
-			printk(KERN_INFO "%s:Non wimax UART\n", __func__);
-			gpio_set_value(SUPERSONIC_WIMAX_CPU_UARTz_SW, uart==2?1:0);
-		}
-	}
-}
 
 static struct platform_device supersonic_rfkill = {
 	.name = "supersonic_rfkill",
@@ -647,8 +663,6 @@ static int supersonic_atmel_ts_power(int on)
 struct atmel_i2c_platform_data supersonic_atmel_ts_data[] = {
 	{
 		.version = 0x016,
-		.display_width = 480,
-		.display_height = 800,
 		.abs_x_min = 34,
 		.abs_x_max = 990,
 		.abs_y_min = 15,
@@ -662,7 +676,7 @@ struct atmel_i2c_platform_data supersonic_atmel_ts_data[] = {
 		.config_T6 = {0, 0, 0, 0, 0, 0},
 		.config_T7 = {50, 15, 50},
 		.config_T8 = {10, 0, 20, 10, 0, 0, 5, 0},
-		.config_T9 = {139, 0, 0, 18, 12, 0, 16, 32, 3, 5, 0, 5, 2, 14, 2, 10, 25, 10, 0, 0, 0, 0, 0, 0, 0, 0, 143, 25, 146, 10, 40},
+		.config_T9 = {139, 0, 0, 18, 12, 0, 16, 32, 3, 5, 0, 5, 2, 14, 5, 10, 25, 10, 0, 0, 0, 0, 0, 0, 0, 0, 143, 25, 146, 10, 40},
 		.config_T15 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		.config_T19 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		.config_T20 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -692,7 +706,7 @@ struct atmel_i2c_platform_data supersonic_atmel_ts_data[] = {
 		.config_T6 = {0, 0, 0, 0, 0, 0},
 		.config_T7 = {100, 10, 50},
 		.config_T8 = {8, 0, 50, 50, 0, 0, 50, 0},
-		.config_T9 = {3, 0, 0, 18, 12, 0, 32, 40, 2, 5, 0, 0, 0, 0, 2, 10, 10, 10, 0, 0, 0, 0, 0, 0, 0, 0, 143, 47, 145, 81},
+		.config_T9 = {139, 0, 0, 18, 12, 0, 16, 32, 3, 5, 0, 5, 2, 14, 5, 10, 25, 10, 0, 0, 0, 0, 0, 0, 0, 0, 143, 25, 146, 10, 20},
 		.config_T15 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		.config_T19 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		.config_T20 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -719,7 +733,7 @@ struct atmel_i2c_platform_data supersonic_atmel_ts_data[] = {
 		.config_T6 = {0, 0, 0, 0, 0, 0},
 		.config_T7 = {100, 10, 50},
 		.config_T8 = {8, 0, 50, 50, 0, 0, 50, 0},
-		.config_T9 = {3, 0, 0, 18, 12, 0, 64, 45, 3, 5, 0, 0, 0, 0, 2, 10, 25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 143, 47, 143, 81},
+		.config_T9 = {139, 0, 0, 18, 12, 0, 16, 32, 3, 5, 0, 5, 2, 14, 5, 10, 25, 10, 0, 0, 0, 0, 0, 0, 0, 0, 143, 25, 146, 10, 20},
 		.config_T15 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		.config_T19 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		.config_T20 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -742,7 +756,7 @@ static struct regulator_init_data tps65023_data[5] = {
 	{
 		.constraints = {
 			.name = "dcdc1", /* VREG_MSMC2_1V29 */
-			.min_uV = 1000000,
+			.min_uV = 975000,
 			.max_uV = 1300000,
 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
 		},
@@ -780,26 +794,28 @@ static struct regulator_init_data tps65023_data[5] = {
 	},
 };
 
-static struct h2w_platform_data supersonic_h2w_data = {
+static struct htc_headset_mgr_platform_data htc_headset_mgr_data = {
 };
 
-static struct platform_device supersonic_h2w = {
-	.name		= "htc_headset",
-	.id			= -1,
-	.dev		= {
-		.platform_data	= &supersonic_h2w_data,
+static struct platform_device htc_headset_mgr = {
+	.name = "HTC_HEADSET_MGR",
+	.id = -1,
+	.dev  = {
+		.platform_data	= &htc_headset_mgr_data,
 	},
 };
 
-static struct audio_jack_platform_data supersonic_jack_data = {
-	.gpio	= SUPERSONIC_GPIO_35MM_HEADSET_DET,
+static struct htc_headset_gpio_platform_data htc_headset_gpio_data = {
+	.hpin_gpio	  = SUPERSONIC_GPIO_35MM_HEADSET_DET,
+	.key_enable_gpio  = 0,
+	.mic_select_gpio  = 0,
 };
 
-static struct platform_device supersonic_audio_jack = {
-	.name		= "audio-jack",
-	.id			= -1,
-	.dev		= {
-		.platform_data	= &supersonic_jack_data,
+static struct platform_device htc_headset_gpio = {
+	.name = "HTC_HEADSET_GPIO",
+	.id = -1,
+	.dev  = {
+		.platform_data	= &htc_headset_gpio_data,
 	},
 };
 
@@ -812,6 +828,192 @@ static struct akm8973_platform_data compass_platform_data = {
 
 static struct tpa2018d1_platform_data tpa2018_data = {
 	.gpio_tpa2018_spk_en = SUPERSONIC_AUD_SPK_EN,
+};
+
+/*
+ * HDMI platform data
+ */
+
+#if 1
+#define HDMI_DBG(s...) printk("[hdmi]" s)
+#else
+#define HDMI_DBG(s...) do {} while (0)
+#endif
+
+static int hdmi_power(int on)
+{
+	HDMI_DBG("%s(%d)\n", __func__, on);
+
+	switch(on) {
+	/* Power on/off sequence for normal or D2 sleep mode */
+	case 0:
+		gpio_set_value(HDMI_RST, 0);
+		msleep(2);
+		gpio_set_value(V_HDMI_3V3_EN, 0);
+		gpio_set_value(V_VGA_5V_SIL9022A_EN, 0);
+		msleep(2);
+		gpio_set_value(V_HDMI_1V2_EN, 0);
+		break;
+	case 1:
+		gpio_set_value(V_HDMI_1V2_EN, 1);
+		msleep(2);
+		gpio_set_value(V_VGA_5V_SIL9022A_EN, 1);
+		gpio_set_value(V_HDMI_3V3_EN, 1);
+		msleep(2);
+		gpio_set_value(HDMI_RST, 1);
+		msleep(2);
+		break;
+
+	/* Power on/off sequence for D3 sleep mode */
+	case 2:
+		gpio_set_value(V_HDMI_3V3_EN, 0);
+		break;
+	case 3:
+		gpio_set_value(HDMI_RST, 0);
+		msleep(2);
+		gpio_set_value(V_HDMI_3V3_EN, 1);
+		gpio_set_value(V_VGA_5V_SIL9022A_EN, 1);
+		msleep(50);
+		gpio_set_value(HDMI_RST, 1);
+		msleep(10);
+		break;
+	case 4:
+		gpio_set_value(V_VGA_5V_SIL9022A_EN, 0);
+		break;
+	case 5:
+		gpio_set_value(V_VGA_5V_SIL9022A_EN, 1);
+		break;
+
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static uint32_t hdmi_gpio_on_table[] = {
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_R0, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_R1, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_R2, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_R3, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_R4, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_G0, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_G1, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_G2, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_G3, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_G4, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_G5, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_B0, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_B1, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_B2, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_B3, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_B4, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_PCLK, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_VSYNC, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_HSYNC, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_DE, 1, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+};
+
+static uint32_t hdmi_gpio_off_table[] = {
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_R0, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_R1, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_R2, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_R3, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_R4, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_G0, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_G1, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_G2, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_G3, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_G4, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_G5, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_B0, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_B1, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_B2, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_B3, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_B4, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_PCLK, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_VSYNC, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_HSYNC, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+	PCOM_GPIO_CFG(SUPERSONIC_LCD_DE, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+			GPIO_2MA),
+};
+
+
+static void suc_hdmi_gpio_on(void)
+{
+	HDMI_DBG("%s\n", __func__);
+
+	config_gpio_table(hdmi_gpio_on_table, ARRAY_SIZE(hdmi_gpio_on_table));
+}
+
+static void suc_hdmi_gpio_off(void)
+{
+	int i = 0;
+
+	HDMI_DBG("%s\n", __func__);
+	config_gpio_table(hdmi_gpio_off_table, ARRAY_SIZE(hdmi_gpio_off_table));
+
+	for (i = SUPERSONIC_LCD_R0; i <= SUPERSONIC_LCD_R4; i++)
+		gpio_set_value(i, 0);
+	for (i = SUPERSONIC_LCD_G0; i <= SUPERSONIC_LCD_G5; i++)
+		gpio_set_value(i, 0);
+	for (i = SUPERSONIC_LCD_B0; i <= SUPERSONIC_LCD_DE; i++)
+		gpio_set_value(i, 0);
+}
+
+static struct hdmi_platform_data hdmi_device_data = {
+	.hdmi_res = {
+		.start = MSM_HDMI_FB_BASE,
+		.end = MSM_HDMI_FB_BASE + MSM_HDMI_FB_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	.power = hdmi_power,
+	.hdmi_gpio_on = suc_hdmi_gpio_on,
+	.hdmi_gpio_off = suc_hdmi_gpio_off,
 };
 
 static struct tpa6130_platform_data headset_amp_platform_data = {
@@ -842,7 +1044,12 @@ static struct i2c_board_info i2c_devices[] = {
 		.platform_data = &compass_platform_data,
 		.irq = MSM_GPIO_TO_INT(SUPERSONIC_GPIO_COMPASS_INT_N),
 	},
-
+	{
+		I2C_BOARD_INFO("s5k3h1gx",	0x20 >> 1),
+	},/*samsung for 2nd source main camera*/
+	{
+		I2C_BOARD_INFO("s5k6aafx", 0x78 >> 1),
+	},/*samsung 2nd camera 2nd source*/
 	{
 		I2C_BOARD_INFO("ov8810", 0x6C >> 1),
 	},
@@ -860,6 +1067,11 @@ static struct i2c_board_info i2c_devices[] = {
 	{
 		I2C_BOARD_INFO("tpa2018d1", 0x58),
 		.platform_data = &tpa2018_data,
+	},
+	{
+		I2C_BOARD_INFO("SiL902x-hdmi", 0x76 >> 1),
+		.platform_data = &hdmi_device_data,
+		.irq = MSM_uP_TO_INT(1),
 	},
 };
 
@@ -897,8 +1109,6 @@ static uint32_t camera_off_gpio_table[] = {
 	PCOM_GPIO_CFG(13, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* HSYNC */
 	PCOM_GPIO_CFG(14, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* VSYNC */
 	PCOM_GPIO_CFG(15, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* MCLK */
-	PCOM_GPIO_CFG(99, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA), /* CAM1_RST */
-	PCOM_GPIO_CFG(100, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA), /* CAM1_PWD */
 };
 
 static uint32_t camera_on_gpio_table[] = {
@@ -956,10 +1166,10 @@ static struct msm_camera_device_platform_data msm_camera_device_data = {
 	.ioext.appsz  = MSM_CLK_CTL_SIZE,
 };
 
-static void supersonic_ov8810_clk_switch(void){
+static void supersonic_maincam_clk_switch(void){
 	int rc = 0;
-	pr_info("SuperSoinc: clk switch (supersonic)(ov8810)\n");
-	rc = gpio_request(SUPERSONIC_CLK_SWITCH, "ov8810");
+	pr_info("SuperSoinc: clk switch (supersonic)(maincam)\n");
+	rc = gpio_request(SUPERSONIC_CLK_SWITCH, "maincam");
 	if (rc < 0)
 		pr_err("GPIO (%d) request fail\n", SUPERSONIC_CLK_SWITCH);
 	else
@@ -969,10 +1179,10 @@ static void supersonic_ov8810_clk_switch(void){
 	return;
 }
 
-static void supersonic_ov9665_clk_switch(void){
+static void supersonic_seccam_clk_switch(void){
 	int rc = 0;
-	pr_info("SuperSoinc: Doing clk switch (supersonic)(ov9665)\n");
-	rc = gpio_request(SUPERSONIC_CLK_SWITCH, "ov9665");
+	pr_info("SuperSoinc: Doing clk switch (supersonic)(2ndcam)\n");
+	rc = gpio_request(SUPERSONIC_CLK_SWITCH, "seccam");
 	if (rc < 0)
 		pr_err("GPIO (%d) request fail\n", SUPERSONIC_CLK_SWITCH);
 	else
@@ -982,18 +1192,94 @@ static void supersonic_ov9665_clk_switch(void){
 	return;
 }
 
+enum msm_camera_source camera_source;
+static void supersonic_set_source(enum msm_camera_source source)
+{
+	camera_source = source;
+}
+
+enum msm_camera_source supersonic_get_source(void){
+	return camera_source;
+}
+
+static int camera_main_probed = 0;
+static int supersonic_camera_main_get_probe(void)
+{
+	return camera_main_probed;
+}
+static void supersonic_camera_main_set_probe(int probed)
+{
+	camera_main_probed = probed;
+}
+
+static int camera_sec_probed = 0;
+static int supersonic_camera_sec_get_probe(void)
+{
+	return camera_sec_probed;
+}
+static void supersonic_camera_sec_set_probe(int probed)
+{
+	camera_sec_probed = probed;
+}
+
 static struct camera_flash_cfg msm_camera_sensor_flash_cfg = {
-//	.camera_flash		= flashlight_control,
+	.camera_flash		= flashlight_control,
 	.num_flash_levels	= FLASHLIGHT_NUM,
 	.low_temp_limit		= 10,
 	.low_cap_limit		= 15,
 };
 
+/*2nd source for 2nd camera*/
+static struct msm_camera_sensor_info msm_camera_sensor_s5k6aafx_data = {
+	.sensor_name = "s5k6aafx",
+	.sensor_reset = SUPERSONIC_MAINCAM_RST,
+	.sensor_pwd = SUPERSONIC_2NDCAM_PWD,
+	.camera_clk_switch = supersonic_seccam_clk_switch,
+	.camera_main_get_probe = supersonic_camera_sec_get_probe,
+	.camera_main_set_probe = supersonic_camera_sec_get_probe,
+	.pdata = &msm_camera_device_data,
+	.resource = msm_camera_resources,
+	.num_resources = ARRAY_SIZE(msm_camera_resources),
+	.waked_up = 0,
+	.need_suspend = 0,
+};
+
+static struct platform_device msm_camera_sensor_s5k6aafx = {
+	.name	   = "msm_camera_s5k6aafx",
+	.dev		= {
+		.platform_data = &msm_camera_sensor_s5k6aafx_data,
+	},
+};
+
+/*samsung for 2nd source main camera*/
+static struct msm_camera_sensor_info msm_camera_sensor_s5k3h1_data = {
+	.sensor_name	= "s5k3h1gx",
+	.sensor_reset	= SUPERSONIC_MAINCAM_RST,
+	.sensor_pwd		= SUPERSONIC_MAINCAM_PWD,
+	.camera_clk_switch	= supersonic_maincam_clk_switch,
+	.camera_set_source = supersonic_set_source,
+	.camera_main_get_probe = supersonic_camera_main_get_probe,
+	.camera_main_set_probe = supersonic_camera_main_set_probe,
+	.pdata = &msm_camera_device_data,
+	.resource = msm_camera_resources,
+	.num_resources = ARRAY_SIZE(msm_camera_resources),
+	.flash_cfg	= &msm_camera_sensor_flash_cfg,
+};
+
+static struct platform_device msm_camera_sensor_s5k3h1 = {
+	.name			= "msm_camera_s5k3h1gx",
+	.dev			= {
+	.platform_data = &msm_camera_sensor_s5k3h1_data,
+	},
+};
 static struct msm_camera_sensor_info msm_camera_sensor_ov8810_data = {
-	.sensor_name    = "ov8810",
-	.sensor_reset   = SUPERSONIC_MAINCAM_RST, /* CAM1_RST */
-	.sensor_pwd     = SUPERSONIC_MAINCAM_PWD,  /* CAM1_PWDN, enabled in a9 */
-	.camera_clk_switch	= supersonic_ov8810_clk_switch,
+	.sensor_name	= "ov8810",
+	.sensor_reset	= SUPERSONIC_MAINCAM_RST,
+	.sensor_pwd		= SUPERSONIC_MAINCAM_PWD,
+	.camera_clk_switch	= supersonic_maincam_clk_switch,
+	.camera_set_source = supersonic_set_source,
+	.camera_main_get_probe = supersonic_camera_main_get_probe,
+	.camera_main_set_probe = supersonic_camera_main_set_probe,
 	.pdata = &msm_camera_device_data,
 	.resource = msm_camera_resources,
 	.num_resources = ARRAY_SIZE(msm_camera_resources),
@@ -1003,17 +1289,20 @@ static struct msm_camera_sensor_info msm_camera_sensor_ov8810_data = {
 };
 
 static struct platform_device msm_camera_sensor_ov8810 = {
-    .name           = "msm_camera_ov8810",
-    .dev            = {
-    .platform_data = &msm_camera_sensor_ov8810_data,
-    },
+	.name			= "msm_camera_ov8810",
+	.dev			= {
+	.platform_data = &msm_camera_sensor_ov8810_data,
+	},
 };
 
 static struct msm_camera_sensor_info msm_camera_sensor_ov9665_data = {
 	.sensor_name	= "ov9665",
 	.sensor_reset	= SUPERSONIC_MAINCAM_RST,
-	.sensor_pwd	= SUPERSONIC_2NDCAM_PWD,
-	.camera_clk_switch	= supersonic_ov9665_clk_switch,
+	.sensor_pwd = SUPERSONIC_2NDCAM_PWD,
+	.camera_clk_switch	= supersonic_seccam_clk_switch,
+	.camera_get_source = supersonic_get_source,
+	.camera_main_get_probe = supersonic_camera_sec_get_probe,
+	.camera_main_get_probe = supersonic_camera_sec_get_probe,
 	.pdata		= &msm_camera_device_data,
 	.resource = msm_camera_resources,
 	.num_resources = ARRAY_SIZE(msm_camera_resources),
@@ -1023,11 +1312,10 @@ static struct msm_camera_sensor_info msm_camera_sensor_ov9665_data = {
 
 static struct platform_device msm_camera_sensor_ov9665 = {
 	.name	   = "msm_camera_ov9665",
-	.dev	    = {
+	.dev		= {
 		.platform_data = &msm_camera_sensor_ov9665_data,
 	},
 };
-
 static void config_supersonic_flashlight_gpios(void)
 {
 	static uint32_t flashlight_gpio_table[] = {
@@ -1043,7 +1331,7 @@ static void config_supersonic_flashlight_gpios(void)
 }
 
 static struct flashlight_platform_data supersonic_flashlight_data = {
-	.gpio_init  = config_supersonic_flashlight_gpios,
+	.gpio_init	= config_supersonic_flashlight_gpios,
 	.torch = SUPERSONIC_GPIO_FLASHLIGHT_TORCH,
 	.flash = SUPERSONIC_GPIO_FLASHLIGHT_FLASH,
 	.flash_adj = SUPERSONIC_GPIO_FLASHLIGHT_FLASH_ADJ,
@@ -1058,16 +1346,36 @@ static struct platform_device supersonic_flashlight_device = {
 	},
 };
 
+static struct msm_serial_hs_platform_data msm_uart_dm1_pdata = {
+		.rx_wakeup_irq = -1,
+		.inject_rx_on_wakeup = 0,
+		.exit_lpm_cb = bcm_bt_lpm_exit_lpm_locked,
+};
+
+static struct bcm_bt_lpm_platform_data bcm_bt_lpm_pdata = {
+		.gpio_wake = SUPERSONIC_GPIO_BT_CHIP_WAKE,
+		.gpio_host_wake = SUPERSONIC_GPIO_BT_HOST_WAKE,
+		.request_clock_off_locked = msm_hs_request_clock_off_locked,
+		.request_clock_on_locked = msm_hs_request_clock_on_locked,
+};
+
+struct platform_device bcm_bt_lpm_device = {
+		.name = "bcm_bt_lpm",
+		.id = 0,
+		.dev = {
+				.platform_data = &bcm_bt_lpm_pdata,
+		},
+};
+
 static struct platform_device *devices[] __initdata = {
 #ifndef CONFIG_MSM_SERIAL_DEBUGGER
 	&msm_device_uart1,
 #endif
-#ifdef CONFIG_SERIAL_MSM_HS
+	&bcm_bt_lpm_device,
 	&msm_device_uart_dm1,
-#endif
-	&supersonic_h2w,
 	&htc_battery_pdev,
-	&supersonic_audio_jack,
+	&htc_headset_mgr,
+	&htc_headset_gpio,
 	&ram_console_device,
 	&supersonic_rfkill,
 	&msm_device_smd,
@@ -1090,7 +1398,9 @@ static struct platform_device *devices[] __initdata = {
 	&android_pmem_ciq2_device,
 	&android_pmem_ciq3_device,
 #endif
+	&msm_camera_sensor_s5k3h1,
 	&msm_camera_sensor_ov8810,
+	&msm_camera_sensor_s5k6aafx,
 	&msm_kgsl_device,
 	&msm_device_i2c,
 	&msm_camera_sensor_ov9665,
@@ -1135,40 +1445,6 @@ static struct msm_acpu_clock_platform_data supersonic_clock_data = {
 
 int supersonic_init_mmc(int sysrev);
 
-#ifdef CONFIG_SERIAL_MSM_HS
-extern void supersonic_config_bt_disable_active(void);
-extern void supersonic_config_bt_disable_sleep(void);
-extern int supersonic_is_bluetooth_off(void);
-
-static struct msm_serial_hs_platform_data msm_uart_dm1_pdata = {
-	.rx_wakeup_irq = MSM_GPIO_TO_INT(SUPERSONIC_GPIO_BT_HOST_WAKE),	/*Chip to Device*/
-	.inject_rx_on_wakeup = 0,
-	.exit_lpm_cb = bcm_bt_lpm_exit_lpm_locked,
-
-#if 0
-	.config_as_uart = supersonic_config_bt_disable_active,
-	.config_as_gpio = supersonic_config_bt_disable_sleep,
-	.need_config = supersonic_is_bluetooth_off,
-#endif
-};
-
-static struct bcm_bt_lpm_platform_data bcm_bt_lpm_pdata = {
-  .gpio_wake = SUPERSONIC_GPIO_BT_CHIP_WAKE,
-  .gpio_host_wake = SUPERSONIC_GPIO_BT_HOST_WAKE,
-  .request_clock_off_locked = msm_hs_request_clock_off_locked,
-  .request_clock_on_locked = msm_hs_request_clock_on_locked,
-};
-
-struct platform_device bcm_bt_lpm_device = {
-  .name = "bcm_bt_lpm",
-  .id = 0,
-  .dev = {
-    .platform_data = &bcm_bt_lpm_pdata,
-  },
-};
-#endif
-
-
 static int OJ_BMA_power(void)
 {
 	int ret;
@@ -1196,9 +1472,9 @@ static ssize_t supersonic_virtual_keys_show(struct kobject *kobj,
 			struct kobj_attribute *attr, char *buf)
 {
 	return sprintf(buf,
-			__stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":43:835:86:50"
-			":" __stringify(EV_KEY) ":" __stringify(KEY_MENU)   ":165:835:100:50"
-			":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)   ":300:835:110:50"
+			__stringify(EV_KEY) ":" __stringify(KEY_HOME)	":43:835:86:50"
+			":" __stringify(EV_KEY) ":" __stringify(KEY_MENU)	":165:835:100:50"
+			":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)	":300:835:110:50"
 			":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH) ":425:835:90:50"
 			"\n");
 }
@@ -1222,7 +1498,7 @@ static struct attribute_group supersonic_properties_attr_group = {
 
 static void supersonic_reset(void)
 {
-        gpio_set_value(SUPERSONIC_GPIO_PS_HOLD, 0);
+		gpio_set_value(SUPERSONIC_GPIO_PS_HOLD, 0);
 }
 
 /* system_rev == higher 16bits of PCBID
@@ -1237,18 +1513,17 @@ static void __init supersonic_init(void)
 
 	printk("supersonic_init() revision=%d\n", system_rev);
 
+	android_usb_pdata.serial_number = board_serialno();
+
 	msm_hw_reset_hook = supersonic_reset;
 
 	OJ_BMA_power();
-
-	gpio_request(SUPERSONIC_GPIO_PROXIMITY_EN_N, "proximity_en");
-	gpio_direction_output(SUPERSONIC_GPIO_PROXIMITY_EN_N, 0);
 
 	msm_acpu_clock_init(&supersonic_clock_data);
 
 #if defined(CONFIG_MSM_SERIAL_DEBUGGER)
 	msm_serial_debug_init(MSM_UART1_PHYS, INT_UART1,
-			      &msm_device_uart1.dev, 1, MSM_GPIO_TO_INT(SUPERSONIC_GPIO_UART1_RX));
+				  &msm_device_uart1.dev, 1, MSM_GPIO_TO_INT(SUPERSONIC_GPIO_UART1_RX));
 #endif
 
 #ifdef CONFIG_ARCH_QSD8X50
@@ -1264,11 +1539,9 @@ static void __init supersonic_init(void)
 	msm_device_spi.dev.platform_data = &supersonic_spi_pdata;
 #endif
 
-	#ifdef CONFIG_SERIAL_MSM_HS
 	msm_device_uart_dm1.dev.platform_data = &msm_uart_dm1_pdata;
-	msm_device_uart_dm1.name = "msm_serial_hs_bcm";	/* for bcm */
-	#endif
 
+	config_gpio_table(usb_phy_3v3_table, ARRAY_SIZE(usb_phy_3v3_table));
 	config_gpio_table(camera_off_gpio_table,
 		ARRAY_SIZE(camera_off_gpio_table));
 	gpio_request(SUPERSONIC_GPIO_TP_EN, "tp_en");
@@ -1299,9 +1572,6 @@ static void __init supersonic_init(void)
 		pr_err("failed to create board_properties\n");
 
 	msm_init_pmic_vibrator();
-	config_gpio_table(usb_phy_3v3_table, ARRAY_SIZE(usb_phy_3v3_table));
-	gpio_set_value(SUPERSONIC_USB_PHY_3V3_ENABLE, 1);
-
 }
 
 static void __init supersonic_fixup(struct machine_desc *desc, struct tag *tags,
@@ -1332,8 +1602,8 @@ extern struct sys_timer msm_timer;
 
 MACHINE_START(SUPERSONIC, "supersonic")
 #ifdef CONFIG_MSM_DEBUG_UART
-	.phys_io        = MSM_DEBUG_UART_PHYS,
-	.io_pg_offst    = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
+	.phys_io		= MSM_DEBUG_UART_PHYS,
+	.io_pg_offst	= ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
 #endif
 	.boot_params	= 0x20000100,
 	.fixup		= supersonic_fixup,
