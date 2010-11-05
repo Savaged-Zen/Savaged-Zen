@@ -55,6 +55,7 @@ struct clkctl_acpu_speed {
 	unsigned sc_l_value;
 	unsigned lpj;
 	int      vdd;
+  unsigned axiclk_khz;
 };
 
 /* clock sources */
@@ -71,30 +72,31 @@ struct clkctl_acpu_speed {
 #define SRC_PLL1	3 /* 768 MHz */
 
 struct clkctl_acpu_speed acpu_freq_tbl[] = {
-        {  19200, CCTL(CLK_TCXO, 1),            SRC_RAW, 0, 0, 975 },
-        { 128000, CCTL(CLK_TCXO, 1),            SRC_AXI, 0, 0, 975 },
-        { 245000, CCTL(CLK_MODEM_PLL, 1),       SRC_RAW, 0, 0, 1000 },
-        { 256000, CCTL(CLK_GLOBAL_PLL, 3),      SRC_RAW, 0, 0, 1000 },
-        { 384000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0A, 0, 1025 },
-        { 422400, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0B, 0, 1050 },
-        { 460800, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0C, 0, 1050 },
-        { 499200, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0D, 0, 1075 },
-        { 537600, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0E, 0, 1075 },
-        { 576000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0F, 0, 1100 },
-        { 614400, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x10, 0, 1100 },
-        { 652800, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x11, 0, 1125 },
-        { 691200, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x12, 0, 1150 },
-        { 729600, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x13, 0, 1175 },
-        { 768000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x14, 0, 1200 },
-        { 806400, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x15, 0, 1225 },
-        { 844800, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x16, 0, 1250 },
-        { 883200, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x17, 0, 1275 },
-        { 921600, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x18, 0, 1275 },
-        { 960000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x19, 0, 1275 },
-        { 998400, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x1A, 0, 1275 },
-	{ 1036800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1B, 0, 1275 },
-	{ 1075200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1C, 0, 1275 },
-	{ 1113600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1D, 0, 1275 },
+        {  19200, CCTL(CLK_TCXO, 1),            SRC_RAW, 0, 0, 975, 14000 },
+        { 128000, CCTL(CLK_TCXO, 1),            SRC_AXI, 0, 0, 975, 14000 },
+        { 245000, CCTL(CLK_MODEM_PLL, 1),       SRC_RAW, 0, 0, 1000, 29000 },
+        /* Work arround for acpu resume hung, GPLL is turn off by arm9 */
+        /*{ 256000, CCTL(CLK_GLOBAL_PLL, 3),      SRC_RAW, 0, 0, 1000, 29000 },*/
+        { 384000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0A, 0, 1025, 58000 },
+        { 422400, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0B, 0, 1050, 117000 },
+        { 460800, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0C, 0, 1050, 117000 },
+        { 499200, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0D, 0, 1075, 117000 },
+        { 537600, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0E, 0, 1075, 117000 },
+        { 576000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0F, 0, 1100, 117000 },
+        { 614400, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x10, 0, 1100, 117000 },
+        { 652800, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x11, 0, 1125, 117000 },
+        { 691200, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x12, 0, 1150, 117000 },
+        { 729600, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x13, 0, 1175, 117000 },
+        { 768000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x14, 0, 1200, 128000 },
+        { 806400, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x15, 0, 1225, 128000 },
+        { 844800, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x16, 0, 1250, 128000 },
+        { 883200, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x17, 0, 1275, 128000 },
+        { 921600, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x18, 0, 1275, 128000 },
+        { 960000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x19, 0, 1275, 128000 },
+        { 998400, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x1A, 0, 1275, 128000 },
+	{ 1036800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1B, 0, 1275, 128000 },
+	{ 1075200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1C, 0, 1275, 128000 },
+	{ 1113600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1D, 0, 1275, 128000 },
 	{ 0 },
 };
 
@@ -157,10 +159,15 @@ struct clock_state {
 	uint32_t			vdd_switch_time_us;
 	unsigned long			power_collapse_khz;
 	unsigned long			wait_for_irq_khz;
+  struct clk*     clk_ebi1;
 	struct regulator                *regulator;
 };
 
 static struct clock_state drv_state = { 0 };
+
+struct clk *clk_get(struct device *dev, const char *id);
+unsigned long clk_get_rate(struct clk *clk);
+int clk_set_rate(struct clk *clk, unsigned long rate);
 
 static DEFINE_SPINLOCK(acpu_lock);
 
@@ -293,7 +300,7 @@ static int acpuclk_set_vdd_level(int vdd)
 	return regulator_set_voltage(drv_state.regulator, vdd, vdd);
 }
 
-int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
+int acpuclk_set_rate(unsigned long rate, enum setrate_reason reason)
 {
 	struct clkctl_acpu_speed *cur, *next;
 	unsigned long flags;
@@ -303,7 +310,7 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
 	/* convert to KHz */
 	rate /= 1000;
 
-	DEBUG("acpuclk_set_rate(%d,%d)\n", (int) rate, for_power_collapse);
+	DEBUG("acpuclk_set_rate(%d,%d)\n", (int) rate, reason);
 
 	if (rate == 0 || rate == cur->acpu_khz)
 		return 0;
@@ -317,7 +324,7 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
 		next++;
 	}
 
-	if (!for_power_collapse) {
+	if (reason == SETRATE_CPUFREQ) {
 		mutex_lock(&drv_state.lock);
 		/* Increase VDD if needed. */
 		if (next->vdd > cur->vdd) {
@@ -356,7 +363,16 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
 	drv_state.current_speed = next;
 
 	spin_unlock_irqrestore(&acpu_lock, flags);
-	if (!for_power_collapse) {
+
+#ifndef CONFIG_AXI_SCREEN_POLICY
+  if (reason == SETRATE_CPUFREQ || reason == SETRATE_PC) {
+    if (cur->axiclk_khz != next->axiclk_khz)
+      clk_set_rate(drv_state.clk_ebi1, next->axiclk_khz * 1000);
+    DEBUG("acpuclk_set_rate switch axi to %d\n",
+      clk_get_rate(drv_state.clk_ebi1));
+  }
+#endif
+	if (reason == SETRATE_CPUFREQ) {
 		/* Drop VDD level if we can. */
 		if (next->vdd < cur->vdd) {
 			if (acpuclk_set_vdd_level(next->vdd))
@@ -462,12 +478,13 @@ uint32_t acpuclk_get_switch_time(void)
 	return drv_state.acpu_switch_time_us;
 }
 
-unsigned long acpuclk_power_collapse(void)
+unsigned long acpuclk_power_collapse(int from_idle)
 {
 	int ret = acpuclk_get_rate();
+  enum setrate_reason reason = (from_idle) ? SETRATE_PC_IDLE : SETRATE_PC;
 	ret *= 1000;
 	if (ret > drv_state.power_collapse_khz)
-		acpuclk_set_rate(drv_state.power_collapse_khz, 1);
+		acpuclk_set_rate(drv_state.power_collapse_khz, reason);
 	return ret;
 }
 
@@ -501,4 +518,8 @@ void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *clkdata)
 
 	acpuclk_init();
 	acpuclk_init_cpufreq_table();
+  drv_state.clk_ebi1 = clk_get(NULL,"ebi1_clk");
+#ifndef CONFIG_AXI_SCREEN_POLICY
+  clk_set_rate(drv_state.clk_ebi1, drv_state.current_speed->axiclk_khz * 1000);
+#endif
 }
