@@ -256,6 +256,13 @@ config MACH_MSM7X30_SURF
 	help
 	  Select this to support the Qualcomm SURF7X30 development board
 
+config JESUS_PHONE
+	depends on ARCH_QSD8X50 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
+	default n
+	bool "Enable Jesus Phone mode (DANGEROUS)"
+	help
+	 Enable support for dangerous acpuclock frequencies/voltages.
+
 config HTC_HEADSET
 	tristate "HTC 2 Wire detection driver"
 	default n
