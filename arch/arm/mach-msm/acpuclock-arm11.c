@@ -135,7 +135,7 @@ static struct clkctl_acpu_speed  acpu_freq_tbl[] = {
 };
 #else /* Table of freq we currently use. */
 static struct clkctl_acpu_speed  acpu_freq_tbl[] = {
-#if defined(CONFIG_TURBO_MODE)
+#if defined(CONFIG_JESUS_PHONE)
     	{ 19200, ACPU_PLL_TCXO, 0, 0, 19200, 0, VDD_0, 30720, 0, 0, 4 },
     	{ 122880, ACPU_PLL_0, 4, 1, 61440, 1, VDD_1, 61440, 0, 0, 4 },
     	{ 160000, ACPU_PLL_1, 1, 5, 53333, 2, VDD_1, 61440, 0, 0, 6 },
@@ -175,7 +175,7 @@ static struct clkctl_acpu_speed  acpu_freq_tbl[] = {
 #endif
 
 static struct cpufreq_frequency_table freq_table[] = {
-#if defined(CONFIG_TURBO_MODE)
+#if defined(CONFIG_JESUS_PHONE)
         { 0, 122880 },
         { 1, 160000 },
 	{ 2, 176000 },
