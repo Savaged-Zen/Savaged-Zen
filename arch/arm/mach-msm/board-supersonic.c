@@ -31,7 +31,7 @@
 #include <mach/audio_jack.h>
 #include <linux/akm8973.h>
 #include <linux/bma150.h>
-#include <linux/capella_cm3602.h>
+#include <linux/capella_cm3602_htc.h>
 #include <linux/regulator/machine.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
