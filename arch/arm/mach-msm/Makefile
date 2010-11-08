@@ -76,6 +76,17 @@ obj-$(CONFIG_MACH_QSD8X50_SURF) += board-qsd8x50.o
 obj-$(CONFIG_MACH_QSD8X50A_ST1_5) += board-qsd8x50.o
 obj-$(CONFIG_MACH_QSD8X50_FFA) += board-qsd8x50.o
 obj-$(CONFIG_ARCH_MSM8X60) += board-msm8x60.o
+obj-$(CONFIG_MACH_SUPERSONIC) += board-supersonic.o board-supersonic-panel.o
+obj-$(CONFIG_MACH_SUPERSONIC) += board-supersonic-keypad.o board-supersonic-mmc.o
+obj-$(CONFIG_MACH_SUPERSONIC) += board-supersonic-rfkill.o board-supersonic-audio.o
+obj-$(CONFIG_MACH_SUPERSONIC) += board-supersonic-wifi.o htc_awb_cal.o
+obj-$(CONFIG_MACH_SUPERSONIC) += msm_vibrator.o
+obj-$(CONFIG_MACH_SUPERSONIC) += board-supersonic-microp.o
+obj-$(CONFIG_MACH_SUPERSONIC) += board-supersonic-tpa2018d1.o
+obj-$(CONFIG_MACH_SUPERSONIC) += board-supersonic-smb329.o
+obj-$(CONFIG_MACH_SUPERSONIC) += board-supersonic-tpa6130.o
+obj-$(CONFIG_MACH_SUPERSONIC) += htc_wifi_nvs.o htc_bluetooth.o
+obj-$(CONFIG_HTC_BATTCHG) += htc_battery.o
 
 obj-$(CONFIG_ARCH_MSM7X30) += gpiomux-7x30.o gpiomux-v1.o gpiomux.o
 obj-$(CONFIG_ARCH_QSD8X50) += gpiomux-8x50.o gpiomux-v1.o gpiomux.o
