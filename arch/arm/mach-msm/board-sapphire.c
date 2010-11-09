@@ -1059,16 +1059,6 @@ static uint32_t camera_on_gpio_12pins_table[] = {
 	PCOM_GPIO_CFG(15, 1, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_16MA), /* MCLK */
 };
 
-static void config_gpio_table(uint32_t *table, int len)
-{
-	int n;
-	unsigned id;
-	for (n = 0; n < len; n++) {
-		id = table[n];
-		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &id, 0);
-	}
-}
-
 void config_sapphire_camera_on_gpios(void)
 {
 	/*Add for judage it's 10 pins or 12 pins platform ----->*/
