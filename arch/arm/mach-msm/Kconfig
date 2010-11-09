@@ -103,7 +103,7 @@ config MSM_AMSS_VERSION
 choice
 	prompt "AMSS modem firmware version"
 
-	depends on ARCH_MSM7X00A
+	depends on ARCH_MSM7X00A || ARCH_QSD8X50
 	default MSM_AMSS_VERSION_6225
 
 	config MSM_AMSS_VERSION_6210
@@ -504,7 +504,7 @@ config MSM_ONCRPCROUTER
 	  the ARM9 and ARM11
 
 config MSM_RPCSERVERS
-	depends on MSM_ONCRPCROUTER && ARCH_MSM7X00A
+	depends on MSM_ONCRPCROUTER
 	default y
 	bool "Kernel side RPC server bundle"
 	help
