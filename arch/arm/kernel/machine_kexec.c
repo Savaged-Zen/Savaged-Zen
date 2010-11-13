@@ -83,5 +83,5 @@ void machine_kexec(struct kimage *image)
 	cpu_proc_fin();
 	outer_inv_all();
 	flush_cache_all();
-	cpu_reset(reboot_code_buffer_phys);
+	__virt_to_phys(cpu_reset)(reboot_code_buffer_phys);
 }
