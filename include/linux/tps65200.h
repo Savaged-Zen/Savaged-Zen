@@ -10,14 +10,14 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-#ifndef _SMB329_H_
-#define _SMB329_H_
+#ifndef _TPS65200_H_
+#define _TPS65200_H_
 #include <linux/notifier.h>
 #include <mach/htc_battery.h>
 
-#ifdef CONFIG_SMB329
-extern int set_charger_ctrl(u32 ctl);
+#ifdef CONFIG_TPS65200
+extern int tps_set_charger_ctrl(u32 ctl);
 #else
-static int set_charger_ctrl(u32 ctl) {return 0 ; }
+static int tps_set_charger_ctrl(u32 ctl) {return 0 ; }
 #endif
 #endif
