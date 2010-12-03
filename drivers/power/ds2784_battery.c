@@ -1151,3 +1151,4 @@ module_init(ds2784_battery_init);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Justin Lin <Justin_lin@htc.com>");
 MODULE_DESCRIPTION("ds2784 battery driver");
+
