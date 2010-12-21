@@ -1722,7 +1722,7 @@ EXPORT_SYMBOL(mmc_card_can_sleep);
  *	mmc_suspend_host - suspend a host
  *	@host: mmc host
  */
-int mmc_suspend_host(struct mmc_host *host)
+int mmc_suspend_host(struct mmc_host *host, pm_message_t state)
 {
 	int err = 0;
 
@@ -1748,13 +1748,12 @@ int mmc_suspend_host(struct mmc_host *host)
 			mmc_claim_host(host);
 			mmc_detach_bus(host);
 			mmc_release_host(host);
-			host->pm_flags = 0;
 			err = 0;
 		}
 	}
 	mmc_bus_put(host);
 
-	if (!err && !(host->pm_flags & MMC_PM_KEEP_POWER))
+	if (!err)
 		mmc_power_off(host);
 
 	return err;

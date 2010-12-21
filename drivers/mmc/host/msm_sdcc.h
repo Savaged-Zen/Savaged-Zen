@@ -28,6 +28,9 @@
 #define MCI_CLK_ENABLE		(1 << 8)
 #define MCI_CLK_PWRSAVE		(1 << 9)
 #define MCI_CLK_WIDEBUS		(1 << 10)
+#define MCI_CLK_WIDEBUS_1	(0 << 10)
+#define MCI_CLK_WIDEBUS_4	(2 << 10)
+#define MCI_CLK_WIDEBUS_8	(3 << 10)
 #define MCI_CLK_FLOWENA		(1 << 12)
 #define MCI_CLK_INVERTOUT	(1 << 13)
 #define MCI_CLK_SELECTIN	(1 << 14)
@@ -101,6 +104,20 @@
 #define MCI_DATAENDCLR		(1 << 8)
 #define MCI_DATABLOCKENDCLR	(1 << 10)
 
+
+#define MCI_SDIOINTRCLR		(1 << 22)
+#define MCI_PROGDONECLR		(1 << 23)
+#define MCI_ATACMDCOMPLCLR	(1 << 24)
+#define MCI_SDIOINTROPECLR	(1 << 25)
+#define MCI_CCSTIMEOUTCLR 	(1 << 26)
+
+#define MCI_CLEAR_STATIC_MASK	\
+	(MCI_CMDCRCFAILCLR|MCI_DATACRCFAILCLR|MCI_CMDTIMEOUTCLR|\
+	MCI_DATATIMEOUTCLR|MCI_TXUNDERRUNCLR|MCI_RXOVERRUNCLR|  \
+	MCI_CMDRESPENDCLR|MCI_CMDSENTCLR|MCI_DATAENDCLR|	\
+	MCI_STARTBITERRCLR|MCI_DATABLOCKENDCLR|MCI_SDIOINTRCLR|	\
+	MCI_SDIOINTROPECLR|MCI_PROGDONECLR|MCI_ATACMDCOMPLCLR|	\
+	MCI_CCSTIMEOUTCLR)
 #define MMCIMASK0		0x03c
 #define MCI_CMDCRCFAILMASK	(1 << 0)
 #define MCI_DATACRCFAILMASK	(1 << 1)
@@ -172,6 +189,8 @@ struct msmsdcc_dma_data {
 	struct msmsdcc_host		*host;
 	int				busy; /* Set if DM is busy */
 	int				active;
+	unsigned int 			result;
+	struct msm_dmov_errdata 	*err;
 };
 
 struct msmsdcc_pio_data {
@@ -188,7 +207,6 @@ struct msmsdcc_curr_req {
 	unsigned int		xfer_remain;	/* Bytes remaining to send */
 	unsigned int		data_xfered;	/* Bytes acked by BLKEND irq */
 	int			got_dataend;
-	int			got_datablkend;
 	int			user_pages;
 };
 
@@ -200,6 +218,7 @@ struct msmsdcc_stats {
 };
 
 struct msmsdcc_host {
+	struct resource		*irqres;
 	struct resource		*cmd_irqres;
 	struct resource		*pio_irqres;
 	struct resource		*memres;
@@ -225,7 +244,7 @@ struct msmsdcc_host {
 
 	u32			pwr;
 	u32			saved_irq0mask;	/* MMCIMASK0 reg value */
-	struct msm_mmc_platform_data *plat;
+	struct mmc_platform_data *plat;
 
 	struct timer_list	timer;
 	unsigned int		oldstat;
@@ -234,13 +253,31 @@ struct msmsdcc_host {
 	struct msmsdcc_pio_data	pio;
 	int			cmdpoll;
 	struct msmsdcc_stats	stats;
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	struct early_suspend early_suspend;
+	int polling_enabled;
+#endif
 
+#ifdef CONFIG_MMC_MSM7X00A_RESUME_IN_WQ
+	struct work_struct	resume_task;
+#endif
+	struct tasklet_struct 	dma_tlet;
+
+
+#ifdef CONFIG_MMC_AUTO_SUSPEND
+	unsigned long           suspended;
+#endif
+	unsigned int prog_scan;
+	unsigned int prog_enable;
 	/* Command parameters */
 	unsigned int		cmd_timeout;
 	unsigned int		cmd_pio_irqmask;
 	unsigned int		cmd_datactrl;
 	struct mmc_command	*cmd_cmd;
 	u32			cmd_c;
+	unsigned int	mci_irqenable;
+	unsigned int	dummy_52_needed;
+	unsigned int	dummy_52_state;
 
 };
 
