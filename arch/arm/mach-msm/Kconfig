@@ -354,6 +354,22 @@ config HTC_PWRSINK
 	default y
 	bool "HTC Power Sink Driver"
 
+-config QSD_SVS
+	bool "QSD Static Voltage Scaling"
+	depends on (ARCH_MSM_SCORPION)
+	default y
+	help
+	Enables static voltage scaling using the TPS65023 PMIC.
+
+config QSD_PMIC_DEFAULT_DCDC1
+	int "PMIC default output voltage"
+	depends on (ARCH_MSM_SCORPION)
+	default 1275
+	help
+	This is the PMIC voltage at Linux kernel boot.
+
+
+
 config HTC_POWER_COLLAPSE_MAGIC
   default n
   bool "Check Power Collapse State"
@@ -584,6 +600,15 @@ config MSM_CPU_FREQ_MIN
         default 245760
 
 endif # CPU_FREQ_MSM
+
+config MSM_CPU_AVS
+	bool "Enable Adaptive Voltage Scaling (AVS)"
+	depends on (ARCH_MSM_SCORPION && QSD_SVS)
+	default y
+	help
+	   This enables the Adaptive Voltage Scaling feature of
+	   Qualcomm ARMv7 CPUs. It adjusts the voltage for each frequency
+	   based on feedback from three ring oscillators in the CPU.
 
 config AXI_SCREEN_POLICY
         depends on ARCH_QSD8X50 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
