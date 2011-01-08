@@ -29,7 +29,7 @@
 #include <linux/akm8973.h>
 #include <linux/mutex.h>
 
-#define DEBUG 1
+#define DEBUG 0
 #define MAX_FAILURE_COUNT 3
 
 static struct i2c_client *this_client;
