@@ -140,8 +140,8 @@ static struct mmc_platform_data supersonic_sdslot_data = {
 	.slot_type	= &supersonic_sdslot_type,
 };
 
-int msm_add_sdcc(unsigned int controller, struct mmc_platform_data *plat,
-		 unsigned int stat_irq, unsigned long stat_irq_flags);
+/*int msm_add_sdcc(unsigned int controller, struct mmc_platform_data *plat,
+		 unsigned int stat_irq, unsigned long stat_irq_flags); */
 
 
 

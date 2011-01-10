@@ -26,6 +26,16 @@ config FB_MSM_MDDI
 	depends on FB_MSM
 	default y
 
+config FB_MSM_MDDI_EPSON
+	bool "Support for Epson MDDI panels"
+	depends on FB_MSM_MDDI
+	default n
+
+config FB_MSM_MDDI_NOVTEC
+	bool "Support for Novtec MDDI panels"
+	depends on FB_MSM_MDDI
+	default n
+
 config GPU_MSM_KGSL
 	tristate "MSM 3D Graphics driver for Adreno class GPUs"
 	default n
@@ -44,3 +54,9 @@ config MSM_KGSL_MMU
 	help
 	  If enabled, the GPU driver will allocate memory from vmalloc
 	  and enable the use of GPU MMU, instead of using pmem.
+
+config MSM_HDMI
+	bool "Support for HDMI in QCT platform"
+	depends on MSM_MDP31
+	default n
+
