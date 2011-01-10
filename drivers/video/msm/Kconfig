@@ -35,7 +35,7 @@ config FB_MSM_MDDI_NOVTEC
 	bool "Support for Novtec MDDI panels"
 	depends on FB_MSM_MDDI
 	default n
-
+	
 config GPU_MSM_KGSL
 	tristate "MSM 3D Graphics driver for Adreno class GPUs"
 	default n
