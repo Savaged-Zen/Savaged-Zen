@@ -97,7 +97,14 @@ endif
 obj-$(CONFIG_HTC_PWRSINK) += htc_pwrsink.o
 obj-$(CONFIG_HTC_PWRSPLY) += htc_power_supply.o
 obj-$(CONFIG_HTC_HEADSET) += htc_headset.o
+obj-$(CONFIG_HTC_AUDIO_JACK) += htc_audio_jack.o
 obj-$(CONFIG_HTC_35MM_JACK) += htc_35mm_jack.o
+obj-$(CONFIG_MICROP_COMMON) += atmega_microp_common.o
+obj-$(CONFIG_HTC_HEADSET_MGR) += htc_headset_mgr.o
+obj-$(CONFIG_HTC_HEADSET_GPIO) += htc_headset_gpio.o
+obj-$(CONFIG_HTC_HEADSET_MICROP) += htc_headset_microp.o
+obj-$(CONFIG_PERFLOCK) += perflock.o
+obj-$(CONFIG_PERFLOCK) += htc_set_perflock.o
 
 obj-$(CONFIG_MACH_MAHIMAHI) += board-mahimahi-tpa2018d1.o
 obj-$(CONFIG_MACH_MAHIMAHI) += board-mahimahi-smb329.o

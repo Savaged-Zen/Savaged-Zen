@@ -74,6 +74,44 @@ config MSM_MDP40
 	depends on ARCH_MSM7X30
 	default y
 
+config PERFLOCK
+  depends on CPU_FREQ
+  depends on ARCH_QSD8X50 || ARCH_MSM7X30 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
+  default n
+  bool "HTC Performance Lock"
+
+config PERFLOCK_BOOT_LOCK
+  depends on PERFLOCK
+  depends on ARCH_QSD8X50 || ARCH_MSM7X30 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
+  default n
+  bool "Boot Time Performance Lock"
+
+config PERFLOCK_SCREEN_POLICY
+  depends on PERFLOCK
+  depends on ARCH_QSD8X50 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
+  default n
+  bool "Change Cpufreq Policy while Screen ON/OFF"
+
+config PERFLOCK_SCREEN_ON_MIN
+  depends on PERFLOCK_SCREEN_POLICY
+  int "Minimum speed while screen on"
+  default MSM_CPU_FREQ_MIN
+
+config PERFLOCK_SCREEN_ON_MAX
+  depends on PERFLOCK_SCREEN_POLICY
+  int "Maximum speed while screen on"
+  default MSM_CPU_FREQ_MAX
+
+config PERFLOCK_SCREEN_OFF_MIN
+  depends on PERFLOCK_SCREEN_POLICY
+  int "Minimum speed while screen off"
+  default MSM_CPU_FREQ_MIN
+
+config PERFLOCK_SCREEN_OFF_MAX
+  depends on PERFLOCK_SCREEN_POLICY
+  int "Maximum speed while screen off"
+  default MSM_CPU_FREQ_MAX
+
 config MSM_REMOTE_SPINLOCK_DEKKERS
 	bool
 
@@ -275,6 +313,14 @@ config HTC_HEADSET
 	 headset, on the trout platform. Can be used with the msm serial
 	 debugger, but not with serial console.
 
+config HTC_AUDIO_JACK
+	tristate "Audio Jack detection driver"
+	depends on HTC_HEADSET
+	default n
+	help
+	  Provides support for detecting audio jack, such as 3.5mm
+	  earphone, on the android platform.
+
 config HTC_35MM_JACK
 	bool "HTC 3.5mm headset jack"
 	default n
@@ -282,7 +328,7 @@ config HTC_35MM_JACK
 	 Provides support for 3.5mm headset jack devices, like wired headsets.
 
 config TROUT_BATTCHG
-	depends on (MACH_TROUT || MACH_SAPPHIRE) && POWER_SUPPLY
+	depends on MACH_TROUT && POWER_SUPPLY
 	default y
 	bool "Trout battery / charger driver"
 
@@ -307,6 +353,14 @@ config HTC_PWRSINK
 	depends on MSM_SMD
 	default y
 	bool "HTC Power Sink Driver"
+
+config HTC_POWER_COLLAPSE_MAGIC
+  default n
+  bool "Check Power Collapse State"
+
+config HTC_ONMODE_CHARGING
+  default n
+  bool "Low-power hibernate charging support"
 
 config CACHE_FLUSH_RANGE_LIMIT
 	hex "Cache flush range limit"
@@ -535,7 +589,7 @@ config AXI_SCREEN_POLICY
         depends on ARCH_QSD8X50 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
   depends on HAS_EARLYSUSPEND
   bool "Use higher AXI bus while screen ON"
-  default y
+  default n
   help
     Simple AXI scaling based on screen ON/OFF and PWRC.
 
@@ -553,6 +607,21 @@ config MSM_ADSP
 	default y
 	help
 	  Provides access to registers needed by the userspace aDSP library.
+
+config HTC_ACOUSTIC
+        tristate "HTC acoustic driver"
+        default y
+        help
+          The driver provide user space use shared memory allocate by using
+          RPC code.
+
+config HTC_ACOUSTIC_QSD
+        tristate "HTC acoustic driver for QSD"
+        depends on ARCH_QSD8X50
+        default n
+        help
+          Provides user space use shared memory allocate by using RPC code.
+          Provides headset amp, mic bias and speaker amp control.
 
 config MSM_ADSP_REPORT_EVENTS
 	bool "Report modem events from the DSP"
@@ -588,7 +657,7 @@ config WIFI_CONTROL_FUNC
 	bool "Enable WiFi control function abstraction"
 	help
 	  Enables Power/Reset/Carddetect function abstraction
-	
+
 config WIFI_MEM_PREALLOC
 	depends on WIFI_CONTROL_FUNC
 	bool "Preallocate memory for WiFi buffers"
@@ -600,6 +669,32 @@ config ARCH_MSM_FLASHLIGHT
         depends on ARCH_MSM
         help
           The flashlight driver is for MSM series.
+
+config MICROP_COMMON
+        tristate "MICROP COMMON Driver"
+        depends on I2C
+        help
+          HTC Microp-P support.
+
+config HTC_HEADSET_MGR
+        tristate "HTC headset manager driver"
+        default n
+        help
+          Provides support of HTC headset manager.
+
+config HTC_HEADSET_GPIO
+        tristate "HTC GPIO headset detection driver"
+        depends on HTC_HEADSET_MGR
+        default n
+        help
+          Provides support of HTC GPIO headset detection.
+
+config HTC_HEADSET_MICROP
+        tristate "HTC Micro-P headset detection driver"
+        depends on HTC_HEADSET_MGR && MICROP_COMMON
+        default n
+        help
+          Provides support of HTC Micro-P headset detection.
 
 config VIRTUAL_KPANIC_PARTITION
 	bool "Create virtual kpanic partition"
@@ -622,5 +717,6 @@ config VIRTUAL_KPANIC_SRC
 	default "cache"
 	help
 	  Sets the partition to steal from to make the virtual one.
-	
+
+
 endif
