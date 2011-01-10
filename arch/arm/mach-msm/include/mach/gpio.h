@@ -16,10 +16,104 @@
 #ifndef __ASM_ARCH_MSM_GPIO_H
 #define __ASM_ARCH_MSM_GPIO_H
 
+#include <linux/interrupt.h>
 #include <asm-generic/gpio.h>
 #include <mach/irqs.h>
 
 #define FIRST_BOARD_GPIO	NR_GPIO_IRQS
+
+static inline int gpio_get_value(unsigned gpio)
+{
+	return __gpio_get_value(gpio);
+}
+
+static inline void gpio_set_value(unsigned gpio, int value)
+{
+	__gpio_set_value(gpio, value);
+}
+
+static inline int gpio_cansleep(unsigned gpio)
+{
+	return __gpio_cansleep(gpio);
+}
+
+static inline int gpio_to_irq(unsigned gpio)
+{
+	return __gpio_to_irq(gpio);
+}
+
+extern void config_gpio_table(uint32_t *table, int len);
+extern int gpio_configure(unsigned int gpio, unsigned long flags);
+
+/**
+ * struct msm_gpio - GPIO pin description
+ * @gpio_cfg - configuration bitmap, as per gpio_tlmm_config()
+ * @label - textual label
+ *
+ * Usually, GPIO's are operated by sets.
+ * This struct accumulate all GPIO information in single source
+ * and facilitete group operations provided by msm_gpios_xxx()
+ */
+struct msm_gpio {
+	u32 gpio_cfg;
+	const char *label;
+};
+
+/**
+ * msm_gpios_request_enable() - request and enable set of GPIOs
+ *
+ * Request and configure set of GPIO's
+ * In case of error, all operations rolled back.
+ * Return error code.
+ *
+ * @table: GPIO table
+ * @size:  number of entries in @table
+ */
+int msm_gpios_request_enable(const struct msm_gpio *table, int size);
+
+/**
+ * msm_gpios_disable_free() - disable and free set of GPIOs
+ *
+ * @table: GPIO table
+ * @size:  number of entries in @table
+ */
+void msm_gpios_disable_free(const struct msm_gpio *table, int size);
+
+/**
+ * msm_gpios_request() - request set of GPIOs
+ * In case of error, all operations rolled back.
+ * Return error code.
+ *
+ * @table: GPIO table
+ * @size:  number of entries in @table
+ */
+int msm_gpios_request(const struct msm_gpio *table, int size);
+
+/**
+ * msm_gpios_free() - free set of GPIOs
+ *
+ * @table: GPIO table
+ * @size:  number of entries in @table
+ */
+void msm_gpios_free(const struct msm_gpio *table, int size);
+
+/**
+ * msm_gpios_enable() - enable set of GPIOs
+ * In case of error, all operations rolled back.
+ * Return error code.
+ *
+ * @table: GPIO table
+ * @size:  number of entries in @table
+ */
+int msm_gpios_enable(const struct msm_gpio *table, int size);
+
+/**
+ * msm_gpios_disable() - disable set of GPIOs
+ *
+ * @table: GPIO table
+ * @size:  number of entries in @table
+ */
+void msm_gpios_disable(const struct msm_gpio *table, int size);
 
 /* GPIO TLMM (Top Level Multiplexing) Definitions */
 
