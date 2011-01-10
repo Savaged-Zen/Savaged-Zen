@@ -17,7 +17,7 @@
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/interrupt.h>
-
+#include <linux/delay.h>
 #include <linux/dma-mapping.h>
 #include <mach/irqs.h>
 #include <mach/msm_iomap.h>
@@ -32,6 +32,216 @@
 #include <linux/mtd/partitions.h>
 
 #include <mach/mmc.h>
+
+#include <mach/msm_hsusb.h>
+#include <mach/msm_rpcrouter.h>
+#include <mach/msm_hsusb_hw.h>
+#ifdef CONFIG_PMIC8058
+#include <linux/mfd/pmic8058.h>
+#endif
+
+int usb_phy_error;
+
+#define HSUSB_API_INIT_PHY_PROC 2
+#define HSUSB_API_PROG          0x30000064
+#define HSUSB_API_VERS MSM_RPC_VERS(1, 1)
+
+static void *usb_base;
+#define MSM_USB_BASE              ((unsigned)usb_base)
+static unsigned ulpi_read(void __iomem *usb_base, unsigned reg)
+{
+        unsigned timeout = 100000;
+
+        /* initiate read operation */
+        writel(ULPI_RUN | ULPI_READ | ULPI_ADDR(reg),
+               USB_ULPI_VIEWPORT);
+
+        /* wait for completion */
+        while ((readl(USB_ULPI_VIEWPORT) & ULPI_RUN) && (--timeout))
+                cpu_relax();
+
+        if (timeout == 0) {
+                printk(KERN_ERR "ulpi_read: timeout %08x\n",
+                        readl(USB_ULPI_VIEWPORT));
+                return 0xffffffff;
+        }
+        return ULPI_DATA_READ(readl(USB_ULPI_VIEWPORT));
+}
+
+static int ulpi_write(void __iomem *usb_base, unsigned val, unsigned reg)
+{
+        unsigned timeout = 10000;
+
+        /* initiate write operation */
+        writel(ULPI_RUN | ULPI_WRITE |
+               ULPI_ADDR(reg) | ULPI_DATA(val),
+               USB_ULPI_VIEWPORT);
+
+        /* wait for completion */
+        while ((readl(USB_ULPI_VIEWPORT) & ULPI_RUN) && (--timeout))
+                cpu_relax();
+
+        if (timeout == 0) {
+                printk(KERN_ERR "ulpi_write: timeout\n");
+                return -1;
+        }
+
+        return 0;
+}
+
+#define CLKRGM_APPS_RESET_USBH      37
+#define CLKRGM_APPS_RESET_USB_PHY   34
+static void msm_hsusb_apps_reset_link(int reset)
+{
+        int ret;
+        unsigned usb_id = CLKRGM_APPS_RESET_USBH;
+
+        if (reset)
+                ret = msm_proc_comm(PCOM_CLK_REGIME_SEC_RESET_ASSERT,
+                                &usb_id, NULL);
+        else
+                ret = msm_proc_comm(PCOM_CLK_REGIME_SEC_RESET_DEASSERT,
+                                &usb_id, NULL);
+        if (ret)
+                printk(KERN_INFO "%s: Cannot set reset to %d (%d)\n",
+                        __func__, reset, ret);
+}
+
+static void msm_hsusb_apps_reset_phy(void)
+{
+        int ret;
+        unsigned usb_phy_id = CLKRGM_APPS_RESET_USB_PHY;
+
+        ret = msm_proc_comm(PCOM_CLK_REGIME_SEC_RESET_ASSERT,
+                        &usb_phy_id, NULL);
+        if (ret) {
+                printk(KERN_INFO "%s: Cannot assert (%d)\n", __func__, ret);
+                return;
+        }
+        msleep(1);
+        ret = msm_proc_comm(PCOM_CLK_REGIME_SEC_RESET_DEASSERT,
+                        &usb_phy_id, NULL);
+        if (ret) {
+                printk(KERN_INFO "%s: Cannot assert (%d)\n", __func__, ret);
+                return;
+        }
+}
+
+#define ULPI_VERIFY_MAX_LOOP_COUNT  3
+static int msm_hsusb_phy_verify_access(void __iomem *usb_base)
+{
+        int temp;
+
+        for (temp = 0; temp < ULPI_VERIFY_MAX_LOOP_COUNT; temp++) {
+                if (ulpi_read(usb_base, ULPI_DEBUG) != (unsigned)-1)
+                        break;
+                msm_hsusb_apps_reset_phy();
+        }
+
+        if (temp == ULPI_VERIFY_MAX_LOOP_COUNT) {
+                pr_err("%s: ulpi read failed for %d times\n",
+                                __func__, ULPI_VERIFY_MAX_LOOP_COUNT);
+                return -1;
+        }
+
+        return 0;
+}
+
+static unsigned msm_hsusb_ulpi_read_with_reset(void __iomem *usb_base, unsigned reg)
+{
+        int temp;
+        unsigned res;
+
+        for (temp = 0; temp < ULPI_VERIFY_MAX_LOOP_COUNT; temp++) {
+                res = ulpi_read(usb_base, reg);
+                if (res != -1)
+                        return res;
+                msm_hsusb_apps_reset_phy();
+        }
+
+        pr_err("%s: ulpi read failed for %d times\n",
+                        __func__, ULPI_VERIFY_MAX_LOOP_COUNT);
+
+        return -1;
+}
+
+static int msm_hsusb_ulpi_write_with_reset(void __iomem *usb_base,
+                unsigned val, unsigned reg)
+{
+        int temp;
+        int res;
+
+        for (temp = 0; temp < ULPI_VERIFY_MAX_LOOP_COUNT; temp++) {
+                res = ulpi_write(usb_base, val, reg);
+                if (!res)
+                        return 0;
+                msm_hsusb_apps_reset_phy();
+        }
+
+        pr_err("%s: ulpi write failed for %d times\n",
+                        __func__, ULPI_VERIFY_MAX_LOOP_COUNT);
+        return -1;
+}
+
+static int msm_hsusb_phy_caliberate(void __iomem *usb_base)
+{
+        int ret;
+        unsigned res;
+
+        ret = msm_hsusb_phy_verify_access(usb_base);
+        if (ret)
+                return -ETIMEDOUT;
+
+        res = msm_hsusb_ulpi_read_with_reset(usb_base, ULPI_FUNC_CTRL_CLR);
+        if (res == -1)
+                return -ETIMEDOUT;
+
+        res = msm_hsusb_ulpi_write_with_reset(usb_base,
+                        res | ULPI_SUSPENDM,
+                        ULPI_FUNC_CTRL_CLR);
+        if (res)
+                return -ETIMEDOUT;
+
+        msm_hsusb_apps_reset_phy();
+
+        return msm_hsusb_phy_verify_access(usb_base);
+}
+
+#define USB_LINK_RESET_TIMEOUT      (msecs_to_jiffies(10))
+void msm_hsusb_8x50_phy_reset(void)
+{
+        u32 temp;
+        unsigned long timeout;
+        printk(KERN_INFO "msm_hsusb_phy_reset\n");
+        usb_base = ioremap(MSM_HSUSB_PHYS, 4096);
+
+        msm_hsusb_apps_reset_link(1);
+        msm_hsusb_apps_reset_phy();
+        msm_hsusb_apps_reset_link(0);
+
+        /* select ULPI phy */
+        temp = (readl(USB_PORTSC) & ~PORTSC_PTS_MASK);
+        writel(temp | PORTSC_PTS_ULPI, USB_PORTSC);
+
+        if (msm_hsusb_phy_caliberate(usb_base)) {
+                usb_phy_error = 1;
+                return;
+        }
+
+        /* soft reset phy */
+        writel(USBCMD_RESET, USB_USBCMD);
+        timeout = jiffies + USB_LINK_RESET_TIMEOUT;
+        while (readl(USB_USBCMD) & USBCMD_RESET) {
+                if (time_after(jiffies, timeout)) {
+                        pr_err("usb link reset timeout\n");
+                        break;
+                }
+                msleep(1);
+        }
+        usb_phy_error = 0;
+
+        return;
+}
 
 static struct resource resources_uart1[] = {
 	{
@@ -91,11 +301,6 @@ struct platform_device msm_device_uart3 = {
 	.id	= 2,
 	.num_resources	= ARRAY_SIZE(resources_uart3),
 	.resource	= resources_uart3,
-};
-
-struct platform_device msm_device_smd = {
-	.name   = "msm_smd",
-	.id     = -1,
 };
 
 static struct resource msm_uart1_dm_resources[] = {
@@ -243,7 +448,7 @@ void msm_set_i2c_mux(bool gpio, int *gpio_clk, int *gpio_dat)
 static struct resource resources_hsusb[] = {
 	{
 		.start	= MSM_HSUSB_PHYS,
-		.end	= MSM_HSUSB_PHYS + MSM_HSUSB_SIZE,
+		.end	= MSM_HSUSB_PHYS + MSM_HSUSB_SIZE - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 	{
@@ -284,6 +489,11 @@ struct platform_device msm_device_nand = {
 	.dev		= {
 		.platform_data	= &msm_nand_data,
 	},
+};
+
+struct platform_device msm_device_smd = {
+	.name	= "msm_smd",
+	.id	= -1,
 };
 
 static struct resource resources_sdc1[] = {
@@ -449,7 +659,8 @@ static struct platform_device *msm_sdcc_devices[] __initdata = {
 	&msm_device_sdc4,
 };
 
-int __init msm_add_sdcc(unsigned int controller, struct msm_mmc_platform_data *plat,
+int __init msm_add_sdcc(unsigned int controller,
+			struct msm_mmc_platform_data *plat,
 			unsigned int stat_irq, unsigned long stat_irq_flags)
 {
 	struct platform_device	*pdev;
@@ -568,38 +779,94 @@ struct platform_device msm_device_touchscreen = {
 	.resource = resources_tssc,
 };
 
+#if defined(CONFIG_ARCH_QSD8X50)
 static struct resource resources_spi[] = {
 	{
-		.start	= MSM_SPI_PHYS,
-		.end	= MSM_SPI_PHYS + MSM_SPI_SIZE - 1,
-		.flags	= IORESOURCE_MEM,
+		.name   = "spi_base",
+		.start  = MSM_SPI_PHYS,
+		.end    = MSM_SPI_PHYS + MSM_SPI_SIZE - 1,
+		.flags  = IORESOURCE_MEM,
 	},
 	{
-		.start	= INT_SPI_INPUT,
-		.end	= INT_SPI_INPUT,
-		.name	= "irq_in",
-		.flags	= IORESOURCE_IRQ,
+		.name   = "spi_irq_in",
+		.start  = INT_SPI_INPUT,
+		.end    = INT_SPI_INPUT,
+		.flags  = IORESOURCE_IRQ,
 	},
 	{
-		.start	= INT_SPI_OUTPUT,
-		.end	= INT_SPI_OUTPUT,
-		.name	= "irq_out",
-		.flags	= IORESOURCE_IRQ,
+		.name   = "spi_irq_out",
+		.start  = INT_SPI_OUTPUT,
+		.end    = INT_SPI_OUTPUT,
+		.flags  = IORESOURCE_IRQ,
 	},
 	{
-		.start	= INT_SPI_ERROR,
-		.end	= INT_SPI_ERROR,
-		.name	= "irq_err",
-		.flags	= IORESOURCE_IRQ,
+		.name   = "spi_irq_err",
+		.start  = INT_SPI_ERROR,
+		.end    = INT_SPI_ERROR,
+		.flags  = IORESOURCE_IRQ,
 	},
+#if defined(CONFIG_SPI_QSD)
+	{
+		.name   = "spi_clk",
+		.start  = 17,
+		.end    = 1,
+		.flags  = IORESOURCE_IRQ,
+	},
+	{
+		.name   = "spi_mosi",
+		.start  = 18,
+		.end    = 1,
+		.flags  = IORESOURCE_IRQ,
+	},
+	{
+		.name   = "spi_miso",
+		.start  = 19,
+		.end    = 1,
+		.flags  = IORESOURCE_IRQ,
+	},
+	{
+		.name   = "spi_cs0",
+		.start  = 20,
+		.end    = 1,
+		.flags  = IORESOURCE_IRQ,
+	},
+	{
+		.name   = "spi_pwr",
+		.start  = 21,
+		.end    = 0,
+		.flags  = IORESOURCE_IRQ,
+	},
+	{
+		.name   = "spi_irq_cs0",
+		.start  = 22,
+		.end    = 0,
+		.flags  = IORESOURCE_IRQ,
+	},
+#endif
 };
 
 struct platform_device msm_device_spi = {
+#if defined(CONFIG_SPI_QSD)
+	.name		= "spi_qsd",
+#else
 	.name		= "msm_spi",
+#endif
 	.id		= 0,
 	.num_resources	= ARRAY_SIZE(resources_spi),
 	.resource	= resources_spi,
 };
+#endif
+
+#define CLK_ALL(name, id, dev, flags) \
+		CLOCK(name, id, dev, flags, CLKFLAG_ARCH_ALL)
+#define CLK_7X00A(name, id, dev, flags) \
+		CLOCK(name, id, dev, flags, CLKFLAG_ARCH_MSM7X00A)
+#define CLK_8X50(name, id, dev, flags) \
+		CLOCK(name, id, dev, flags, CLKFLAG_ARCH_QSD8X50)
+
+#define OFF CLKFLAG_AUTO_OFF
+#define MINMAX (CLKFLAG_USE_MIN_TO_SET | CLKFLAG_USE_MAX_TO_SET)
+#define USE_MIN (CLKFLAG_USE_MIN_TO_SET | CLKFLAG_SHARED)
 
 struct clk msm_clocks_8x50[] = {
 	CLK_PCOM("adm_clk",	ADM_CLK,	NULL, 0),
@@ -652,7 +919,9 @@ struct clk msm_clocks_8x50[] = {
 	CLK_PCOM("usb_hs3_clk",	USB_HS3_CLK,	NULL, OFF),
 	CLK_PCOM("usb_hs3_pclk",	USB_HS3_P_CLK,	NULL, OFF),
 	CLK_PCOM("usb_phy_clk",	USB_PHY_CLK,	NULL, 0),
+
 };
+
 
 unsigned msm_num_clocks_8x50 = ARRAY_SIZE(msm_clocks_8x50);
 

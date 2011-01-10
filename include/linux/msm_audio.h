@@ -50,6 +50,9 @@
 #define AUDIO_START_FM       _IOW(AUDIO_IOCTL_MAGIC, 37, unsigned)
 #define AUDIO_STOP_FM        _IOW(AUDIO_IOCTL_MAGIC, 38, unsigned)
 #define AUDIO_REINIT_ACDB    _IOW(AUDIO_IOCTL_MAGIC, 39, unsigned)
+#define AUDIO_ENABLE_AUXPGA_LOOPBACK _IOW(AUDIO_IOCTL_MAGIC, 40, unsigned)
+#define AUDIO_SET_AUXPGA_GAIN       _IOW(AUDIO_IOCTL_MAGIC, 41, unsigned)
+#define AUDIO_SET_RX_MUTE           _IOW(AUDIO_IOCTL_MAGIC, 42, unsigned)
 
 #define	AUDIO_MAX_COMMON_IOCTL_NUM	100
 
