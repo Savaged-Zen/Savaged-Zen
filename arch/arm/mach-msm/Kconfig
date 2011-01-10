@@ -74,6 +74,44 @@ config MSM_MDP40
 	depends on ARCH_MSM7X30
 	default y
 
+config PERFLOCK
+  depends on CPU_FREQ
+  depends on ARCH_QSD8X50 || ARCH_MSM7X30 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
+  default n
+  bool "HTC Performance Lock"
+
+config PERFLOCK_BOOT_LOCK
+  depends on PERFLOCK
+  depends on ARCH_QSD8X50 || ARCH_MSM7X30 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
+  default n
+  bool "Boot Time Performance Lock"
+
+config PERFLOCK_SCREEN_POLICY
+  depends on PERFLOCK
+  depends on ARCH_QSD8X50 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
+  default n
+  bool "Change Cpufreq Policy while Screen ON/OFF"
+
+config PERFLOCK_SCREEN_ON_MIN
+  depends on PERFLOCK_SCREEN_POLICY
+  int "Minimum speed while screen on"
+  default MSM_CPU_FREQ_MIN
+
+config PERFLOCK_SCREEN_ON_MAX
+  depends on PERFLOCK_SCREEN_POLICY
+  int "Maximum speed while screen on"
+  default MSM_CPU_FREQ_MAX
+
+config PERFLOCK_SCREEN_OFF_MIN
+  depends on PERFLOCK_SCREEN_POLICY
+  int "Minimum speed while screen off"
+  default MSM_CPU_FREQ_MIN
+
+config PERFLOCK_SCREEN_OFF_MAX
+  depends on PERFLOCK_SCREEN_POLICY
+  int "Maximum speed while screen off"
+  default MSM_CPU_FREQ_MAX
+
 config MSM_REMOTE_SPINLOCK_DEKKERS
 	bool
 
@@ -122,6 +160,17 @@ choice
 endchoice
 
 menu "Qualcomm MSM Board Type"
+
+config HOLES_IN_ZONE
+        depends on ARCH_MSM7X00A || ARCH_QSD8X50
+        bool "Support for non-aligned zones"
+        default n
+        help
+         Select this to support boards with zones that aren't aligned
+         to MAX_ORDER boundaries (4MB by default).
+
+         Both the start and end of all zones must be aligned without
+         this option.
 
 config MACH_HALIBUT
 	depends on ARCH_MSM
@@ -235,6 +284,34 @@ config MACH_MAHIMAHI
 	help
 	  Select this to support the Mahi-Mahi device
 
+choice
+        depends on ARCH_QSD8X50
+        prompt "Bravo"
+        default MACH_BRAVO_NONE
+	help
+	  Select this to support the Bravo GSM or CDMA device
+
+	config MACH_BRAVO_NONE
+		bool "None"
+
+        config MACH_BRAVO
+                bool "GSM"
+		help
+		  Select this to support the Bravo GSM device
+
+	config MACH_BRAVOC
+		bool "CDMA"
+		help
+		  Select this to support the Bravo CDMA device
+endchoice
+
+config MACH_SUPERSONIC
+	depends on ARCH_QSD8X50
+	default y
+	bool "Supersonic (HTC EVO 4G)"
+	help
+	  Select this to support the Supersonic device
+
 config MACH_QSD8X50_FFA
 	depends on ARCH_QSD8X50
 	default y
@@ -264,6 +341,14 @@ config HTC_HEADSET
 	 headset, on the trout platform. Can be used with the msm serial
 	 debugger, but not with serial console.
 
+config HTC_AUDIO_JACK
+	tristate "Audio Jack detection driver"
+	depends on HTC_HEADSET
+	default n
+	help
+	  Provides support for detecting audio jack, such as 3.5mm
+	  earphone, on the android platform.
+
 config HTC_35MM_JACK
 	bool "HTC 3.5mm headset jack"
 	default n
@@ -274,6 +359,28 @@ config TROUT_BATTCHG
 	depends on (MACH_TROUT || MACH_SAPPHIRE) && POWER_SUPPLY
 	default y
 	bool "Trout battery / charger driver"
+
+config HTC_BATTCHG_TRICKLE
+	depends on HTC_BATTCHG
+	default y
+	bool "Enable SBC Trickle Charge Fix"
+	help
+	  This enables the SBC (Superior Battery Charging) modificaton.
+	  Features:
+	   - Trickle Charging (AC & USB)
+	   - Battery Charging to 100%
+	   - Accurate voltage measurement on the charger
+	  Author: ms79723 
+
+config HTC_BATTCHG
+	depends on MSM_ONCRPCROUTER && POWER_SUPPLY
+	default n
+	bool "HTC battery / charger driver"
+
+config HTC_BATTCHG_SMEM
+	depends on HTC_BATTCHG
+	default n
+	bool "Read Battery Info via SMEM"
 
 config HTC_PWRSPLY
 	depends on MSM_ONCRPCROUTER && POWER_SUPPLY && !TROUT_BATTCHG
@@ -286,6 +393,33 @@ config HTC_PWRSINK
 	depends on MSM_SMD
 	default y
 	bool "HTC Power Sink Driver"
+
+config HTC_PWRSINK
+	depends on MSM_SMD
+	default y
+	bool "HTC Power Sink Driver"
+
+-config QSD_SVS
+	bool "QSD Static Voltage Scaling"
+	depends on (ARCH_MSM_SCORPION)
+	default y
+	help
+	Enables static voltage scaling using the TPS65023 PMIC.
+
+config QSD_PMIC_DEFAULT_DCDC1
+	int "PMIC default output voltage"
+	depends on (ARCH_MSM_SCORPION)
+	default 1275
+	help
+	This is the PMIC voltage at Linux kernel boot.
+
+config HTC_POWER_COLLAPSE_MAGIC
+  default n
+  bool "Check Power Collapse State"
+
+config HTC_ONMODE_CHARGING
+  default n
+  bool "Low-power hibernate charging support"
 
 config CACHE_FLUSH_RANGE_LIMIT
 	hex "Cache flush range limit"
@@ -533,6 +667,21 @@ config MSM_ADSP
 	help
 	  Provides access to registers needed by the userspace aDSP library.
 
+config HTC_ACOUSTIC
+        tristate "HTC acoustic driver"
+        default y
+        help
+          The driver provide user space use shared memory allocate by using
+          RPC code.
+
+config HTC_ACOUSTIC_QSD
+        tristate "HTC acoustic driver for QSD"
+        depends on ARCH_QSD8X50
+        default n
+        help
+          Provides user space use shared memory allocate by using RPC code.
+          Provides headset amp, mic bias and speaker amp control.
+
 config MSM_ADSP_REPORT_EVENTS
 	bool "Report modem events from the DSP"
 	default y
@@ -579,6 +728,32 @@ config ARCH_MSM_FLASHLIGHT
         depends on ARCH_MSM
         help
           The flashlight driver is for MSM series.
+
+config MICROP_COMMON
+        tristate "MICROP COMMON Driver"
+        depends on I2C
+        help
+          HTC Microp-P support.
+
+config HTC_HEADSET_MGR
+        tristate "HTC headset manager driver"
+        default n
+        help
+          Provides support of HTC headset manager.
+
+config HTC_HEADSET_GPIO
+        tristate "HTC GPIO headset detection driver"
+        depends on HTC_HEADSET_MGR
+        default n
+        help
+          Provides support of HTC GPIO headset detection.
+
+config HTC_HEADSET_MICROP
+        tristate "HTC Micro-P headset detection driver"
+        depends on HTC_HEADSET_MGR && MICROP_COMMON
+        default n
+        help
+          Provides support of HTC Micro-P headset detection.
 
 config VIRTUAL_KPANIC_PARTITION
 	bool "Create virtual kpanic partition"
