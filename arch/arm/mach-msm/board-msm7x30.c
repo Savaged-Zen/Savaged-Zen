@@ -56,6 +56,7 @@ static struct platform_device *devices[] __initdata = {
         &msm_device_uart2,
 #endif
 	&msm_device_smd,
+	&msm_device_nand,
 };
 
 static void __init msm7x30_init_irq(void)
