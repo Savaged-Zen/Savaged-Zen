@@ -5,7 +5,9 @@ obj-y += dma.o
 endif
 
 obj-y += nand_partitions.o
+obj-y += drv_callback.o
 obj-y += pmic.o
+obj-y += htc_board_tags.o
 
 obj-$(CONFIG_ARCH_MSM_ARM11) += acpuclock-arm11.o idle.o
 obj-$(CONFIG_ARCH_MSM_SCORPION) += idle-v7.o
@@ -40,6 +42,8 @@ obj-$(CONFIG_PM) += pm.o
 obj-$(CONFIG_CPU_FREQ) += cpufreq.o
 obj-$(CONFIG_MSM_REMOTE_SPINLOCK) += remote_spinlock.o
 obj-$(CONFIG_MSM_SSBI) += ssbi.o
+obj-$(CONFIG_HTC_ACOUSTIC) += htc_acoustic.o
+obj-$(CONFIG_HTC_ACOUSTIC_QSD) += htc_acoustic_qsd.o
 
 obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o devices-msm7x00.o
 obj-$(CONFIG_MACH_TROUT) += board-trout-keypad.o
@@ -91,7 +95,7 @@ obj-$(CONFIG_ARCH_MSM7X30) += gpiomux-7x30.o gpiomux-v1.o gpiomux.o
 obj-$(CONFIG_ARCH_QSD8X50) += gpiomux-8x50.o gpiomux-v1.o gpiomux.o
 obj-$(CONFIG_ARCH_MSM8X60) += gpiomux-8x60.o gpiomux-v2.o gpiomux.o
 ifndef CONFIG_MSM_V2_TLMM
-obj-y	+= gpio.o
+obj-y	+= gpio.o generic_gpio.o
 endif
 
 obj-$(CONFIG_HTC_PWRSINK) += htc_pwrsink.o

@@ -26,6 +26,7 @@
 #include <linux/miscdevice.h>
 #include <linux/lightsensor.h>
 #include <linux/irq.h>
+#include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <asm/uaccess.h>
 #include "proc_comm.h"

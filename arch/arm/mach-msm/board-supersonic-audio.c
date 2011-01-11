@@ -276,3 +276,4 @@ void __init supersonic_audio_init(void)
 	q6audio_register_analog_ops(&ops);
 	acoustic_register_ops(&acoustic);
 }
+

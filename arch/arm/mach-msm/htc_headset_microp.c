@@ -19,6 +19,7 @@
 
 #include <linux/gpio.h>
 #include <linux/platform_device.h>
+#include <linux/interrupt.h>
 #include <linux/slab.h>
 
 #include <mach/atmega_microp.h>

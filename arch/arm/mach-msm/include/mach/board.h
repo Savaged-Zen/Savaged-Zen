@@ -176,8 +176,33 @@ int __init msm_add_sdcc(unsigned int controller,
 
 #ifdef CONFIG_USB_MSM_72K
 void msm_hsusb_set_vbus_state(int online);
+/* START: add USB connected notify function */
+struct t_usb_status_notifier{
+	struct list_head notifier_link;
+	const char *name;
+	void (*func)(int online);
+};
+	int usb_register_notifier(struct t_usb_status_notifier *);
+	static LIST_HEAD(g_lh_usb_notifier_list);
+/* END: add USB connected notify function */
 #else
 static inline void msm_hsusb_set_vbus_state(int online) {}
 #endif
+
+char *board_serialno(void);
+int __init parse_tag_skuid(const struct tag *tags);
+int __init parse_tag_engineerid(const struct tag *tags);
+int __init parse_tag_memsize(const struct tag *tags);
+int board_mfg_mode(void);
+void __init msm_snddev_init(void);
+void msm_snddev_poweramp_on(void);
+void msm_snddev_poweramp_off(void);
+void msm_snddev_hsed_pamp_on(void);
+void msm_snddev_hsed_pamp_off(void);
+void msm_snddev_tx_route_config(void);
+void msm_snddev_tx_route_deconfig(void);
+
+extern int emmc_partition_read_proc(char *page, char **start, off_t off,
+                           int count, int *eof, void *data);
 
 #endif
