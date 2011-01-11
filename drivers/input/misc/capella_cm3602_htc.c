@@ -20,6 +20,7 @@
 #include <linux/irq.h>
 #include <linux/gpio.h>
 #include <linux/input.h>
+#include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/capella_cm3602_htc.h>
 #include <linux/fs.h>
