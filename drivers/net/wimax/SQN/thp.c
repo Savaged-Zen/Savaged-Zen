@@ -331,7 +331,7 @@ struct file_operations thp_fops =
 	, .read	=	thp_read
 	, .write=	thp_write
 	, .poll	=	thp_poll
-	, .ioctl =	thp_ioctl
+	, .unlocked_ioctl =	thp_ioctl
 };
 
 /********************** File Operations BEGIN  *****************************/
