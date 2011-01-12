@@ -456,10 +456,8 @@ static int  spi_bma150_probe(struct platform_device *pdev)
 			"start initial\n", __func__);
 
 	this_pdata = pdev->dev.platform_data;
-/*
-	printk(KERN_DEBUG "%s: this_pdata->microp_new_cmd = %d\n",
-			__func__, this_pdata->microp_new_cmd);
-*/
+/*	printk(KERN_DEBUG "%s: this_pdata->microp_new_cmd = %d\n",
+			__func__, this_pdata->microp_new_cmd);*/
 	spi_gsensor_initial();
 
 	return 0;
