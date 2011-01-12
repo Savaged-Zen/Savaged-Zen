@@ -244,7 +244,7 @@ struct msmsdcc_host {
 
 	u32			pwr;
 	u32			saved_irq0mask;	/* MMCIMASK0 reg value */
-	struct mmc_platform_data *plat;
+	struct msm_mmc_platform_data *plat;
 
 	struct timer_list	timer;
 	unsigned int		oldstat;
@@ -257,12 +257,7 @@ struct msmsdcc_host {
 	struct early_suspend early_suspend;
 	int polling_enabled;
 #endif
-
-#ifdef CONFIG_MMC_MSM7X00A_RESUME_IN_WQ
-	struct work_struct	resume_task;
-#endif
-	struct tasklet_struct 	dma_tlet;
-
+	struct tasklet_struct   dma_tlet;
 
 #ifdef CONFIG_MMC_AUTO_SUSPEND
 	unsigned long           suspended;
@@ -275,9 +270,9 @@ struct msmsdcc_host {
 	unsigned int		cmd_datactrl;
 	struct mmc_command	*cmd_cmd;
 	u32			cmd_c;
-	unsigned int	mci_irqenable;
-	unsigned int	dummy_52_needed;
-	unsigned int	dummy_52_state;
+	unsigned int    mci_irqenable;
+	unsigned int    dummy_52_needed;
+	unsigned int    dummy_52_state;
 
 };
 
