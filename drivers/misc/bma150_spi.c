@@ -25,160 +25,19 @@
 #include <linux/platform_device.h>
 #include <mach/atmega_microp.h>
 
-#define I2C_READ_RETRY_TIMES                    10
-#define I2C_WRITE_RETRY_TIMES                   10
-#define MICROP_I2C_WRITE_BLOCK_SIZE             80
+struct early_suspend bma_early_suspend;
 
-static struct i2c_client *private_microp_client;
 static struct bma150_platform_data *this_pdata;
 
 static struct mutex gsensor_RW_mutex;
 static struct mutex gsensor_set_mode_mutex;
 
-static char *hex2string(uint8_t *data, int len)
-{
-	static char buf[101];
-	int i;
-
-	i = (sizeof(buf) - 1) / 4;
-	if (len > i)
-		len = i;
-
-	for (i = 0; i < len; i++)
-		sprintf(buf + i * 4, "[%02X]", data[i]);
-
-	return buf;
-}
-
-static int i2c_read_block(struct i2c_client *client, uint8_t addr,
-	uint8_t *data, int length)
-{
-	int retry;
-	int ret;
-	struct i2c_msg msgs[] = {
-	{
-		.addr = client->addr,
-		.flags = 0,
-		.len = 1,
-		.buf = &addr,
-	},
-	{
-		.addr = client->addr,
-		.flags = I2C_M_RD,
-		.len = length,
-		.buf = data,
-	}
-	};
-
-	mdelay(1);
-	for (retry = 0; retry <= I2C_READ_RETRY_TIMES; retry++) {
-		ret = i2c_transfer(client->adapter, msgs, 2);
-		if (ret == 2) {
-			dev_dbg(&client->dev, "R [%02X] = %s\n", addr,
-					hex2string(data, length));
-			return 0;
-		}
-		msleep(10);
-	}
-
-	dev_err(&client->dev, "i2c_read_block retry over %d\n",
-			I2C_READ_RETRY_TIMES);
-	return -EIO;
-}
-
-static int i2c_write_block(struct i2c_client *client, uint8_t addr,
-	uint8_t *data, int length)
-{
-	int retry;
-	uint8_t buf[MICROP_I2C_WRITE_BLOCK_SIZE];
-	int ret;
-
-	struct i2c_msg msg[] = {
-		{
-			.addr = client->addr,
-			.flags = 0,
-			.len = length + 1,
-			.buf = buf,
-		}
-	};
-
-	dev_dbg(&client->dev, "W [%02X] = %s\n", addr,
-			hex2string(data, length));
-
-	if (length + 1 > MICROP_I2C_WRITE_BLOCK_SIZE) {
-		dev_err(&client->dev, "i2c_write_block length too long\n");
-		return -E2BIG;
-	}
-
-	buf[0] = addr;
-	memcpy((void *)&buf[1], (void *)data, length);
-
-	mdelay(1);
-	for (retry = 0; retry <= I2C_WRITE_RETRY_TIMES; retry++) {
-		ret = i2c_transfer(client->adapter, msg, 1);
-		if (ret == 1)
-			return 0;
-		msleep(10);
-	}
-	dev_err(&client->dev, "i2c_write_block retry over %d\n",
-			I2C_WRITE_RETRY_TIMES);
-	return -EIO;
-}
-
 static int spi_microp_enable(uint8_t on)
 {
-	struct i2c_client *client;
 	int ret;
-
-	client = private_microp_client;
-	ret = i2c_write_block(client, MICROP_I2C_WCMD_SPI_EN, &on, 1);
-	if (ret < 0) {
-		dev_err(&client->dev,"%s: i2c_write_block fail\n", __func__);
-		return ret;
-	}
-	msleep(10);
-	return ret;
-}
-
-static int spi_gsensor_read_reg(uint8_t reg, uint8_t *data)
-{
-	struct i2c_client *client;
-	int ret;
-	uint8_t tmp[2];
-
-	client = private_microp_client;
-	ret = i2c_write_block(client, MICROP_I2C_WCMD_GSENSOR_REG_DATA_REQ,
-			      &reg, 1);
-	if (ret < 0) {
-		dev_err(&client->dev,"%s: i2c_write_block fail\n", __func__);
-		return ret;
-	}
-	msleep(10);
-
-	ret = i2c_read_block(client, MICROP_I2C_RCMD_GSENSOR_REG_DATA, tmp, 2);
-	if (ret < 0) {
-		dev_err(&client->dev,"%s: i2c_read_block fail\n", __func__);
-		return ret;
-	}
-	*data = tmp[1];
-	return ret;
-}
-
-static int spi_gsensor_write_reg(uint8_t reg, uint8_t data)
-{
-	struct i2c_client *client;
-	int ret;
-	uint8_t tmp[2];
-
-	client = private_microp_client;
-
-	tmp[0] = reg;
-	tmp[1] = data;
-	ret = i2c_write_block(client, MICROP_I2C_WCMD_GSENSOR_REG, tmp, 2);
-	if (ret < 0) {
-		dev_err(&client->dev,"%s: i2c_write_block fail\n", __func__);
-		return ret;
-	}
+	ret = microp_spi_vote_enable(SPI_GSENSOR, on);
+	if (ret < 0)
+		printk(KERN_ERR "%s: i2c_write_block fail\n", __func__);
 
 	return ret;
 }
@@ -186,148 +45,212 @@ static int spi_gsensor_write_reg(uint8_t reg, uint8_t data)
 static int spi_gsensor_read(uint8_t *data)
 {
 	int ret;
-	uint8_t reg = data[0];
 
-	ret = spi_gsensor_read_reg(reg, &data[1]);
-	pr_debug("%s reg = %x data = %x\n", __func__, reg, data[1]);
+	mutex_lock(&gsensor_RW_mutex);
+
+	ret = microp_i2c_write(MICROP_I2C_WCMD_GSENSOR_REG_DATA_REQ, data, 1);
+	if (ret < 0) {
+		printk(KERN_ERR "%s: i2c_write_block fail\n", __func__);
+		mutex_unlock(&gsensor_RW_mutex);
+		return ret;
+	}
+
+	ret = microp_i2c_read(MICROP_I2C_RCMD_GSENSOR_REG_DATA, data, 2);
+	if (ret < 0) {
+		printk(KERN_ERR "%s: i2c_read_block fail\n", __func__);
+		mutex_unlock(&gsensor_RW_mutex);
+		return ret;
+	}
+
+	mutex_unlock(&gsensor_RW_mutex);
+
 	return ret;
 }
 
 static int spi_gsensor_write(uint8_t *data)
 {
 	int ret;
-	uint8_t reg = data[0];
 
-	pr_debug("%s reg = %x data = %x\n", __func__, reg, data[1]);
-	ret = spi_gsensor_write_reg(reg, data[1]);
+	mutex_lock(&gsensor_RW_mutex);
+
+	ret = microp_i2c_write(MICROP_I2C_WCMD_GSENSOR_REG, data, 2);
+	if (ret < 0) {
+		printk(KERN_ERR "%s: i2c_write_block fail\n", __func__);
+		mutex_unlock(&gsensor_RW_mutex);
+		return ret;
+	}
+
+	mutex_unlock(&gsensor_RW_mutex);
+
 	return ret;
 }
 
 static int spi_gsensor_init_hw(void)
 {
-	uint8_t reg;
-	int ret;
+	char buffer[2];
 
-	pr_debug("%s\n", __func__);
-
-	spi_microp_enable(1);
-
-	ret = spi_gsensor_read_reg(RANGE_BWIDTH_REG, &reg);
-	if (ret < 0 )
-		return -EIO;
-	reg &= 0xe0;
-	ret = spi_gsensor_write_reg(RANGE_BWIDTH_REG, reg);
-	if (ret < 0 )
+	memset(buffer, 0x0, sizeof(buffer));
+	buffer[0] = RANGE_BWIDTH_REG;
+	if (spi_gsensor_read(buffer) < 0)
 		return -EIO;
 
-	ret = spi_gsensor_read_reg(SMB150_CONF2_REG, &reg);
-	if (ret < 0 )
-		return -EIO;
-	reg |= (1 << 3);
-	ret = spi_gsensor_write_reg(SMB150_CONF2_REG, reg);
+	/*printk("spi_gsensor_init_hw,read RANGE_BWIDTH_REG = %x "
+	, buffer[1]);*/
 
-	return ret;
+	buffer[1] = (buffer[1]&0xe0);
+	buffer[0] = RANGE_BWIDTH_REG;
+	if (spi_gsensor_write(buffer) < 0)
+		return -EIO;
+
+	buffer[0] = SMB150_CONF2_REG;
+	if (spi_gsensor_read(buffer) < 0)
+		return -EIO;
+
+	buffer[1] = buffer[1]|1<<3;
+	buffer[0] = SMB150_CONF2_REG;
+	if (spi_gsensor_write(buffer) < 0)
+		return -EIO;
+
+	return 0;
 }
 
-static int spi_gsensor_read_acceleration(short *buf)
+/*
+static int spi_gsensor_read_version(void)
 {
-	struct i2c_client *client;
-	int ret;
-	uint8_t tmp[6];
-	struct microp_i2c_client_data *cdata;
+	uint8_t buffer[2];
+	int ret = -EIO;
 
-	client = private_microp_client;
-
-	cdata = i2c_get_clientdata(client);
-
-	tmp[0] = 1;
-	ret = i2c_write_block(client, MICROP_I2C_WCMD_GSENSOR_DATA_REQ,
-			      tmp, 1);
+	buffer[0] = VERSION_REG;
+	buffer[1] = 1;
+	ret = spi_gsensor_read(buffer);
 	if (ret < 0) {
-		dev_err(&client->dev,"%s: i2c_write_block fail\n", __func__);
+		printk(KERN_ERR "%s: get al_version fail(%d)\n", __func__, ret);
+		return ret;
+	}
+	printk(KERN_INFO "%s: al_version: 0x%2.2X\n", __func__, buffer[0]);
+
+	buffer[0] = CHIP_ID_REG;
+	buffer[1] = 1;
+	ret = spi_gsensor_read(buffer);
+	if (ret < 0) {
+		printk(KERN_ERR "%s: get chip_id fail(%d)\n", __func__, ret);
+		return ret;
+	}
+	printk(KERN_INFO "%s: chip_id: 0x%2.2X\n", __func__, buffer[0]);
+	return 0;
+}
+*/
+static int spi_bma150_TransRBuff(short *rbuf)
+{
+	int ret;
+	unsigned char buffer[6];
+	memset(buffer, 0, 6);
+
+	mutex_lock(&gsensor_RW_mutex);
+
+	buffer[0] = 1;
+	ret = microp_i2c_write(MICROP_I2C_WCMD_GSENSOR_DATA_REQ, buffer, 1);
+	if (ret < 0) {
+		printk(KERN_ERR "%s: i2c_write_block fail\n", __func__);
+		mutex_unlock(&gsensor_RW_mutex);
 		return ret;
 	}
 
-	msleep(10);
-
-	if (cdata->version <= 0x615) {
-		/*
-		 * Note the data is a 10bit signed value from the chip.
-		*/
-		ret = i2c_read_block(client, MICROP_I2C_RCMD_GSENSOR_X_DATA,
-				     tmp, 2);
-		if (ret < 0) {
-			dev_err(&client->dev, "%s: i2c_read_block fail\n",
-				__func__);
-			return ret;
-		}
-		buf[0] = (short)(tmp[0] << 8 | tmp[1]);
-		buf[0] >>= 6;
-
-		ret = i2c_read_block(client, MICROP_I2C_RCMD_GSENSOR_Y_DATA,
-				     tmp, 2);
-		if (ret < 0) {
-			dev_err(&client->dev, "%s: i2c_read_block fail\n",
-				__func__);
-			return ret;
-		}
-		buf[1] = (short)(tmp[0] << 8 | tmp[1]);
-		buf[1] >>= 6;
-
-		ret = i2c_read_block(client, MICROP_I2C_RCMD_GSENSOR_Z_DATA,
-				     tmp, 2);
-		if (ret < 0) {
-			dev_err(&client->dev, "%s: i2c_read_block fail\n",
-				__func__);
-			return ret;
-		}
-		buf[2] = (short)(tmp[0] << 8 | tmp[1]);
-		buf[2] >>= 6;
+	if (this_pdata && this_pdata->microp_new_cmd &&
+			this_pdata->microp_new_cmd == 1) {
+		/*printk(KERN_DEBUG "%s: New MicroP command\n", __func__);*/
+		ret = microp_i2c_read(MICROP_I2C_RCMD_GSENSOR_DATA, buffer, 6);
+		rbuf[0] = buffer[0]<<2|buffer[1]>>6;
+		if (rbuf[0]&0x200)
+			rbuf[0] -= 1<<10;
+		rbuf[1] = buffer[2]<<2|buffer[3]>>6;
+		if (rbuf[1]&0x200)
+			rbuf[1] -= 1<<10;
+		rbuf[2] = buffer[4]<<2|buffer[5]>>6;
+		if (rbuf[2]&0x200)
+			rbuf[2] -= 1<<10;
 	} else {
-		ret = i2c_read_block(client, MICROP_I2C_RCMD_GSENSOR_DATA,
-				     tmp, 6);
+		/* For Passion with V01 ~ V05 Microp */
+		/*printk(KERN_DEBUG "%s: Old MicroP command\n", __func__);*/
+		ret = microp_i2c_read(MICROP_I2C_RCMD_GSENSOR_X_DATA,
+					buffer, 2);
 		if (ret < 0) {
-			dev_err(&client->dev, "%s: i2c_read_block fail\n",
-				__func__);
+			printk(KERN_ERR "%s: i2c_read_block fail\n", __func__);
+			mutex_unlock(&gsensor_RW_mutex);
 			return ret;
 		}
-		buf[0] = (short)(tmp[0] << 8 | tmp[1]);
-		buf[0] >>= 6;
-		buf[1] = (short)(tmp[2] << 8 | tmp[3]);
-		buf[1] >>= 6;
-		buf[2] = (short)(tmp[4] << 8 | tmp[5]);
-		buf[2] >>= 6;
+		rbuf[0] = buffer[0]<<2|buffer[1]>>6;
+		if (rbuf[0]&0x200)
+			rbuf[0] -= 1<<10;
+
+		ret = microp_i2c_read(MICROP_I2C_RCMD_GSENSOR_Y_DATA,
+					buffer, 2);
+		if (ret < 0) {
+			printk(KERN_ERR "%s: i2c_read_block fail\n", __func__);
+			mutex_unlock(&gsensor_RW_mutex);
+			return ret;
+			}
+		rbuf[1] = buffer[0]<<2|buffer[1]>>6;
+		if (rbuf[1]&0x200)
+			rbuf[1] -= 1<<10;
+
+		ret = microp_i2c_read(MICROP_I2C_RCMD_GSENSOR_Z_DATA,
+					buffer, 2);
+		if (ret < 0) {
+			printk(KERN_ERR "%s: i2c_read_block fail\n", __func__);
+			mutex_unlock(&gsensor_RW_mutex);
+			return ret;
+			}
+		rbuf[2] = buffer[0]<<2|buffer[1]>>6;
+		if (rbuf[2]&0x200)
+			rbuf[2] -= 1<<10;
 	}
+/*	printk("X=%d, Y=%d, Z=%d\n",rbuf[0],rbuf[1],rbuf[2]);*/
+
+/*	printk(KERN_DEBUG "%s: 0x%2.2X 0x%2.2X 0x%2.2X \
+0x%2.2X 0x%2.2X 0x%2.2X\n",
+		__func__, buffer[0], buffer[1], buffer[2], \
+		buffer[3], buffer[4], buffer[5]);*/
+
+	mutex_unlock(&gsensor_RW_mutex);
 
 	return 1;
 }
 
-static int spi_bma150_set_mode(char mode)
+static int __spi_bma150_set_mode(char mode)
 {
-	uint8_t reg;
+	char buffer[2];
 	int ret;
-
-	pr_debug("%s mode = %d\n", __func__, mode);
-	if (mode == BMA_MODE_NORMAL)
+	mutex_lock(&gsensor_set_mode_mutex);
+	if (mode == BMA_MODE_NORMAL) {
 		spi_microp_enable(1);
+		printk(KERN_INFO "%s: BMA get into NORMAL mode!\n",
+			__func__);
+	}
 
+	buffer[0] = SMB150_CTRL_REG;
+	ret = spi_gsensor_read(buffer);
+	if (ret < 0) {
+		mutex_unlock(&gsensor_set_mode_mutex);
+		return -1;
+	}
 
-	ret = spi_gsensor_read_reg(SMB150_CTRL_REG, &reg);
-	if (ret < 0 )
-		return -EIO;
-	reg = (reg & 0xfe) | mode;
-	ret = spi_gsensor_write_reg(SMB150_CTRL_REG, reg);
+	buffer[1] = (buffer[1]&0xfe)|mode;
+	buffer[0] = SMB150_CTRL_REG;
+	ret = spi_gsensor_write(buffer);
 
-	if (mode == BMA_MODE_SLEEP)
+	if (mode == BMA_MODE_SLEEP) {
 		spi_microp_enable(0);
-
+		printk(KERN_INFO "%s: BMA get into SLEEP mode!\n",
+			__func__);
+	}
+	mutex_unlock(&gsensor_set_mode_mutex);
 	return ret;
 }
-static DEFINE_MUTEX(spi_bma150_lock);
+
 
 static int spi_bma150_open(struct inode *inode, struct file *file)
 {
-	pr_debug("%s\n", __func__);
 	return nonseekable_open(inode, file);
 }
 
@@ -336,10 +259,12 @@ static int spi_bma150_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static long spi_bma150_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+static int spi_bma150_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+	   unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
 	char rwbuf[8];
+	char *toRbuf;
 	int ret = -1;
 	short buf[8], temp;
 
@@ -358,52 +283,55 @@ static long spi_bma150_ioctl(struct file *file, unsigned int cmd, unsigned long 
 		break;
 	}
 
-	mutex_lock(&spi_bma150_lock);
 	switch (cmd) {
 	case BMA_IOCTL_INIT:
 		ret = spi_gsensor_init_hw();
 		if (ret < 0)
-			goto err;
+			return ret;
 		break;
 
 	case BMA_IOCTL_READ:
-		if (rwbuf[0] < 1) {
-			ret = -EINVAL;
-			goto err;
-		}
-		ret = spi_gsensor_read(rwbuf);
+		if (rwbuf[0] < 1)
+			return -EINVAL;
+		ret = spi_gsensor_read(&rwbuf[1]);
 		if (ret < 0)
-			goto err;
+			return ret;
 		break;
 	case BMA_IOCTL_WRITE:
-		if (rwbuf[0] < 2) {
-			ret = -EINVAL;
-			goto err;
-		}
-		ret = spi_gsensor_write(rwbuf);
+		if (rwbuf[0] < 2)
+			return -EINVAL;
+		ret = spi_gsensor_write(&rwbuf[1]);
 		if (ret < 0)
-			goto err;
+			return ret;
 		break;
 	case BMA_IOCTL_READ_ACCELERATION:
-		ret = spi_gsensor_read_acceleration(&buf[0]);
+		ret = spi_bma150_TransRBuff(&buf[0]);
 		if (ret < 0)
-			goto err;
+			return ret;
 		break;
 	case BMA_IOCTL_SET_MODE:
-		spi_bma150_set_mode(rwbuf[0]);
+		/*printk(KERN_DEBUG
+		"%s: BMA_IOCTL_SET_MODE by ioctl = %d\n",
+			__func__,rwbuf[0]);*/
+		ret = __spi_bma150_set_mode(rwbuf[0]);
+		if (ret < 0)
+			return ret;
 		break;
 	case BMA_IOCTL_GET_INT:
 		temp = 0;
 		break;
+	case BMA_IOCTL_GET_CHIP_LAYOUT:
+		if (this_pdata)
+			temp = this_pdata->chip_layout;
+		break;
 	default:
-		ret = -ENOTTY;
-		goto err;
+		return -ENOTTY;
 	}
-	mutex_unlock(&spi_bma150_lock);
 
 	switch (cmd) {
 	case BMA_IOCTL_READ:
-		if (copy_to_user(argp, &rwbuf, sizeof(rwbuf)))
+		toRbuf = &rwbuf[1];
+		if (copy_to_user(argp, toRbuf, sizeof(rwbuf)-1))
 			return -EFAULT;
 		break;
 	case BMA_IOCTL_READ_ACCELERATION:
@@ -414,15 +342,15 @@ static long spi_bma150_ioctl(struct file *file, unsigned int cmd, unsigned long 
 		if (copy_to_user(argp, &temp, sizeof(temp)))
 			return -EFAULT;
 		break;
+	case BMA_IOCTL_GET_CHIP_LAYOUT:
+		if (copy_to_user(argp, &temp, sizeof(temp)))
+			return -EFAULT;
+		break;
 	default:
 		break;
 	}
 
 	return 0;
-
-err:
-	mutex_unlock(&spi_bma150_lock);
-	return ret;
 }
 
 static struct file_operations spi_bma_fops = {
@@ -438,9 +366,43 @@ static struct miscdevice spi_bma_device = {
 	.fops = &spi_bma_fops,
 };
 
+static void bma150_early_suspend(struct early_suspend *handler)
+{
+	int ret = 0;
+	ret = __spi_bma150_set_mode(BMA_MODE_SLEEP);
+
+	printk(KERN_DEBUG
+		"%s: spi_bma150_set_mode returned = %d!\n",
+			__func__, ret);
+}
+
+static void bma150_early_resume(struct early_suspend *handler)
+{
+	/*printk(KERN_DEBUG
+		"%s: spi_bma150_set_mode returned = %d!\n",
+			__func__, ret);*/
+}
+
 static int spi_gsensor_initial(void)
 {
 	int ret;
+/*	ret = spi_microp_enable(1);
+	if (ret < 0) {
+		printk(KERN_ERR "%s: spi_microp_enable fail\n", __func__);
+		return ret;
+	}*/
+/*	ret = spi_gsensor_read_version();
+	if (ret < 0) {
+		printk(KERN_ERR "%s: get version fail\n", __func__);
+		return ret;
+	}*/
+
+/*	ret = microp_gsensor_init_hw(client);
+	if (ret < 0) {
+		printk(KERN_ERR "%s: init g-sensor fail\n", __func__);
+		return ret;
+	}
+*/
 	ret = misc_register(&spi_bma_device);
 	if (ret < 0) {
 		printk(KERN_ERR "%s: init misc_register fail\n", __func__);
@@ -457,11 +419,15 @@ static int spi_gsensor_initial(void)
 		goto err_spi_enable;
 	}
 
-	ret = spi_bma150_set_mode(BMA_MODE_SLEEP);
+	ret = __spi_bma150_set_mode(BMA_MODE_SLEEP);
 	if (ret) {
 		printk(KERN_ERR "%s: set BMA_MODE_SLEEP fail!\n", __func__);
 		goto err_set_mode;
 	}
+
+	bma_early_suspend.suspend = bma150_early_suspend;
+	bma_early_suspend.resume = bma150_early_resume;
+	register_early_suspend(&bma_early_suspend);
 
 	return 0;
 
@@ -479,6 +445,10 @@ static int  spi_bma150_probe(struct platform_device *pdev)
 			"start initial\n", __func__);
 
 	this_pdata = pdev->dev.platform_data;
+/*
+	printk(KERN_DEBUG "%s: this_pdata->microp_new_cmd = %d\n",
+			__func__, this_pdata->microp_new_cmd);
+*/
 	spi_gsensor_initial();
 
 	return 0;

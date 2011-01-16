@@ -21,33 +21,19 @@
 #include <mach/htc_battery.h>
 #include <asm/mach-types.h>
 
-static const unsigned short normal_i2c[] = { 0x2e, I2C_CLIENT_END };
-
-/* Registers */
-#define TPS65200_REG_DEVICE			0x09
-#define         TPS65200_DEVICE		11
-#define TPS65200_REG_VENDOR_REV		0x07
-#define		TPS65200_VENDOR		      1
-#define		TPS65200_VENDOR_MASK	      0x0F
-#define		TPS65200_REV		      4
-#define		TPS65200_REV_SHIFT	      4
-
+static const unsigned short normal_i2c[] = { I2C_CLIENT_END };
 static int tps65200_initial = -1;
 /**
  * Insmod parameters
  */
+I2C_CLIENT_INSMOD_1(tps65200);
 
 static int tps65200_probe(struct i2c_client *client,
 			const struct i2c_device_id *id);
-static int tps65200_detect(struct i2c_client *client,
+static int tps65200_detect(struct i2c_client *client, int kind,
 			 struct i2c_board_info *info);
 static int tps65200_remove(struct i2c_client *client);
 
-static const struct i2c_device_id tps65200_id[] = {
-	{ "tps65200", 0 },
-	{ }
-};
-MODULE_DEVICE_TABLE(i2c, tps65200_id);
 
 /* Supersonic for Switch charger */
 struct tps65200_i2c_client {
@@ -187,7 +173,7 @@ static int tps65200_i2c_read_byte(u8 *value, u8 reg)
 int tps_set_charger_ctrl(u32 ctl)
 {
 	int result = 0;
-//	u8 version;
+	u8 version;
 	u8 status;
 	u8 regh;
 
@@ -292,33 +278,17 @@ static struct notifier_block cable_status_handler = {
 	.notifier_call = cable_status_handler_func,
 };
 
-static int tps65200_detect(struct i2c_client *client,
-                          struct i2c_board_info *info)
+static int tps65200_detect(struct i2c_client *client, int kind,
+			 struct i2c_board_info *info)
 {
-        struct i2c_adapter *adapter = client->adapter;
-        int vendor, device, revision;
+	if (!i2c_check_functionality(client->adapter,
+				     I2C_FUNC_SMBUS_WRITE_BYTE_DATA |
+				     I2C_FUNC_SMBUS_BYTE))
+		return -ENODEV;
 
-        if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA))
-                return -ENODEV;
+	strlcpy(info->type, "tps65200", I2C_NAME_SIZE);
 
-        vendor = i2c_smbus_read_word_data(client, TPS65200_REG_VENDOR_REV);
-        vendor >>= 8;
-        revision = vendor >> TPS65200_REV_SHIFT;
-        vendor &= TPS65200_VENDOR_MASK;
-        if (vendor != TPS65200_VENDOR)
-                return -ENODEV;
-
-        device = i2c_smbus_read_word_data(client, TPS65200_REG_DEVICE);
-        device >>= 8;
-        if (device != TPS65200_DEVICE)
-                return -ENODEV;
-
-        if (revision != TPS65200_REV)
-                dev_info(&adapter->dev, "Unknown revision %d\n", revision);
-
-        strlcpy(info->type, "tps65200", I2C_NAME_SIZE);
-
-        return 0;
+	return 0;
 }
 
 static int tps65200_probe(struct i2c_client *client,
@@ -344,19 +314,21 @@ static int tps65200_probe(struct i2c_client *client,
 static int tps65200_remove(struct i2c_client *client)
 {
 	struct tps65200_i2c_client   *data = i2c_get_clientdata(client);
-//	int idx;
+	int idx;
 	if (data->client && data->client != client)
 		i2c_unregister_device(data->client);
 	tps65200_i2c_module.client = NULL;
 	return 0;
 }
+static const struct i2c_device_id tps65200_id[] = {
+	{ "tps65200", 0 },
+	{  },
+};
 static struct i2c_driver tps65200_driver = {
 	.driver.name    = "tps65200",
 	.id_table   = tps65200_id,
 	.probe      = tps65200_probe,
 	.remove     = tps65200_remove,
-	.detect	    = tps65200_detect,
-	.address_list	= normal_i2c,
 };
 
 static int __init sensors_tps65200_init(void)

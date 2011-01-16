@@ -926,4 +926,3 @@ int __init supersonic_init_panel(void)
 
 	return 0;
 }
-

@@ -25,7 +25,6 @@
 #include <linux/slab.h>
 #include <linux/device.h>
 #include <linux/utsname.h>
-#include <linux/delay.h>
 
 #include <linux/usb/composite.h>
 
@@ -154,7 +153,7 @@ int usb_add_function(struct usb_configuration *config,
 	if (!function->set_alt || !function->disable)
 		goto done;
 
-	/*index = atomic_inc_return(&cdev->driver->function_count);
+	index = atomic_inc_return(&cdev->driver->function_count);
 	function->dev = device_create(cdev->driver->class, NULL,
 		MKDEV(0, index), NULL, function->name);
 	if (IS_ERR(function->dev))
@@ -165,7 +164,7 @@ int usb_add_function(struct usb_configuration *config,
 		device_destroy(cdev->driver->class, MKDEV(0, index));
 		return value;
 	}
-	dev_set_drvdata(function->dev, function); */
+	dev_set_drvdata(function->dev, function);
 
 	function->config = config;
 	list_add_tail(&function->list, &config->functions);
