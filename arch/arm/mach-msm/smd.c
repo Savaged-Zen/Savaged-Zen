@@ -61,6 +61,12 @@ static struct shared_info smd_info = {
 	.state = (unsigned) &dummy_state,
 };
 
+#ifdef CONFIG_BUILD_CIQ
+static int msm_smd_ciq_info;
+module_param_named(ciq_info, msm_smd_ciq_info,
+		   int, S_IRUGO | S_IWUSR | S_IWGRP);
+#endif
+
 module_param_named(debug_mask, msm_smd_debug_mask,
 		   int, S_IRUGO | S_IWUSR | S_IWGRP);
 
@@ -395,7 +401,11 @@ static void handle_smd_irq(struct list_head *list, void (*notify)(void))
 	int do_notify = 0;
 	unsigned ch_flags;
 	unsigned tmp;
-
+#ifdef CONFIG_BUILD_CIQ
+	/* put here to make sure we got the disable/enable index */
+	if (!msm_smd_ciq_info)
+		msm_smd_ciq_info = (*(volatile uint32_t *)(MSM_SHARED_RAM_BASE + 0xFC11C));
+#endif
 	spin_lock_irqsave(&smd_lock, flags);
 	list_for_each_entry(ch, list, ch_list) {
 		ch_flags = 0;
@@ -520,6 +530,10 @@ static int smd_is_packet(int chn, unsigned type)
 		return 0;
 
 	/* older AMSS reports SMD_KIND_UNKNOWN always */
+#ifdef CONFIG_BUILD_CIQ
+	if (chn == 26)
+		return 0;
+#endif
 	if ((chn > 4) || (chn == 1))
 		return 1;
 	else
