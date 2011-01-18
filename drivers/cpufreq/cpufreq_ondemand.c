@@ -28,12 +28,22 @@
  * It helps to keep variable names smaller, simpler
  */
 
-#define DEF_FREQUENCY_DOWN_DIFFERENTIAL		(17)
-#define DEF_FREQUENCY_UP_THRESHOLD		(63)
+/* These tunables should be different for BFS/CFS due to different behaviors */
+#ifdef CONFIG_SCHED_BFS
+# define DEF_FREQUENCY_DOWN_DIFFERENTIAL		(17)
+# define DEF_FREQUENCY_UP_THRESHOLD		(63)
+#else /* CFS */
+# define DEF_FREQUENCY_DOWN_DIFFERENTIAL		(10)
+# define DEF_FREQUENCY_UP_THRESHOLD		(80)
+#endif
 #define DEF_SAMPLING_DOWN_FACTOR		(1)
 #define MAX_SAMPLING_DOWN_FACTOR		(100000)
 #define MICRO_FREQUENCY_DOWN_DIFFERENTIAL	(3)
-#define MICRO_FREQUENCY_UP_THRESHOLD		(80)
+#ifdef CONFIG_SCHED_BFS
+# define MICRO_FREQUENCY_UP_THRESHOLD		(80)
+#else
+# define MICRO_FREQUENCY_UP_THRESHOLD		(95)
+#endif
 #define MICRO_FREQUENCY_MIN_SAMPLE_RATE		(10000)
 #define MIN_FREQUENCY_UP_THRESHOLD		(11)
 #define MAX_FREQUENCY_UP_THRESHOLD		(100)
