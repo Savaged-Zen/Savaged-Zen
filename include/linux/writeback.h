@@ -12,6 +12,21 @@ struct backing_dev_info;
 extern spinlock_t inode_lock;
 
 /*
+ * The 1/8 region under the bdi dirty threshold is set aside for elastic
+ * throttling. In rare cases when the threshold is exceeded, more rigid
+ * throttling will be imposed, which will inevitably stall the dirtier task
+ * for seconds (or more) at _one_ time. The rare case could be a fork bomb
+ * where every new task dirties some more pages.
+ */
+#define BDI_SOFT_DIRTY_LIMIT	8
+#define TASK_SOFT_DIRTY_LIMIT	(BDI_SOFT_DIRTY_LIMIT * 2)
+
+/*
+ * 4MB minimal write chunk size
+ */
+#define MIN_WRITEBACK_PAGES     (4096UL >> (PAGE_CACHE_SHIFT - 10))
+
+/*
  * fs/fs-writeback.c
  */
 enum writeback_sync_modes {
@@ -33,6 +48,7 @@ struct writeback_control {
 					   extra jobs and livelock */
 	long nr_to_write;		/* Write this many pages, and decrement
 					   this for each page written */
+	long per_file_limit;		/* Write this many pages for one file */
 	long pages_skipped;		/* Pages which were not written */
 
 	/*
@@ -126,7 +142,18 @@ int dirty_writeback_centisecs_handler(struct ctl_table *, int,
 
 void global_dirty_limits(unsigned long *pbackground, unsigned long *pdirty);
 unsigned long bdi_dirty_limit(struct backing_dev_info *bdi,
-			       unsigned long dirty);
+			       unsigned long dirty,
+			       unsigned long dirty_pages);
+
+void bdi_update_bandwidth(struct backing_dev_info *bdi,
+			  unsigned long start_time,
+			  unsigned long bdi_dirty,
+			  unsigned long bdi_thresh);
+static inline void bdi_update_write_bandwidth(struct backing_dev_info *bdi,
+					      unsigned long start_time)
+{
+	bdi_update_bandwidth(bdi, start_time, 0, 0);
+}
 
 void page_writeback_init(void);
 void balance_dirty_pages_ratelimited_nr(struct address_space *mapping,
