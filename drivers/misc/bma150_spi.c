@@ -248,7 +248,6 @@ static int __spi_bma150_set_mode(char mode)
 	return ret;
 }
 
-static DEFINE_MUTEX(spi_bma150_lock);
 
 static int spi_bma150_open(struct inode *inode, struct file *file)
 {
@@ -260,10 +259,11 @@ static int spi_bma150_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static long spi_bma150_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+static int spi_bma150_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
 	char rwbuf[8];
+	char *toRbuf;
 	int ret = -1;
 	short buf[8], temp;
 
@@ -282,52 +282,55 @@ static long spi_bma150_ioctl(struct file *file, unsigned int cmd, unsigned long 
 		break;
 	}
 
-	mutex_lock(&spi_bma150_lock);
 	switch (cmd) {
 	case BMA_IOCTL_INIT:
 		ret = spi_gsensor_init_hw();
 		if (ret < 0)
-			goto err;
+			return ret;
 		break;
 
 	case BMA_IOCTL_READ:
-		if (rwbuf[0] < 1) {
-			ret = -EINVAL;
-			goto err;
-		}
-		ret = spi_gsensor_read(rwbuf);
+		if (rwbuf[0] < 1)
+			return -EINVAL;
+		ret = spi_gsensor_read(&rwbuf[1]);
 		if (ret < 0)
-			goto err;
+			return ret;
 		break;
 	case BMA_IOCTL_WRITE:
-		if (rwbuf[0] < 2) {
-			ret = -EINVAL;
-			goto err;
-		}
-		ret = spi_gsensor_write(rwbuf);
+		if (rwbuf[0] < 2)
+			return -EINVAL;
+		ret = spi_gsensor_write(&rwbuf[1]);
 		if (ret < 0)
-			goto err;
+			return ret;
 		break;
 	case BMA_IOCTL_READ_ACCELERATION:
 		ret = spi_bma150_TransRBuff(&buf[0]);
 		if (ret < 0)
-			goto err;
+			return ret;
 		break;
 	case BMA_IOCTL_SET_MODE:
-		__spi_bma150_set_mode(rwbuf[0]);
+		/*printk(KERN_DEBUG
+		"%s: BMA_IOCTL_SET_MODE by ioctl = %d\n",
+			__func__,rwbuf[0]);*/
+		ret = __spi_bma150_set_mode(rwbuf[0]);
+		if (ret < 0)
+			return ret;
 		break;
 	case BMA_IOCTL_GET_INT:
 		temp = 0;
 		break;
+	case BMA_IOCTL_GET_CHIP_LAYOUT:
+		if (this_pdata)
+			temp = this_pdata->chip_layout;
+		break;
 	default:
-		ret = -ENOTTY;
-		goto err;
+		return -ENOTTY;
 	}
-	mutex_unlock(&spi_bma150_lock);
 
 	switch (cmd) {
 	case BMA_IOCTL_READ:
-		if (copy_to_user(argp, &rwbuf, sizeof(rwbuf)))
+		toRbuf = &rwbuf[1];
+		if (copy_to_user(argp, toRbuf, sizeof(rwbuf)-1))
 			return -EFAULT;
 		break;
 	case BMA_IOCTL_READ_ACCELERATION:
@@ -338,15 +341,15 @@ static long spi_bma150_ioctl(struct file *file, unsigned int cmd, unsigned long 
 		if (copy_to_user(argp, &temp, sizeof(temp)))
 			return -EFAULT;
 		break;
+	case BMA_IOCTL_GET_CHIP_LAYOUT:
+		if (copy_to_user(argp, &temp, sizeof(temp)))
+			return -EFAULT;
+		break;
 	default:
 		break;
 	}
 
 	return 0;
-
-err:
-	mutex_unlock(&spi_bma150_lock);
-	return ret;
 }
 
 static struct file_operations spi_bma_fops = {
