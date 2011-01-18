@@ -134,7 +134,7 @@ static enum hrtimer_restart gpio_event_input_timer_func(struct hrtimer *timer)
 		if (key_entry->code == BTN_MOUSE) {
 			pr_info("gpio_keys_scan_keys: OJ action key %x-%x, %d (%d) "
 				"changed to %d\n", ds->info->type,
-				key_entry->code, i, key_entry->gpio, pressed);
+			key_entry->code, i, key_entry->gpio, pressed);
 			curcial_oj_send_key(BTN_MOUSE, pressed);
 		} else
 #endif
@@ -165,30 +165,30 @@ static enum hrtimer_restart gpio_event_input_timer_func(struct hrtimer *timer)
 
 #ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
 void keypad_reprort_keycode(struct gpio_key_state *ks){
-        struct gpio_input_state *ds = ks->ds;
-        int keymap_index = ks - ds->key_state;
-        const struct gpio_event_direct_entry *key_entry;
-        int pressed;
+	struct gpio_input_state *ds = ks->ds;
+	int keymap_index = ks - ds->key_state;
+	const struct gpio_event_direct_entry *key_entry;
+	int pressed;
 
-        key_entry = &ds->info->keymap[keymap_index];
+	key_entry = &ds->info->keymap[keymap_index];
 
-        pressed = gpio_get_value(key_entry->gpio) ^
-                        !(ds->info->flags & GPIOEDF_ACTIVE_HIGH);
-                if (ds->info->flags & GPIOEDF_PRINT_KEYS)
-                        pr_info("keypad_reprort_keycode: key %x-%x, %d "
-                                "(%d) changed to %d\n",
-                                ds->info->type, key_entry->code, keymap_index,
-                                key_entry->gpio, pressed);
+	pressed = gpio_get_value(key_entry->gpio) ^
+		!(ds->info->flags & GPIOEDF_ACTIVE_HIGH);
+	if (ds->info->flags & GPIOEDF_PRINT_KEYS)
+		pr_info("keypad_reprort_keycode: key %x-%x, %d "
+			"(%d) changed to %d\n",
+			ds->info->type, key_entry->code, keymap_index,
+			key_entry->gpio, pressed);
 
-                if (ds->info->info.oj_btn && key_entry->code == BTN_MOUSE){
-                        curcial_oj_send_key(BTN_MOUSE, pressed);
-                        pr_info("keypad_reprort_keycode: OJ key %x-%x, %d "
-                                "(%d) changed to %d\n",
-                                ds->info->type, key_entry->code, keymap_index,
-                                key_entry->gpio, pressed);
-                } else
-                        input_event(ds->input_devs->dev[key_entry->dev],
-                                ds->info->type, key_entry->code, pressed);
+	if (ds->info->info.oj_btn && key_entry->code == BTN_MOUSE){
+		curcial_oj_send_key(BTN_MOUSE, pressed);
+		pr_info("keypad_reprort_keycode: OJ key %x-%x, %d "
+			"(%d) changed to %d\n",
+			ds->info->type, key_entry->code, keymap_index,
+			key_entry->gpio, pressed);
+	} else
+		input_event(ds->input_devs->dev[key_entry->dev],
+			ds->info->type, key_entry->code, pressed);
 }
 #endif
 
