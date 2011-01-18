@@ -44,6 +44,19 @@ config GINGERBREAD
 
 menu "General setup"
 
+config SCHED_BFS
+	bool "BFS cpu scheduler"
+	---help---
+	  The Brain Fuck CPU Scheduler for excellent interactivity and
+	  responsiveness on the desktop and solid scalability on normal
+          hardware. Not recommended for 4096 CPUs.
+
+	  Currently incompatible with the Group CPU scheduler, and RCU TORTURE
+          TEST so these options are disabled.
+
+          Say Y here.
+	default y
+
 config EXPERIMENTAL
 	bool "Prompt for development and/or incomplete code/drivers"
 	---help---
@@ -577,6 +590,7 @@ config PROC_PID_CPUSET
 
 config CGROUP_CPUACCT
 	bool "Simple CPU accounting cgroup subsystem"
+	depends on !SCHED_BFS
 	help
 	  Provides a simple Resource Controller for monitoring the
 	  total CPU consumed by the tasks in a cgroup.
@@ -643,7 +657,7 @@ config CGROUP_MEM_RES_CTLR_SWAP_ENABLED
 
 menuconfig CGROUP_SCHED
 	bool "Group CPU scheduler"
-	depends on EXPERIMENTAL
+	depends on EXPERIMENTAL && !SCHED_BFS
 	default n
 	help
 	  This feature lets CPU scheduler recognize task groups and control CPU
@@ -754,6 +768,20 @@ config NET_NS
 	  of the network stack.
 
 endif # NAMESPACES
+
+config SCHED_AUTOGROUP
+	bool "Automatic process group scheduling"
+	select EVENTFD
+	select CGROUPS
+	select CGROUP_SCHED
+	select FAIR_GROUP_SCHED
+	depends on !SCHED_BFS
+	help
+	  This option optimizes the scheduler for common desktop workloads by
+	  automatically creating and populating task groups.  This separation
+	  of workloads isolates aggressive CPU burners (like build jobs) from
+	  desktop applications.  Task group autogeneration is currently based
+	  upon task session.
 
 config MM_OWNER
 	bool
