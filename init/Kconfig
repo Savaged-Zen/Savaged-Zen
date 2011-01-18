@@ -28,6 +28,20 @@ config IRQ_WORK
 	bool
 	depends on HAVE_IRQ_WORK
 
+config GINGERBREAD
+	bool "Build for Android 2.3+ (lose compatibility)"
+	select BCM4329_ENABLE_CSCAN 
+	default y
+	---help---
+	  Select this option to build the kernel to work completely with
+	  Android 2.3+ (Gingerbread or higher roms). If building for 
+	  Android 2.2 (Froyo) or lower, say N here.
+
+	  ***WARNING***
+	  Saying Y here will potentially cause issues on older (pre-2.3)
+	  android versions. Saying N here could cause some odd driver behavior
+	  on 2.3 roms.
+
 menu "General setup"
 
 config EXPERIMENTAL
