@@ -81,7 +81,7 @@ static int bravo_phy_init_seq[] = {
 	0x31, 0x32,
 	0x1D, 0x0D,
 	0x1D, 0x10,
-	-1 
+	-1
 };
 
 static void bravo_usb_phy_reset(void)
@@ -396,8 +396,6 @@ static struct synaptics_i2c_rmi_platform_data bravo_synaptics_ts_data[] = {
 		.inactive_top = -5 * 0x10000 / 800,
 		.inactive_bottom = -5 * 0x10000 / 800,
 		.sensitivity_adjust = 12,
-		.dup_threshold = 10,
-		.margin_inactive_pixel = {8, 32, 32, 8},
 	}
 };
 
@@ -465,7 +463,6 @@ static void ds2482_set_slp_n(unsigned n)
 	gpio_direction_output(BRAVO_GPIO_DS2482_SLP_N, n);
 }
 
-//static int capella_cm3602_power(int on);
 static int capella_cm3602_power(int pwr_device, uint8_t enable);
 static struct microp_function_config microp_functions[] = {
 	{
@@ -864,7 +861,7 @@ static void curcial_oj_shutdown(int enable)
 	cmd[2] = 0x20;
 	// microp firmware(v04) non-shutdown by default
 	microp_i2c_write(0x90, cmd, 3);
-	pr_err("%s\n", __func__);	
+	pr_err("%s\n", __func__);
 }
 
 #define CURCIAL_OJ_POWER		150
@@ -1250,10 +1247,8 @@ static void __init bravo_fixup(struct machine_desc *desc, struct tag *tags,
 {
 	mi->nr_banks = 2;
 	mi->bank[0].start = PHYS_OFFSET;
-	mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
 	mi->bank[0].size = MSM_EBI1_BANK0_SIZE;
 	mi->bank[1].start = MSM_EBI1_BANK1_BASE;
-	mi->bank[1].node = PHYS_TO_NID(MSM_EBI1_BANK1_BASE);
 	mi->bank[1].size = MSM_EBI1_BANK1_SIZE;
 }
 
@@ -1269,10 +1264,6 @@ extern struct sys_timer msm_timer;
 MACHINE_START(BRAVO, "bravo")
 #else
 MACHINE_START(BRAVOC, "bravoc")
-#endif
-#ifdef CONFIG_MSM_DEBUG_UART
-	.phys_io	= MSM_DEBUG_UART_PHYS,
-	.io_pg_offst	= ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
 #endif
 	.boot_params	= 0x20000100,
 	.fixup		= bravo_fixup,
