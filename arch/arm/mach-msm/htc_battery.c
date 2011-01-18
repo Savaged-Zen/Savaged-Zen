@@ -1752,3 +1752,4 @@ MODULE_DESCRIPTION("HTC Battery Driver");
 MODULE_LICENSE("GPL");
 EXPORT_SYMBOL(htc_is_cable_in);
 EXPORT_SYMBOL(htc_is_zcharge_enabled);
+#endif
