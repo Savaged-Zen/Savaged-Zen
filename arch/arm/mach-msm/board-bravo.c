@@ -48,6 +48,9 @@
 #include <mach/bcm_bt_lpm.h>
 #include <mach/msm_smd.h>
 #include <mach/msm_flashlight.h>
+#ifdef CONFIG_PERFLOCK
+#include <mach/perflock.h>
+#endif
 #include <mach/vreg.h>
 #include <mach/board-bravo-microp-common.h>
 
@@ -1138,10 +1141,23 @@ static struct msm_acpu_clock_platform_data bravo_cdma_clock_data = {
 	.mpll_khz		= 235930
 };
 
+#ifdef CONFIG_PERFLOCK
+static unsigned bravo_perf_acpu_table[] = {
+	245000000,
+	576000000,
+	998400000,
+};
+
+static struct perflock_platform_data bravo_perflock_data = {
+	.perf_acpu_table = bravo_perf_acpu_table,
+	.table_size = ARRAY_SIZE(bravo_perf_acpu_table),
+};
+#endif
+
 static void bravo_reset(void)
 {
 	gpio_set_value(BRAVO_GPIO_PS_HOLD, 0);
-}
+};
 
 int bravo_init_mmc(int sysrev, unsigned debug_uart);
 
@@ -1167,6 +1183,10 @@ static void __init bravo_init(void)
 		msm_acpu_clock_init(&bravo_cdma_clock_data);
 	else
 		msm_acpu_clock_init(&bravo_clock_data);
+
+#ifdef CONFIG_PERFLOCK
+	perflock_init(&bravo_perflock_data);
+#endif
 
 	msm_serial_debug_init(MSM_UART1_PHYS, INT_UART1,
 			      &msm_device_uart1.dev, 1, MSM_GPIO_TO_INT(139));
