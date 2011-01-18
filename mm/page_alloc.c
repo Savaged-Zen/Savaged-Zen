@@ -358,6 +358,7 @@ void prep_compound_page(struct page *page, unsigned long order)
 	}
 }
 
+/* update __split_huge_page_refcount if you change this function */
 static int destroy_compound_page(struct page *page, unsigned long order)
 {
 	int i;
@@ -449,8 +450,8 @@ __find_combined_index(unsigned long page_idx, unsigned int order)
  * (c) a page and its buddy have the same order &&
  * (d) a page and its buddy are in the same zone.
  *
- * For recording whether a page is in the buddy system, we use PG_buddy.
- * Setting, clearing, and testing PG_buddy is serialized by zone->lock.
+ * For recording whether a page is in the buddy system, we set ->_mapcount -2.
+ * Setting, clearing, and testing _mapcount -2 is serialized by zone->lock.
  *
  * For recording page's order, we use page_private(page).
  */
@@ -483,7 +484,7 @@ static inline int page_is_buddy(struct page *page, struct page *buddy,
  * as necessary, plus some accounting needed to play nicely with other
  * parts of the VM system.
  * At each level, we keep a list of pages, which are heads of continuous
- * free pages of length of (1 << order) and marked with PG_buddy. Page's
+ * free pages of length of (1 << order) and marked with _mapcount -2. Page's
  * order is recorded in page_private(page) field.
  * So when we are allocating or freeing one, we can derive the state of the
  * other.  That is, if we allocate a small block, and both were   
@@ -652,13 +653,10 @@ static bool free_pages_prepare(struct page *page, unsigned int order)
 	trace_mm_page_free_direct(page, order);
 	kmemcheck_free_shadow(page, order);
 
-	for (i = 0; i < (1 << order); i++) {
-		struct page *pg = page + i;
-
-		if (PageAnon(pg))
-			pg->mapping = NULL;
-		bad += free_pages_check(pg);
-	}
+	if (PageAnon(page))
+		page->mapping = NULL;
+	for (i = 0; i < (1 << order); i++)
+		bad += free_pages_check(page + i);
 	if (bad)
 		return false;
 
@@ -1461,24 +1459,24 @@ static inline int should_fail_alloc_page(gfp_t gfp_mask, unsigned int order)
 #endif /* CONFIG_FAIL_PAGE_ALLOC */
 
 /*
- * Return 1 if free pages are above 'mark'. This takes into account the order
+ * Return true if free pages are above 'mark'. This takes into account the order
  * of the allocation.
  */
-int zone_watermark_ok(struct zone *z, int order, unsigned long mark,
-		      int classzone_idx, int alloc_flags)
+static bool __zone_watermark_ok(struct zone *z, int order, unsigned long mark,
+		      int classzone_idx, int alloc_flags, long free_pages)
 {
 	/* free_pages my go negative - that's OK */
 	long min = mark;
-	long free_pages = zone_nr_free_pages(z) - (1 << order) + 1;
 	int o;
 
+	free_pages -= (1 << order) + 1;
 	if (alloc_flags & ALLOC_HIGH)
 		min -= min / 2;
 	if (alloc_flags & ALLOC_HARDER)
 		min -= min / 4;
 
 	if (free_pages <= min + z->lowmem_reserve[classzone_idx])
-		return 0;
+		return false;
 	for (o = 0; o < order; o++) {
 		/* At the next order, this order's pages become unavailable */
 		free_pages -= z->free_area[o].nr_free << o;
@@ -1487,9 +1485,28 @@ int zone_watermark_ok(struct zone *z, int order, unsigned long mark,
 		min >>= min_free_order_shift;
 
 		if (free_pages <= min)
-			return 0;
+			return false;
 	}
-	return 1;
+	return true;
+}
+
+bool zone_watermark_ok(struct zone *z, int order, unsigned long mark,
+		      int classzone_idx, int alloc_flags)
+{
+	return __zone_watermark_ok(z, order, mark, classzone_idx, alloc_flags,
+					zone_page_state(z, NR_FREE_PAGES));
+}
+
+bool zone_watermark_ok_safe(struct zone *z, int order, unsigned long mark,
+		      int classzone_idx, int alloc_flags)
+{
+	long free_pages = zone_page_state(z, NR_FREE_PAGES);
+
+	if (z->percpu_drift_mark && free_pages < z->percpu_drift_mark)
+		free_pages = zone_page_state_snapshot(z, NR_FREE_PAGES);
+
+	return __zone_watermark_ok(z, order, mark, classzone_idx, alloc_flags,
+								free_pages);
 }
 
 #ifdef CONFIG_NUMA
@@ -1794,7 +1811,8 @@ static struct page *
 __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 	struct zonelist *zonelist, enum zone_type high_zoneidx,
 	nodemask_t *nodemask, int alloc_flags, struct zone *preferred_zone,
-	int migratetype, unsigned long *did_some_progress)
+	int migratetype, unsigned long *did_some_progress,
+	bool sync_migration)
 {
 	struct page *page;
 
@@ -1802,7 +1820,7 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 		return NULL;
 
 	*did_some_progress = try_to_compact_pages(zonelist, order, gfp_mask,
-								nodemask);
+						nodemask, sync_migration);
 	if (*did_some_progress != COMPACT_SKIPPED) {
 
 		/* Page migration frees to the PCP lists but we want merging */
@@ -1838,7 +1856,8 @@ static inline struct page *
 __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 	struct zonelist *zonelist, enum zone_type high_zoneidx,
 	nodemask_t *nodemask, int alloc_flags, struct zone *preferred_zone,
-	int migratetype, unsigned long *did_some_progress)
+	int migratetype, unsigned long *did_some_progress,
+	bool sync_migration)
 {
 	return NULL;
 }
@@ -1949,7 +1968,12 @@ gfp_to_alloc_flags(gfp_t gfp_mask)
 	alloc_flags |= (__force int) (gfp_mask & __GFP_HIGH);
 
 	if (!wait) {
-		alloc_flags |= ALLOC_HARDER;
+		/*
+		 * Not worth trying to allocate harder for
+		 * __GFP_NOMEMALLOC even if it can't schedule.
+		 */
+		if  (!(gfp_mask & __GFP_NOMEMALLOC))
+			alloc_flags |= ALLOC_HARDER;
 		/*
 		 * Ignore cpuset if GFP_ATOMIC (!wait) rather than fail alloc.
 		 * See also cpuset_zone_allowed() comment in kernel/cpuset.c.
@@ -1980,6 +2004,7 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	unsigned long pages_reclaimed = 0;
 	unsigned long did_some_progress;
 	struct task_struct *p = current;
+	bool sync_migration = false;
 
 	/*
 	 * In the slowpath, we sanity check order to avoid ever trying to
@@ -2004,7 +2029,8 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 		goto nopage;
 
 restart:
-	wake_all_kswapd(order, zonelist, high_zoneidx);
+	if (!(gfp_mask & __GFP_NO_KSWAPD))
+		wake_all_kswapd(order, zonelist, high_zoneidx);
 
 	/*
 	 * OK, we're below the kswapd watermark and have kicked background
@@ -2042,14 +2068,19 @@ rebalance:
 	if (test_thread_flag(TIF_MEMDIE) && !(gfp_mask & __GFP_NOFAIL))
 		goto nopage;
 
-	/* Try direct compaction */
+	/*
+	 * Try direct compaction. The first pass is asynchronous. Subsequent
+	 * attempts after direct reclaim are synchronous
+	 */
 	page = __alloc_pages_direct_compact(gfp_mask, order,
 					zonelist, high_zoneidx,
 					nodemask,
 					alloc_flags, preferred_zone,
-					migratetype, &did_some_progress);
+					migratetype, &did_some_progress,
+					sync_migration);
 	if (page)
 		goto got_pg;
+	sync_migration = true;
 
 	/* Try direct reclaim and then allocating */
 	page = __alloc_pages_direct_reclaim(gfp_mask, order,
@@ -2103,6 +2134,20 @@ rebalance:
 		/* Wait for some write requests to complete then retry */
 		wait_iff_congested(preferred_zone, BLK_RW_ASYNC, HZ/50);
 		goto rebalance;
+	} else {
+		/*
+		 * High-order allocations do not necessarily loop after
+		 * direct reclaim and reclaim/compaction depends on compaction
+		 * being called after reclaim so call directly if necessary
+		 */
+		page = __alloc_pages_direct_compact(gfp_mask, order,
+					zonelist, high_zoneidx,
+					nodemask,
+					alloc_flags, preferred_zone,
+					migratetype, &did_some_progress,
+					sync_migration);
+		if (page)
+			goto got_pg;
 	}
 
 nopage:
@@ -2443,7 +2488,7 @@ void show_free_areas(void)
 			" all_unreclaimable? %s"
 			"\n",
 			zone->name,
-			K(zone_nr_free_pages(zone)),
+			K(zone_page_state(zone, NR_FREE_PAGES)),
 			K(min_wmark_pages(zone)),
 			K(low_wmark_pages(zone)),
 			K(high_wmark_pages(zone)),
@@ -5532,7 +5577,6 @@ static struct trace_print_flags pageflag_names[] = {
 	{1UL << PG_swapcache,		"swapcache"	},
 	{1UL << PG_mappedtodisk,	"mappedtodisk"	},
 	{1UL << PG_reclaim,		"reclaim"	},
-	{1UL << PG_buddy,		"buddy"		},
 	{1UL << PG_swapbacked,		"swapbacked"	},
 	{1UL << PG_unevictable,		"unevictable"	},
 #ifdef CONFIG_MMU
@@ -5580,7 +5624,7 @@ void dump_page(struct page *page)
 {
 	printk(KERN_ALERT
 	       "page:%p count:%d mapcount:%d mapping:%p index:%#lx\n",
-		page, page_count(page), page_mapcount(page),
+		page, atomic_read(&page->_count), page_mapcount(page),
 		page->mapping, page->index);
 	dump_page_flags(page->flags);
 }

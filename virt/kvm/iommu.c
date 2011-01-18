@@ -83,7 +83,7 @@ int kvm_iommu_map_pages(struct kvm *kvm, struct kvm_memory_slot *slot)
 		}
 
 		/* Get the page size we could use to map */
-		page_size = kvm_host_page_size(kvm, gfn);
+		page_size = kvm_host_page_size(kvm, gfn, NULL);
 
 		/* Make sure the page_size does not exceed the memslot */
 		while ((gfn + (page_size >> PAGE_SHIFT)) > end_gfn)

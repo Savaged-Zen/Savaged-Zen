@@ -561,13 +561,13 @@ static int FNAME(page_fault)(struct kvm_vcpu *vcpu, gva_t addr,
 		return 0;
 	}
 
+	mmu_seq = vcpu->kvm->mmu_notifier_seq;
+	smp_rmb();
 	if (walker.level >= PT_DIRECTORY_LEVEL) {
 		level = min(walker.level, mapping_level(vcpu, walker.gfn));
 		walker.gfn = walker.gfn & ~(KVM_PAGES_PER_HPAGE(level) - 1);
 	}
 
-	mmu_seq = vcpu->kvm->mmu_notifier_seq;
-	smp_rmb();
 	pfn = gfn_to_pfn(vcpu->kvm, walker.gfn);
 
 	/* mmio */

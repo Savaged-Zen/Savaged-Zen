@@ -29,6 +29,7 @@
 #include <linux/mmu_notifier.h>
 #include <linux/perf_event.h>
 #include <linux/audit.h>
+#include <linux/khugepaged.h>
 
 #include <asm/uaccess.h>
 #include <asm/cacheflush.h>
@@ -588,6 +589,8 @@ again:			remove_next = 1 + (end > next->vm_end);
 		}
 	}
 
+	vma_adjust_trans_huge(vma, start, end, adjust_next);
+
 	/*
 	 * When changing only vma->vm_end, we don't really need anon_vma
 	 * lock. This is a fairly rare case by itself, but the anon_vma
@@ -815,6 +818,7 @@ struct vm_area_struct *vma_merge(struct mm_struct *mm,
 				end, prev->vm_pgoff, NULL);
 		if (err)
 			return NULL;
+		khugepaged_enter_vma_merge(prev);
 		return prev;
 	}
 
@@ -833,6 +837,7 @@ struct vm_area_struct *vma_merge(struct mm_struct *mm,
 				next->vm_pgoff - pglen, NULL);
 		if (err)
 			return NULL;
+		khugepaged_enter_vma_merge(area);
 		return area;
 	}
 
@@ -1761,6 +1766,7 @@ int expand_upwards(struct vm_area_struct *vma, unsigned long address)
 		}
 	}
 	vma_unlock_anon_vma(vma);
+	khugepaged_enter_vma_merge(vma);
 	return error;
 }
 #endif /* CONFIG_STACK_GROWSUP || CONFIG_IA64 */
@@ -1808,6 +1814,7 @@ static int expand_downwards(struct vm_area_struct *vma,
 		}
 	}
 	vma_unlock_anon_vma(vma);
+	khugepaged_enter_vma_merge(vma);
 	return error;
 }
 
