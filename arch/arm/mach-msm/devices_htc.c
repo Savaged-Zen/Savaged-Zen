@@ -424,6 +424,19 @@ int __init parse_tag_skuid(const struct tag *tags)
 }
 __tagtable(ATAG_SKUID, parse_tag_skuid);
 
+#define ATAG_HERO_PANEL_TYPE 0x4d534D74
+int panel_type;
+int __init tag_panel_parsing(const struct tag *tags)
+{
+	panel_type = tags->u.revision.rev;
+
+	printk(KERN_DEBUG "%s: panel type = %d\n", __func__,
+		panel_type);
+
+	return panel_type;
+}
+__tagtable(ATAG_HERO_PANEL_TYPE, tag_panel_parsing);
+
 #define ATAG_ENGINEERID 0x4d534D75
 int __init parse_tag_engineerid(const struct tag *tags)
 {

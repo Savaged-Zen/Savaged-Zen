@@ -56,18 +56,7 @@ static struct vreg *vreg_lcm_aux_2v6;
 #define SONY_GAMMA		0x4		/*Set bit 2 as 1 when panel contains GAMMA table in its NVM*/
 #define SONY_RGB666		0x8		/*Set bit 3 as 1 when panel is 18 bit, otherwise it is 16 bit*/
 
-#define ATAG_HERO_PANEL_TYPE 0x4d534D74
-int panel_type;
-int __init tag_panel_parsing(const struct tag *tags)
-{
-	panel_type = tags->u.revision.rev;
-
-	printk(KERN_DEBUG "%s: panel type = %d\n", __func__,
-		panel_type);
-
-	return panel_type;
-}
-__tagtable(ATAG_HERO_PANEL_TYPE, tag_panel_parsing);
+extern int panel_type;
 
 static int is_sony_spi(void)
 {
