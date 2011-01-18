@@ -1433,6 +1433,18 @@ int set_page_dirty(struct page *page)
 {
 	struct address_space *mapping = page_mapping(page);
 
+	/*
+	 * readahead/lru_deactivate_page could remain
+	 * PG_readahead/PG_reclaim due to race with end_page_writeback
+	 * About readahead, if the page is written, the flags would be
+	 * reset. So no problem.
+	 * About lru_deactivate_page, if the page is redirty, the flag
+	 * will be reset. So no problem. but if the page is used by readahead
+	 * it will confuse readahead and  make it restart the size rampup
+	 * process. But it's a trivial problem.
+	 */
+	if (!PageCompound(page))
+		ClearPageReclaim(page);
 	if (likely(mapping)) {
 		int (*spd)(struct page *) = mapping->a_ops->set_page_dirty;
 #ifdef CONFIG_BLOCK
@@ -1490,7 +1502,6 @@ int clear_page_dirty_for_io(struct page *page)
 
 	BUG_ON(!PageLocked(page));
 
-	ClearPageReclaim(page);
 	if (mapping && mapping_cap_account_dirty(mapping)) {
 		/*
 		 * Yes, Virginia, this is indeed insane.
