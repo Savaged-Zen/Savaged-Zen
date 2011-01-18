@@ -1,3 +1,6 @@
+#ifdef CONFIG_HTC_BATTCHG_TRICKLE
+# include "htc_battery_ms79723.c"
+#else
 /* arch/arm/mach-msm/htc_battery.c
  *
  * Copyright (C) 2008 HTC Corporation.
