@@ -1250,11 +1250,10 @@ struct task_struct {
 	unsigned did_exec:1;
 	unsigned in_execve:1;	/* Tell the LSMs that the process is doing an
 				 * execve */
-	unsigned in_iowait:1;
 
-
-	/* Revert to default priority/policy when forking */
-	unsigned sched_reset_on_fork:1;
+	unsigned sched_in_iowait:1;		/* Called io_schedule() */
+	unsigned sched_reset_on_fork:1;		/* Revert to default
+						 * priority/policy on fork */
 
 	pid_t pid;
 	pid_t tgid;
