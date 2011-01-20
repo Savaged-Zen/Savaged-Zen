@@ -1058,7 +1058,7 @@ return 0;
 
 #define HTC_BATTERY_ATTR(_name) \
 { \
-.attr = { .name = #_name, .mode = S_IRUGO, .owner = THIS_MODULE }, \
+.attr = { .name = #_name, .mode = S_IRUGO }, \
 .show = htc_battery_show_property, \
 .store = NULL, \
 }
