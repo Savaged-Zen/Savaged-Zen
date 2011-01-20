@@ -293,7 +293,7 @@ static void select_clock(unsigned src, unsigned config)
 	writel(val | ((src & 3) << 1), SPSS_CLK_SEL_ADDR);
 }
 
-+static int acpu_set_vdd(int vdd)
+static int acpu_set_vdd(int vdd)
 {
 	if (!drv_state.regulator || IS_ERR(drv_state.regulator)) {
 		drv_state.regulator = regulator_get(NULL, "acpu_vcore");
