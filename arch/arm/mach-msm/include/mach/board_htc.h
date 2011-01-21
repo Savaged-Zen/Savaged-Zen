@@ -31,6 +31,16 @@ struct msm_pmem_setting{
 	resource_size_t pmem_camera_size;
 	resource_size_t ram_console_start;
 	resource_size_t ram_console_size;
+#ifdef CONFIG_BUILD_CIQ
+	resource_size_t pmem_ciq_start;
+	resource_size_t pmem_ciq_size;
+	resource_size_t pmem_ciq1_start;
+	resource_size_t pmem_ciq1_size;
+	resource_size_t pmem_ciq2_start;
+	resource_size_t pmem_ciq2_size;
+	resource_size_t pmem_ciq3_start;
+	resource_size_t pmem_ciq3_size;
+#endif
 };
 
 enum {

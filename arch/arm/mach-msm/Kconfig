@@ -733,6 +733,12 @@ config HTC_HEADSET_MICROP
         help
           Provides support of HTC Micro-P headset detection.
 
+config BUILD_CIQ
+        bool "Build in CIQ fixes"
+        default n
+        help
+          For CIQ we need to do some additional fixes.
+
 config VIRTUAL_KPANIC_PARTITION
 	bool "Create virtual kpanic partition"
 	default n
