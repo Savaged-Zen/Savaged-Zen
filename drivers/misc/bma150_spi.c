@@ -248,7 +248,6 @@ static int __spi_bma150_set_mode(char mode)
 	return ret;
 }
 
-static DEFINE_MUTEX(spi_bma150_lock);
 
 static int spi_bma150_open(struct inode *inode, struct file *file)
 {
@@ -260,8 +259,7 @@ static int spi_bma150_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static long spi_bma150_ioctl(struct file *file, unsigned int cmd,
-	   unsigned long arg)
+static int spi_bma150_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
 	char rwbuf[8];
@@ -269,7 +267,6 @@ static long spi_bma150_ioctl(struct file *file, unsigned int cmd,
 	int ret = -1;
 	short buf[8], temp;
 
-	mutex_lock(&spi_bma150_lock);
 	switch (cmd) {
 	case BMA_IOCTL_READ:
 	case BMA_IOCTL_WRITE:
@@ -289,31 +286,27 @@ static long spi_bma150_ioctl(struct file *file, unsigned int cmd,
 	case BMA_IOCTL_INIT:
 		ret = spi_gsensor_init_hw();
 		if (ret < 0)
-			goto err;
+			return ret;
 		break;
 
 	case BMA_IOCTL_READ:
-		if (rwbuf[0] < 1) {
-			ret = -EINVAL;
-			goto err;
-		}
+		if (rwbuf[0] < 1)
+			return -EINVAL;
 		ret = spi_gsensor_read(&rwbuf[1]);
 		if (ret < 0)
-			goto err;
+			return ret;
 		break;
 	case BMA_IOCTL_WRITE:
-		if (rwbuf[0] < 2) {
-			ret = -EINVAL;
-			goto err;
-		}
+		if (rwbuf[0] < 2)
+			return -EINVAL;
 		ret = spi_gsensor_write(&rwbuf[1]);
 		if (ret < 0)
-			goto err;
+			return ret;
 		break;
 	case BMA_IOCTL_READ_ACCELERATION:
 		ret = spi_bma150_TransRBuff(&buf[0]);
 		if (ret < 0)
-			goto err;
+			return ret;
 		break;
 	case BMA_IOCTL_SET_MODE:
 		/*printk(KERN_DEBUG
@@ -321,7 +314,7 @@ static long spi_bma150_ioctl(struct file *file, unsigned int cmd,
 			__func__,rwbuf[0]);*/
 		ret = __spi_bma150_set_mode(rwbuf[0]);
 		if (ret < 0)
-			goto err;
+			return ret;
 		break;
 	case BMA_IOCTL_GET_INT:
 		temp = 0;
@@ -331,10 +324,8 @@ static long spi_bma150_ioctl(struct file *file, unsigned int cmd,
 			temp = this_pdata->chip_layout;
 		break;
 	default:
-		ret = -ENOTTY;
-		goto err;
+		return -ENOTTY;
 	}
-	mutex_unlock(&spi_bma150_lock);
 
 	switch (cmd) {
 	case BMA_IOCTL_READ:
@@ -359,9 +350,6 @@ static long spi_bma150_ioctl(struct file *file, unsigned int cmd,
 	}
 
 	return 0;
-err:
-	mutex_unlock(&spi_bma150_lock);
-	return ret;
 }
 
 static struct file_operations spi_bma_fops = {
@@ -456,8 +444,10 @@ static int  spi_bma150_probe(struct platform_device *pdev)
 			"start initial\n", __func__);
 
 	this_pdata = pdev->dev.platform_data;
-/*	printk(KERN_DEBUG "%s: this_pdata->microp_new_cmd = %d\n",
-			__func__, this_pdata->microp_new_cmd);*/
+/*
+	printk(KERN_DEBUG "%s: this_pdata->microp_new_cmd = %d\n",
+			__func__, this_pdata->microp_new_cmd);
+*/
 	spi_gsensor_initial();
 
 	return 0;

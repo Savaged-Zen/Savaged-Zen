@@ -331,8 +331,7 @@ static int akm_aot_release(struct inode *inode, struct file *file)
 }
 
 static int
-akm_aot_ioctl(struct inode *inode, struct file *file,
-	      unsigned int cmd, unsigned long arg)
+akm_aot_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
 	short flag;
@@ -418,8 +417,7 @@ static int akmd_release(struct inode *inode, struct file *file)
 }
 
 static int
-akmd_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
-	   unsigned long arg)
+akmd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 
 	void __user *argp = (void __user *)arg;

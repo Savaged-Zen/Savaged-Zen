@@ -28,20 +28,21 @@ config IRQ_WORK
 	bool
 	depends on HAVE_IRQ_WORK
 
-menu "General setup"
-
-config SCHED_BFS
-	bool "BFS cpu scheduler"
-	---help---
-	  The Brain Fuck CPU Scheduler for excellent interactivity and
-	  responsiveness on the desktop and solid scalability on normal
-          hardware. Not recommended for 4096 CPUs.
-
-	  Currently incompatible with the Group CPU scheduler, and RCU TORTURE
-          TEST so these options are disabled.
-
-          Say Y here.
+config GINGERBREAD
+	bool "Build for Android 2.3+ (lose compatibility)"
+	select BCM4329_ENABLE_CSCAN 
 	default y
+	---help---
+	  Select this option to build the kernel to work completely with
+	  Android 2.3+ (Gingerbread or higher roms). If building for 
+	  Android 2.2 (Froyo) or lower, say N here.
+
+	  ***WARNING***
+	  Saying Y here will potentially cause issues on older (pre-2.3)
+	  android versions. Saying N here could cause some odd driver behavior
+	  on 2.3 roms.
+
+menu "General setup"
 
 config EXPERIMENTAL
 	bool "Prompt for development and/or incomplete code/drivers"
@@ -576,7 +577,6 @@ config PROC_PID_CPUSET
 
 config CGROUP_CPUACCT
 	bool "Simple CPU accounting cgroup subsystem"
-	depends on !SCHED_BFS
 	help
 	  Provides a simple Resource Controller for monitoring the
 	  total CPU consumed by the tasks in a cgroup.
@@ -643,7 +643,7 @@ config CGROUP_MEM_RES_CTLR_SWAP_ENABLED
 
 menuconfig CGROUP_SCHED
 	bool "Group CPU scheduler"
-	depends on EXPERIMENTAL && !SCHED_BFS
+	depends on EXPERIMENTAL
 	default n
 	help
 	  This feature lets CPU scheduler recognize task groups and control CPU
