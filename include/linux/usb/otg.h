@@ -43,6 +43,13 @@ enum usb_xceiv_events {
 	USB_EVENT_ENUMERATED,   /* gadget driver enumerated */
 };
 
+#define USB_OTG_PULLUP_ID		(1 << 0)
+#define USB_OTG_PULLDOWN_DP		(1 << 1)
+#define USB_OTG_PULLDOWN_DM		(1 << 2)
+#define USB_OTG_EXT_VBUS_INDICATOR	(1 << 3)
+#define USB_OTG_DRV_VBUS		(1 << 4)
+#define USB_OTG_DRV_VBUS_EXT		(1 << 5)
+
 struct otg_transceiver;
 
 /* for transceivers connected thru an ULPI interface, the user must
@@ -139,10 +146,10 @@ static inline int otg_io_read(struct otg_transceiver *otg, u32 reg)
 	return -EINVAL;
 }
 
-static inline int otg_io_write(struct otg_transceiver *otg, u32 val, u32 reg)
+static inline int otg_io_write(struct otg_transceiver *otg, u32 reg, u32 val)
 {
 	if (otg->io_ops && otg->io_ops->write)
-		return otg->io_ops->write(otg, val, reg);
+		return otg->io_ops->write(otg, reg, val);
 
 	return -EINVAL;
 }
@@ -164,19 +171,8 @@ otg_shutdown(struct otg_transceiver *otg)
 }
 
 /* for usb host and peripheral controller drivers */
-#ifdef CONFIG_USB_OTG_UTILS
 extern struct otg_transceiver *otg_get_transceiver(void);
 extern void otg_put_transceiver(struct otg_transceiver *);
-#else
-static inline struct otg_transceiver *otg_get_transceiver(void)
-{
-	return NULL;
-}
-
-static inline void otg_put_transceiver(struct otg_transceiver *x)
-{
-}
-#endif
 
 /* Context: can sleep */
 static inline int

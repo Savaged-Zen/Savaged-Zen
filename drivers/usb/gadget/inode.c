@@ -33,6 +33,7 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/poll.h>
+#include <linux/smp_lock.h>
 
 #include <linux/device.h>
 #include <linux/moduleparam.h>
@@ -1298,9 +1299,11 @@ static long dev_ioctl (struct file *fd, unsigned code, unsigned long value)
 	struct usb_gadget	*gadget = dev->gadget;
 	long ret = -ENOTTY;
 
-	if (gadget->ops->ioctl)
+	if (gadget->ops->ioctl) {
+		lock_kernel();
 		ret = gadget->ops->ioctl (gadget, code, value);
-
+		unlock_kernel();
+	}
 	return ret;
 }
 
@@ -1774,6 +1777,7 @@ static struct usb_gadget_driver gadgetfs_driver = {
 	.speed		= USB_SPEED_FULL,
 #endif
 	.function	= (char *) driver_desc,
+	.bind		= gadgetfs_bind,
 	.unbind		= gadgetfs_unbind,
 	.setup		= gadgetfs_setup,
 	.disconnect	= gadgetfs_disconnect,
@@ -1796,6 +1800,7 @@ static int gadgetfs_probe (struct usb_gadget *gadget)
 
 static struct usb_gadget_driver probe_driver = {
 	.speed		= USB_SPEED_HIGH,
+	.bind		= gadgetfs_probe,
 	.unbind		= gadgetfs_nop,
 	.setup		= (void *)gadgetfs_nop,
 	.disconnect	= gadgetfs_nop,
@@ -1862,9 +1867,13 @@ dev_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 	buf += 4;
 	length -= 4;
 
-	kbuf = memdup_user(buf, length);
-	if (IS_ERR(kbuf))
-		return PTR_ERR(kbuf);
+	kbuf = kmalloc (length, GFP_KERNEL);
+	if (!kbuf)
+		return -ENOMEM;
+	if (copy_from_user (kbuf, buf, length)) {
+		kfree (kbuf);
+		return -EFAULT;
+	}
 
 	spin_lock_irq (&dev->lock);
 	value = -EINVAL;
@@ -1905,7 +1914,7 @@ dev_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 
 	/* triggers gadgetfs_bind(); then we can enumerate. */
 	spin_unlock_irq (&dev->lock);
-	value = usb_gadget_probe_driver(&gadgetfs_driver, gadgetfs_bind);
+	value = usb_gadget_register_driver (&gadgetfs_driver);
 	if (value != 0) {
 		kfree (dev->buf);
 		dev->buf = NULL;
@@ -1991,7 +2000,6 @@ gadgetfs_make_inode (struct super_block *sb,
 	struct inode *inode = new_inode (sb);
 
 	if (inode) {
-		inode->i_ino = get_next_ino();
 		inode->i_mode = mode;
 		inode->i_uid = default_uid;
 		inode->i_gid = default_gid;
@@ -2045,7 +2053,7 @@ gadgetfs_fill_super (struct super_block *sb, void *opts, int silent)
 		return -ESRCH;
 
 	/* fake probe to determine $CHIP */
-	(void) usb_gadget_probe_driver(&probe_driver, gadgetfs_probe);
+	(void) usb_gadget_register_driver (&probe_driver);
 	if (!CHIP)
 		return -ENODEV;
 
@@ -2097,11 +2105,11 @@ enomem0:
 }
 
 /* "mount -t gadgetfs path /dev/gadget" ends up here */
-static struct dentry *
-gadgetfs_mount (struct file_system_type *t, int flags,
-		const char *path, void *opts)
+static int
+gadgetfs_get_sb (struct file_system_type *t, int flags,
+		const char *path, void *opts, struct vfsmount *mnt)
 {
-	return mount_single (t, flags, opts, gadgetfs_fill_super);
+	return get_sb_single (t, flags, opts, gadgetfs_fill_super, mnt);
 }
 
 static void
@@ -2119,7 +2127,7 @@ gadgetfs_kill_sb (struct super_block *sb)
 static struct file_system_type gadgetfs_type = {
 	.owner		= THIS_MODULE,
 	.name		= shortname,
-	.mount		= gadgetfs_mount,
+	.get_sb		= gadgetfs_get_sb,
 	.kill_sb	= gadgetfs_kill_sb,
 };
 

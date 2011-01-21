@@ -94,7 +94,7 @@ uvc_v4l2_set_format(struct uvc_video *video, struct v4l2_format *fmt)
 			break;
 	}
 
-	if (i == ARRAY_SIZE(uvc_formats)) {
+	if (format == NULL || format->fcc != fmt->fmt.pix.pixelformat) {
 		printk(KERN_INFO "Unsupported format 0x%08x.\n",
 			fmt->fmt.pix.pixelformat);
 		return -EINVAL;

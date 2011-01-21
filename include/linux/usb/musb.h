@@ -89,8 +89,6 @@ struct musb_hdrc_config {
 	/* A GPIO controlling VRSEL in Blackfin */
 	unsigned int	gpio_vrsel;
 	unsigned int	gpio_vrsel_active;
-	/* musb CLKIN in Blackfin in MHZ */
-	unsigned char   clkin;
 #endif
 
 };

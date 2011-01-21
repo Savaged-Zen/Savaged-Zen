@@ -25,7 +25,7 @@
 #include <linux/ioport.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
-#include <linux/mutex.h>
+#include <linux/smp_lock.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/timer.h>
@@ -70,7 +70,6 @@
 #define DRIVER_DESC		"Printer Gadget"
 #define DRIVER_VERSION		"2007 OCT 06"
 
-static DEFINE_MUTEX(printer_mutex);
 static const char shortname [] = "printer";
 static const char driver_desc [] = DRIVER_DESC;
 
@@ -477,7 +476,7 @@ printer_open(struct inode *inode, struct file *fd)
 	unsigned long		flags;
 	int			ret = -EBUSY;
 
-	mutex_lock(&printer_mutex);
+	lock_kernel();
 	dev = container_of(inode->i_cdev, struct printer_dev, printer_cdev);
 
 	spin_lock_irqsave(&dev->lock, flags);
@@ -493,7 +492,7 @@ printer_open(struct inode *inode, struct file *fd)
 	spin_unlock_irqrestore(&dev->lock, flags);
 
 	DBG(dev, "printer_open returned %x\n", ret);
-	mutex_unlock(&printer_mutex);
+	unlock_kernel();
 	return ret;
 }
 
@@ -884,8 +883,7 @@ static const struct file_operations printer_io_operations = {
 	.fsync =	printer_fsync,
 	.poll =		printer_poll,
 	.unlocked_ioctl = printer_ioctl,
-	.release =	printer_close,
-	.llseek =	noop_llseek,
+	.release =	printer_close
 };
 
 /*-------------------------------------------------------------------------*/
@@ -1544,6 +1542,7 @@ static struct usb_gadget_driver printer_driver = {
 	.speed		= DEVSPEED,
 
 	.function	= (char *) driver_desc,
+	.bind		= printer_bind,
 	.unbind		= printer_unbind,
 
 	.setup		= printer_setup,
@@ -1579,11 +1578,11 @@ init(void)
 		return status;
 	}
 
-	status = usb_gadget_probe_driver(&printer_driver, printer_bind);
+	status = usb_gadget_register_driver(&printer_driver);
 	if (status) {
 		class_destroy(usb_gadget_class);
 		unregister_chrdev_region(g_printer_devno, 1);
-		DBG(dev, "usb_gadget_probe_driver %x\n", status);
+		DBG(dev, "usb_gadget_register_driver %x\n", status);
 	}
 
 	return status;

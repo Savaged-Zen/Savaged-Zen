@@ -1929,8 +1929,7 @@ static void ep0_start (struct net2280 *dev)
  * disconnect is reported.  then a host may connect again, or
  * the driver might get unbound.
  */
-int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
-		int (*bind)(struct usb_gadget *))
+int usb_gadget_register_driver (struct usb_gadget_driver *driver)
 {
 	struct net2280		*dev = the_controller;
 	int			retval;
@@ -1942,7 +1941,8 @@ int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
 	 */
 	if (!driver
 			|| driver->speed != USB_SPEED_HIGH
-			|| !bind || !driver->setup)
+			|| !driver->bind
+			|| !driver->setup)
 		return -EINVAL;
 	if (!dev)
 		return -ENODEV;
@@ -1957,7 +1957,7 @@ int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
 	driver->driver.bus = NULL;
 	dev->driver = driver;
 	dev->gadget.dev.driver = &driver->driver;
-	retval = bind(&dev->gadget);
+	retval = driver->bind (&dev->gadget);
 	if (retval) {
 		DEBUG (dev, "bind to driver %s --> %d\n",
 				driver->driver.name, retval);
@@ -1993,7 +1993,7 @@ err_unbind:
 	dev->driver = NULL;
 	return retval;
 }
-EXPORT_SYMBOL(usb_gadget_probe_driver);
+EXPORT_SYMBOL (usb_gadget_register_driver);
 
 static void
 stop_activity (struct net2280 *dev, struct usb_gadget_driver *driver)

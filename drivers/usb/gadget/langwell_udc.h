@@ -18,7 +18,11 @@
  */
 
 #include <linux/usb/langwell_udc.h>
+
+#if defined(CONFIG_USB_LANGWELL_OTG)
 #include <linux/usb/langwell_otg.h>
+#endif
+
 
 /*-------------------------------------------------------------------------*/
 
@@ -195,9 +199,7 @@ struct langwell_udc {
 				vbus_active:1,
 				suspended:1,
 				stopped:1,
-				lpm:1,		/* LPM capability */
-				has_sram:1,	/* SRAM caching */
-				got_sram:1;
+				lpm:1;	/* LPM capability */
 
 	/* pci state used to access those endpoints */
 	struct pci_dev		*pdev;
@@ -222,12 +224,5 @@ struct langwell_udc {
 
 	/* make sure release() is done */
 	struct completion	*done;
-
-	/* for private SRAM caching */
-	unsigned int		sram_addr;
-	unsigned int		sram_size;
-
-	/* device status data for get_status request */
-	u16			dev_status;
 };
 
