@@ -903,21 +903,21 @@ static struct file_operations akmd_fops = {
 	.owner = THIS_MODULE,
 	.open = akmd_open,
 	.release = akmd_release,
-	.ioctl = akmd_ioctl,
+	.unlocked_ioctl = akmd_ioctl,
 };
 
 static struct file_operations akm_aot_fops = {
 	.owner = THIS_MODULE,
 	.open = akm_aot_open,
 	.release = akm_aot_release,
-	.ioctl = akm_aot_ioctl,
+	.unlocked_ioctl = akm_aot_ioctl,
 };
 
 static struct file_operations akm_pffd_fops = {
 	.owner = THIS_MODULE,
 	.open = akm_pffd_open,
 	.release = akm_pffd_release,
-	.ioctl = akm_pffd_ioctl,
+	.unlocked_ioctl = akm_pffd_ioctl,
 };
 
 static struct miscdevice akm_aot_device = {
