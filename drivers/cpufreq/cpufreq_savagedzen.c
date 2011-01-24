@@ -12,7 +12,9 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * Author: Erasmux
+ * Author: Joshua Seidel
+
+ * Based on the smartass governor by Erasmux
  *
  * Based on the interactive governor By Mike Chan (mike@android.com)
  * which was adaptated to 2.6.29 kernel by Nadlabak (pavel@doshaska.net)
@@ -718,7 +720,7 @@ static int __init cpufreq_savagedzen_init(void)
         }
 
         /* Scale up is high priority */
-        up_wq = create_rt_workqueue("ksavagedzen_up");
+        up_wq = create_workqueue("ksavagedzen_up");
         down_wq = create_workqueue("ksavagedzen_down");
 
         INIT_WORK(&freq_scale_work, cpufreq_savagedzen_freq_change_time_work);
