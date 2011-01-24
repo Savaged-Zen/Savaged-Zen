@@ -120,7 +120,6 @@ config CPU_FREQ_DEFAULT_GOV_SMARTASS
 config CPU_FREQ_DEFAULT_GOV_SAVAGEDZEN
 	bool "SavagedZen"
 	select CPU_FREQ_GOV_SAVAGEDZEN
-	select CPU_FREQ_GOV_PERFORMANCE
 	help
 	  Use the CPUFreq governor 'savagedzen' as default.
 
