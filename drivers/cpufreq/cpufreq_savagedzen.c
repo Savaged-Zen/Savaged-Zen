@@ -151,7 +151,7 @@ static unsigned long min_cpu_load;
 static int cpufreq_governor_savagedzen(struct cpufreq_policy *policy,
                 unsigned int event);
 
-#ifndef CONFIG_CPU_FREQ_DEFAULT_GOV_savagedzen
+#ifndef CONFIG_CPU_FREQ_DEFAULT_GOV_SAVAGEDZEN
 static
 #endif
 struct cpufreq_governor cpufreq_gov_savagedzen = {
