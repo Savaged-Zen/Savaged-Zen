@@ -117,10 +117,10 @@ config CPU_FREQ_DEFAULT_GOV_SMARTASS
 	help
 	  Use the CPUFreq governor 'smartass' as default.
 config CPU_FREQ_DEFAULT_GOV_SavagedZen
-	bool "smartass"
+	bool "SavagedZen"
 	select CPU_FREQ_GOV_SavagedZen
 	help
-	  Use the CPUFreq governor 'smartass' as default.
+	  Use the CPUFreq governor 'savagedzen' as default.
 
 
 config CPU_FREQ_DEFAULT_GOV_INTERACTIVE
