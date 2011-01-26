@@ -169,23 +169,6 @@ static inline void rcu_nmi_exit(void)
 {
 }
 
-#elif defined(CONFIG_CLASSIC_RCU)
-static inline void rcu_irq_enter(void)
-{
-}
-
-static inline void rcu_irq_exit(void)
-{
-}
-
-static inline void rcu_nmi_enter(void)
-{
-}
-
-static inline void rcu_nmi_exit(void)
-{
-}
-
 #else
 extern void rcu_irq_enter(void);
 extern void rcu_irq_exit(void);
