@@ -13,7 +13,7 @@
 #ifdef CONFIG_MICROP_COMMON
 #include <linux/kernel.h>
 #include <linux/delay.h>
-#include <linux/gpio.h>
+#include <asm/gpio.h>
 #include <linux/i2c.h>
 #include <linux/platform_device.h>
 #include <asm/mach-types.h>

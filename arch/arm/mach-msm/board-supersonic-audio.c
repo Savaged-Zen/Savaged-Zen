@@ -14,7 +14,7 @@
  *
  */
 
-#include <linux/gpio.h>
+#include <asm/gpio.h>
 #include <linux/err.h>
 #include <linux/delay.h>
 #include <mach/msm_qdsp6_audio.h>

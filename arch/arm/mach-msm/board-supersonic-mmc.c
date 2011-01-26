@@ -21,7 +21,7 @@
 #include <linux/mmc/host.h>
 #include <linux/mmc/sdio_ids.h>
 #include <linux/platform_device.h>
-#include <linux/gpio.h>
+#include <asm/gpio.h>
 
 #include <asm/io.h>
 #include <asm/mach-types.h>
@@ -398,7 +398,7 @@ int mmc_wimax_set_status(int on)
 }
 EXPORT_SYMBOL(mmc_wimax_set_status);
 
-int mmc_wimax_get_status()
+int mmc_wimax_get_status(void)
 {
 	//printk(KERN_INFO "%s status:%d\n", __func__, mmc_wimax_sdio_status);
 	return mmc_wimax_sdio_status;
