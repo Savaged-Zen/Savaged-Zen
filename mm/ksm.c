@@ -34,7 +34,6 @@
 #include <linux/swap.h>
 #include <linux/ksm.h>
 #include <linux/hash.h>
-#include <linux/freezer.h>
 
 #include <asm/tlbflush.h>
 #include "internal.h"
@@ -429,7 +428,7 @@ static struct page *get_mergeable_page(struct rmap_item *rmap_item)
 	page = follow_page(vma, addr, FOLL_GET);
 	if (IS_ERR_OR_NULL(page))
 		goto out;
-	if (PageAnon(page) && !PageTransCompound(page)) {
+	if (PageAnon(page)) {
 		flush_anon_page(vma, page, addr);
 		flush_dcache_page(page);
 	} else {
@@ -799,8 +798,6 @@ static int replace_page(struct vm_area_struct *vma, struct page *page,
 	set_pte_at_notify(mm, addr, ptep, mk_pte(kpage, vma->vm_page_prot));
 
 	page_remove_rmap(page);
-	if (!page_mapped(page))
-		try_to_free_swap(page);
 	put_page(page);
 
 	pte_unmap_unlock(ptep, ptl);
@@ -1278,19 +1275,7 @@ next_mm:
 			if (ksm_test_exit(mm))
 				break;
 			*page = follow_page(vma, ksm_scan.address, FOLL_GET);
-			if (IS_ERR_OR_NULL(*page)) {
-				ksm_scan.address += PAGE_SIZE;
-				cond_resched();
-				continue;
-			}
-			if (PageTransCompound(*page)) {
-				put_page(*page);
-				ksm_scan.address &= HPAGE_PMD_MASK;
-				ksm_scan.address += HPAGE_PMD_SIZE;
-				cond_resched();
-				continue;
-			}
-			if (PageAnon(*page)) {
+			if (!IS_ERR_OR_NULL(*page) && PageAnon(*page)) {
 				flush_anon_page(vma, *page, ksm_scan.address);
 				flush_dcache_page(*page);
 				rmap_item = get_next_rmap_item(slot,
@@ -1304,7 +1289,8 @@ next_mm:
 				up_read(&mm->mmap_sem);
 				return rmap_item;
 			}
-			put_page(*page);
+			if (!IS_ERR_OR_NULL(*page))
+				put_page(*page);
 			ksm_scan.address += PAGE_SIZE;
 			cond_resched();
 		}
@@ -1364,7 +1350,7 @@ static void ksm_do_scan(unsigned int scan_npages)
 	struct rmap_item *rmap_item;
 	struct page *uninitialized_var(page);
 
-	while (scan_npages-- && likely(!freezing(current))) {
+	while (scan_npages--) {
 		cond_resched();
 		rmap_item = scan_get_next_rmap_item(&page);
 		if (!rmap_item)
@@ -1382,7 +1368,6 @@ static int ksmd_should_run(void)
 
 static int ksm_scan_thread(void *nothing)
 {
-	set_freezable();
 	set_user_nice(current, 5);
 
 	while (!kthread_should_stop()) {
@@ -1391,13 +1376,11 @@ static int ksm_scan_thread(void *nothing)
 			ksm_do_scan(ksm_thread_pages_to_scan);
 		mutex_unlock(&ksm_thread_mutex);
 
-		try_to_freeze();
-
 		if (ksmd_should_run()) {
 			schedule_timeout_interruptible(
 				msecs_to_jiffies(ksm_thread_sleep_millisecs));
 		} else {
-			wait_event_freezable(ksm_thread_wait,
+			wait_event_interruptible(ksm_thread_wait,
 				ksmd_should_run() || kthread_should_stop());
 		}
 	}

@@ -13,16 +13,12 @@ struct mem_section;
 #ifdef CONFIG_MEMORY_HOTPLUG
 
 /*
- * Types for free bootmem stored in page->lru.next. These have to be in
- * some random range in unsigned long space for debugging purposes.
+ * Types for free bootmem.
+ * The normal smallest mapcount is -1. Here is smaller value than it.
  */
-enum {
-	MEMORY_HOTPLUG_MIN_BOOTMEM_TYPE = 12,
-	SECTION_INFO = MEMORY_HOTPLUG_MIN_BOOTMEM_TYPE,
-	MIX_SECTION_INFO,
-	NODE_INFO,
-	MEMORY_HOTPLUG_MAX_BOOTMEM_TYPE = NODE_INFO,
-};
+#define SECTION_INFO		(-1 - 1)
+#define MIX_SECTION_INFO	(-1 - 2)
+#define NODE_INFO		(-1 - 3)
 
 /*
  * pgdat resizing functions

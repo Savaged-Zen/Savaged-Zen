@@ -102,36 +102,8 @@ static pfn_t fault_pfn;
 inline int kvm_is_mmio_pfn(pfn_t pfn)
 {
 	if (pfn_valid(pfn)) {
-		struct page *head;
-		struct page *tail = pfn_to_page(pfn);
-		head = compound_head(tail);
-		if (head != tail) {
-			smp_rmb();
-			/*
-			 * head may be a dangling pointer.
-			 * __split_huge_page_refcount clears PageTail
-			 * before overwriting first_page, so if
-			 * PageTail is still there it means the head
-			 * pointer isn't dangling.
-			 */
-			if (PageTail(tail)) {
-				/*
-				 * the "head" is not a dangling
-				 * pointer but the hugepage may have
-				 * been splitted from under us (and we
-				 * may not hold a reference count on
-				 * the head page so it can be reused
-				 * before we run PageReferenced), so
-				 * we've to recheck PageTail before
-				 * returning what we just read.
-				 */
-				int reserved = PageReserved(head);
-				smp_rmb();
-				if (PageTail(tail))
-					return reserved;
-			}
-		}
-		return PageReserved(tail);
+		struct page *page = compound_head(pfn_to_page(pfn));
+		return PageReserved(page);
 	}
 
 	return true;
@@ -372,22 +344,6 @@ static int kvm_mmu_notifier_clear_flush_young(struct mmu_notifier *mn,
 	return young;
 }
 
-static int kvm_mmu_notifier_test_young(struct mmu_notifier *mn,
-				       struct mm_struct *mm,
-				       unsigned long address)
-{
-	struct kvm *kvm = mmu_notifier_to_kvm(mn);
-	int young, idx;
-
-	idx = srcu_read_lock(&kvm->srcu);
-	spin_lock(&kvm->mmu_lock);
-	young = kvm_test_age_hva(kvm, address);
-	spin_unlock(&kvm->mmu_lock);
-	srcu_read_unlock(&kvm->srcu, idx);
-
-	return young;
-}
-
 static void kvm_mmu_notifier_release(struct mmu_notifier *mn,
 				     struct mm_struct *mm)
 {
@@ -404,7 +360,6 @@ static const struct mmu_notifier_ops kvm_mmu_notifier_ops = {
 	.invalidate_range_start	= kvm_mmu_notifier_invalidate_range_start,
 	.invalidate_range_end	= kvm_mmu_notifier_invalidate_range_end,
 	.clear_flush_young	= kvm_mmu_notifier_clear_flush_young,
-	.test_young		= kvm_mmu_notifier_test_young,
 	.change_pte		= kvm_mmu_notifier_change_pte,
 	.release		= kvm_mmu_notifier_release,
 };
@@ -929,8 +884,7 @@ int kvm_is_visible_gfn(struct kvm *kvm, gfn_t gfn)
 }
 EXPORT_SYMBOL_GPL(kvm_is_visible_gfn);
 
-unsigned long kvm_host_page_size(struct kvm *kvm, gfn_t gfn,
-				 unsigned long *addrp)
+unsigned long kvm_host_page_size(struct kvm *kvm, gfn_t gfn)
 {
 	struct vm_area_struct *vma;
 	unsigned long addr, size;
@@ -938,8 +892,6 @@ unsigned long kvm_host_page_size(struct kvm *kvm, gfn_t gfn,
 	size = PAGE_SIZE;
 
 	addr = gfn_to_hva(kvm, gfn);
-	if (addrp)
-		*addrp = addr;
 	if (kvm_is_error_hva(addr))
 		return PAGE_SIZE;
 
@@ -994,7 +946,7 @@ unsigned long gfn_to_hva(struct kvm *kvm, gfn_t gfn)
 }
 EXPORT_SYMBOL_GPL(gfn_to_hva);
 
-pfn_t hva_to_pfn(struct kvm *kvm, unsigned long addr, bool atomic)
+static pfn_t hva_to_pfn(struct kvm *kvm, unsigned long addr, bool atomic)
 {
 	struct page *page[1];
 	int npages;

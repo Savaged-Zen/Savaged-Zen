@@ -82,10 +82,9 @@ static void release_memory_resource(struct resource *res)
 
 #ifdef CONFIG_MEMORY_HOTPLUG_SPARSE
 #ifndef CONFIG_SPARSEMEM_VMEMMAP
-static void get_page_bootmem(unsigned long info,  struct page *page,
-			     unsigned long type)
+static void get_page_bootmem(unsigned long info,  struct page *page, int type)
 {
-	page->lru.next = (struct list_head *) type;
+	atomic_set(&page->_mapcount, type);
 	SetPagePrivate(page);
 	set_page_private(page, info);
 	atomic_inc(&page->_count);
@@ -95,16 +94,15 @@ static void get_page_bootmem(unsigned long info,  struct page *page,
  * so use __ref to tell modpost not to generate a warning */
 void __ref put_page_bootmem(struct page *page)
 {
-	unsigned long type;
+	int type;
 
-	type = (unsigned long) page->lru.next;
-	BUG_ON(type < MEMORY_HOTPLUG_MIN_BOOTMEM_TYPE ||
-	       type > MEMORY_HOTPLUG_MAX_BOOTMEM_TYPE);
+	type = atomic_read(&page->_mapcount);
+	BUG_ON(type >= -1);
 
 	if (atomic_dec_return(&page->_count) == 1) {
 		ClearPagePrivate(page);
 		set_page_private(page, 0);
-		INIT_LIST_HEAD(&page->lru);
+		reset_page_mapcount(page);
 		__free_pages_bootmem(page, 0);
 	}
 
@@ -733,8 +731,7 @@ do_migrate_range(unsigned long start_pfn, unsigned long end_pfn)
 			goto out;
 		}
 		/* this function returns # of failed pages */
-		ret = migrate_pages(&source, hotremove_migrate_alloc, 0,
-								true, true);
+		ret = migrate_pages(&source, hotremove_migrate_alloc, 0, 1);
 		if (ret)
 			putback_lru_pages(&source);
 	}
