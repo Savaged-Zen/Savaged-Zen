@@ -103,8 +103,6 @@ struct mddi_info {
 	char client_name[20];
 
 	struct platform_device client_pdev;
-	struct resource client_vsync_res;
-
 	unsigned type;
 	char debugfs_buf[32];
 };
@@ -210,10 +208,8 @@ static void mddi_wait_interrupt(struct mddi_info *mddi, uint32_t intmask);
 
 static void mddi_handle_rev_data_avail(struct mddi_info *mddi)
 {
-	union mddi_rev *rev = mddi->rev_data;
 	uint32_t rev_data_count;
 	uint32_t rev_crc_err_count;
-	int i;
 	struct reg_read_info *ri;
 	size_t prev_offset;
 	uint16_t length;
@@ -248,6 +244,8 @@ static void mddi_handle_rev_data_avail(struct mddi_info *mddi)
 		return;
 
 	if (mddi_debug_flags & 1) {
+		int i;
+		union mddi_rev *rev = mddi->rev_data;
 		printk(KERN_INFO "INT %x, STAT %x, CURR_REV_PTR %x\n",
 		       mddi_readl(INT), mddi_readl(STAT),
 		       mddi_readl(CURR_REV_PTR));
@@ -375,7 +373,7 @@ static long mddi_wait_interrupt_timeout(struct mddi_info *mddi,
 static void mddi_wait_interrupt(struct mddi_info *mddi, uint32_t intmask)
 {
 	if (mddi_wait_interrupt_timeout(mddi, intmask, HZ/10) == 0)
-		printk(KERN_INFO KERN_ERR "mddi_wait_interrupt %d, timeout "
+		printk(KERN_INFO "mddi_wait_interrupt %d, timeout "
 		       "waiting for %x, INT = %x, STAT = %x gotint = %x\n",
 		       current->pid, intmask, mddi_readl(INT), mddi_readl(STAT),
 		       mddi->got_int);
@@ -1087,15 +1085,6 @@ dummy_client:
 		       pdev->id);
 		ret = -EINVAL;
 		goto error_mddi_interface;
-	}
-
-	if (pdata->vsync_irq) {
-		mddi->client_vsync_res.start = pdata->vsync_irq;
-		mddi->client_vsync_res.end = pdata->vsync_irq;
-		mddi->client_vsync_res.flags = IORESOURCE_IRQ;
-		mddi->client_vsync_res.name = "vsync";
-		mddi->client_pdev.resource = &mddi->client_vsync_res;
-		mddi->client_pdev.num_resources = 1;
 	}
 
 	mddi->client_pdev.dev.platform_data = &mddi->client_data;

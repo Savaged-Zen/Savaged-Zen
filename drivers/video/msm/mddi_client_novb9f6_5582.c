@@ -308,3 +308,4 @@ static int __init mddi_client_novtec_init(void)
 }
 
 module_init(mddi_client_novtec_init);
+
