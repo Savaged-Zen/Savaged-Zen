@@ -134,7 +134,6 @@ static void __init acpuclk_init_cpufreq_table(void)
 		/* Define speeds that we want to skip */
 		if (/* acpu_freq_tbl[i].acpu_khz == 256000 || */
 				acpu_freq_tbl[i].acpu_khz == 19200 ||
-				acpu_freq_tbl[i].acpu_khz == 128000 ||
 				acpu_freq_tbl[i].acpu_khz == 256000)
 			continue;
 
