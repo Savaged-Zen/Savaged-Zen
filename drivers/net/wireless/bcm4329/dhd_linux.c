@@ -43,7 +43,6 @@
 #include <linux/ethtool.h>
 #include <linux/fcntl.h>
 #include <linux/fs.h>
-#include <linux/mutex.h>
 
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
@@ -255,7 +254,7 @@ typedef struct dhd_info {
 	/* OS/stack specifics */
 	dhd_if_t *iflist[DHD_MAX_IFS];
 
-	struct mutex proto_sem;
+	struct semaphore proto_sem;
 	wait_queue_head_t ioctl_resp_wait;
 	struct timer_list timer;
 	bool wd_timer_valid;
@@ -266,7 +265,7 @@ typedef struct dhd_info {
 
 	/* Thread based operation */
 	bool threads_only;
-	struct mutex sdsem;
+	struct semaphore sdsem;
 	long watchdog_pid;
 	struct semaphore watchdog_sem;
 	struct completion watchdog_exited;
@@ -2059,7 +2058,7 @@ dhd_attach(osl_t *osh, struct dhd_bus *bus, uint bus_hdrlen)
 	net->netdev_ops = NULL;
 #endif
 
-	mutex_init(&dhd->proto_sem);
+	init_MUTEX(&dhd->proto_sem);
 	/* Initialize other structure content */
 	init_waitqueue_head(&dhd->ioctl_resp_wait);
 	init_waitqueue_head(&dhd->ctrl_wait);
@@ -2106,7 +2105,7 @@ dhd_attach(osl_t *osh, struct dhd_bus *bus, uint bus_hdrlen)
 	dhd->timer.function = dhd_watchdog;
 
 	/* Initialize thread based operation and lock */
-	mutex_init(&dhd->sdsem);
+	init_MUTEX(&dhd->sdsem);
 	if ((dhd_watchdog_prio >= 0) && (dhd_dpc_prio >= 0)) {
 		dhd->threads_only = TRUE;
 	}
@@ -2622,7 +2621,7 @@ dhd_os_proto_block(dhd_pub_t *pub)
 	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
 
 	if (dhd) {
-		mutex_lock(&dhd->proto_sem);
+		down(&dhd->proto_sem);
 		return 1;
 	}
 
@@ -2635,7 +2634,7 @@ dhd_os_proto_unblock(dhd_pub_t *pub)
 	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
 
 	if (dhd) {
-		mutex_unlock(&dhd->proto_sem);
+		up(&dhd->proto_sem);
 		return 1;
 	}
 
@@ -2774,7 +2773,7 @@ dhd_os_sdlock(dhd_pub_t *pub)
 	dhd = (dhd_info_t *)(pub->info);
 
 	if (dhd->threads_only)
-		mutex_lock(&dhd->sdsem);
+		down(&dhd->sdsem);
 	else
 		spin_lock_bh(&dhd->sdlock);
 }
@@ -2787,7 +2786,7 @@ dhd_os_sdunlock(dhd_pub_t *pub)
 	dhd = (dhd_info_t *)(pub->info);
 
 	if (dhd->threads_only)
-		mutex_unlock(&dhd->sdsem);
+		up(&dhd->sdsem);
 	else
 		spin_unlock_bh(&dhd->sdlock);
 }
@@ -3076,15 +3075,6 @@ void dhd_bus_country_set(struct net_device *dev, char *country_code)
 
 	if (dhd && dhd->pub.up)
 		strncpy(dhd->pub.country_code, country_code, WLC_CNTRY_BUF_SZ);
-}
-
-char *dhd_bus_country_get(struct net_device *dev)
-{
-	dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev);
-
-	if (dhd && (dhd->pub.country_code[0] != 0))
-		return dhd->pub.country_code;
-	return NULL;
 }
 
 void dhd_os_start_lock(dhd_pub_t *pub)
