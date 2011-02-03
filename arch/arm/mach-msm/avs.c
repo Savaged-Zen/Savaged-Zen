@@ -166,7 +166,7 @@ static void avs_update_voltage_table(short *vdd_table)
 		AVSDEBUG("Voltage up at %d\n", cur_freq_idx);
 
 		if (cur_voltage >= VOLTAGE_MAX || cur_voltage >= acpu_vdd_tbl[cur_freq_idx].max_vdd)
-			printk(KERN_ERR
+			AVSDEBUG(KERN_ERR
 				"AVS: Voltage can not get high enough!\n");
 
 		/* Raise the voltage for all frequencies */
@@ -210,11 +210,11 @@ static short avs_get_target_voltage(int freq_idx, bool update_table)
 		avs_update_voltage_table(vdd_table);
 
 	if (vdd_table[freq_idx] > acpu_vdd_tbl[freq_idx].max_vdd) {
-		pr_info("%dmV too high for %d.\n", vdd_table[freq_idx], acpu_vdd_tbl[freq_idx].acpu_khz);
+		AVSDEBUG("%dmV too high for %d.\n", vdd_table[freq_idx], acpu_vdd_tbl[freq_idx].acpu_khz);
 		vdd_table[freq_idx] = acpu_vdd_tbl[freq_idx].max_vdd;
 	}
 	if (vdd_table[freq_idx] < acpu_vdd_tbl[freq_idx].min_vdd) {
-		pr_info("%dmV too low for %d.\n", vdd_table[freq_idx], acpu_vdd_tbl[freq_idx].acpu_khz);
+		AVSDEBUG("%dmV too low for %d.\n", vdd_table[freq_idx], acpu_vdd_tbl[freq_idx].acpu_khz);
 		vdd_table[freq_idx] = acpu_vdd_tbl[freq_idx].min_vdd;
 	}
 
@@ -228,7 +228,7 @@ static short avs_get_target_voltage(int freq_idx, bool update_table)
  */
 static int avs_set_target_voltage(int freq_idx, bool update_table)
 {
-	int rc = 0, new_voltage;
+	int ctr = 5, rc = 0, new_voltage;
 
 	if (freq_idx < 0 || freq_idx >= avs_state.freq_cnt) {
 		AVSDEBUG("Out of range :%d\n", freq_idx);
@@ -237,9 +237,17 @@ static int avs_set_target_voltage(int freq_idx, bool update_table)
 
 	new_voltage = avs_get_target_voltage(freq_idx, update_table);
 	if (avs_state.vdd != new_voltage) {
-		/*AVSDEBUG*/pr_info("AVS setting V to %d mV @%d MHz\n",
+		AVSDEBUG("AVS setting V to %d mV @%d MHz\n",
 			new_voltage, acpu_vdd_tbl[freq_idx].acpu_khz / 1000);
 		rc = avs_state.set_vdd(new_voltage);
+		while (rc && ctr) {
+			rc = avs_state.set_vdd(new_voltage);
+			ctr--;
+			if (rc) {
+				AVSDEBUG(KERN_ERR "avs_set_target_voltage: Unable to set V to %d mV (attempt: %d)\n", new_voltage, 5 - ctr);
+				mdelay(1);
+			}
+		}
 		if (rc)
 			return rc;
 		avs_state.vdd = new_voltage;
@@ -321,6 +329,7 @@ static int __init avs_work_init(void)
 		printk(KERN_ERR "AVS initialization failed\n");
 		return -EFAULT;
 	}
+	printk(KERN_ERR "AVS initialization success\n");
 	avs_timer_init();
 
 	return 1;
