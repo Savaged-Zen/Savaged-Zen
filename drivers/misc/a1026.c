@@ -27,7 +27,7 @@
 #include <linux/a1026.h>
 
 #define DEBUG			(0)
-#define ENABLE_DIAG_IOCTLS	(0)
+#define ENABLE_DIAG_IOCTLS	(1)
 
 static struct i2c_client *this_client;
 static struct a1026_platform_data *pdata;
