@@ -30,6 +30,7 @@
 #define DRIVER_DEBUG 0
 #define SKB_DEBUG 0
 #define IGNORE_CARRIER_STATE 1
+#define SDIO_CLAIM_HOST_DEBUG 0
 
 /*******************************************************************/
 /* Module parameter variables */
@@ -107,7 +108,7 @@ int sqn_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	sqn_pr_dbg("skb->len = %d\n", skb->len);
 
 #if SKB_DEBUG
-	sqn_pr_info("%s: got skb [0x%p] from kernel, users %d\n", __func__, skb, atomic_read(&skb->users));
+	sqn_pr_info("%s: got skb [0x%p] from kernel, users %d\n", __func__, skb, atomic_read(&skb->users)); 
 #endif
 
 	spin_lock_irqsave(&priv->drv_lock, irq_flags);
@@ -132,8 +133,11 @@ int sqn_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		}
 	}
 
-	if (priv->removed)
-		goto out;
+	if (priv->removed) {
+		spin_unlock_irqrestore(&priv->drv_lock, irq_flags);
+		dev_kfree_skb_any(skb);
+		return NETDEV_TX_LOCKED;
+	}
 
 	if (skb->len < 1 || (skb->len > SQN_MAX_PDU_LEN)) {
 		sqn_pr_dbg("skb length %d not in range (1, %d)\n", skb->len,
@@ -229,7 +233,7 @@ static int sqn_tx_thread(void *data)
 		if (priv->removed) {
 			sqn_pr_dbg("adapter removed; wait to die...\n");
 			spin_unlock_irqrestore(&priv->drv_lock, irq_flags);
-			mdelay(1);
+			ssleep(1);
 			continue;
 		}
 		spin_unlock_irqrestore(&priv->drv_lock, irq_flags);
@@ -288,6 +292,10 @@ int sqn_rx_process(struct net_device *dev, struct sk_buff *skb)
 	int rc = 0;
 	struct sqn_private *priv = netdev_priv(dev);
 
+#if SDIO_CLAIM_HOST_DEBUG
+	/* sqn_pr_info("%s+\n", __func__); */
+#endif
+
 #if DRIVER_DEBUG
 	printk(KERN_WARNING "sqn_rx_process \n");
 #endif
@@ -306,6 +314,11 @@ int sqn_rx_process(struct net_device *dev, struct sk_buff *skb)
 	/* netif_receive_skb(skb); */
 
 	sqn_pr_leave();
+
+#if SDIO_CLAIM_HOST_DEBUG
+	/* sqn_pr_info("%s-\n", __func__); */
+#endif
+
 	return rc;
 }
 
@@ -352,7 +365,7 @@ struct sqn_private *sqn_add_card(void *card, struct device *realdev)
 
 	sqn_pr_enter();
 
-	if (!dev) {
+	if (!dev) {	
 		sqn_pr_err("init wimaxX device failed\n");
 		goto done;
 	}

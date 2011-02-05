@@ -9,3 +9,4 @@ config WIMAX_SQN
 
 	  If you choose to build a module, it'll be called sequans_sdio. Say M if
 	  unsure.
+

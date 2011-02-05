@@ -53,3 +53,4 @@ int thp_wimax_uart_switch(int on);
 void cleanup_thp(void);
 
 #endif  /* _SQN_THP2_H */
+
