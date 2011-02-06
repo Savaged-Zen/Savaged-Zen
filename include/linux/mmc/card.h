@@ -151,6 +151,8 @@ struct mmc_card {
 	unsigned int		removed;
 };
 
+void mmc_fixup_device(struct mmc_card *dev);
+
 #define mmc_card_mmc(c)		((c)->type == MMC_TYPE_MMC)
 #define mmc_card_sd(c)		((c)->type == MMC_TYPE_SD)
 #define mmc_card_sdio(c)	((c)->type == MMC_TYPE_SDIO)
