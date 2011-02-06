@@ -25,7 +25,7 @@ obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o clock-pcom.o vreg.o
 obj-$(CONFIG_MSM_PROC_COMM) += clock.o
 obj-$(CONFIG_ARCH_QSD8X50) += sirc.o
 obj-$(CONFIG_MSM_FIQ_SUPPORT) += fiq_glue.o
-obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o
+obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o smem_log.o
 obj-$(CONFIG_MSM_SMD) += smd_tty.o smd_qmi.o
 obj-$(CONFIG_MSM_SMD) += last_radio_log.o
 obj-$(CONFIG_MSM_DAL) += dal.o
@@ -123,6 +123,16 @@ obj-$(CONFIG_MACH_SUPERSONIC) += board-supersonic-tpa6130.o
 obj-$(CONFIG_MACH_SUPERSONIC) += htc_wifi_nvs.o htc_bluetooth.o
 obj-$(CONFIG_MACH_SUPERSONIC) += htc_acoustic_qsd.o
 obj-$(CONFIG_HTC_BATTCHG) += htc_battery.o
+
+obj-$(CONFIG_MACH_INCREDIBLEC) += board-incrediblec.o board-incrediblec-panel.o board-incrediblec-tv.o
+obj-$(CONFIG_MACH_INCREDIBLEC) += board-incrediblec-keypad.o board-incrediblec-mmc.o
+obj-$(CONFIG_MACH_INCREDIBLEC) += board-incrediblec-rfkill.o htc_wifi_nvs.o  board-incrediblec-audio.o
+obj-$(CONFIG_MACH_INCREDIBLEC) += board-incrediblec-wifi.o htc_awb_cal.o
+obj-$(CONFIG_MACH_INCREDIBLEC) += board-incrediblec-microp.o htc_bluetooth.o
+obj-$(CONFIG_MACH_INCREDIBLEC) += msm_vibrator.o board-incrediblec-tpa2018d1.o
+obj-$(CONFIG_MACH_INCREDIBLEC) += proc_engineerid.o board-incrediblec-tpa6130.o
+obj-$(CONFIG_MACH_INCREDIBLEC) += htc_acoustic_qsd.o
+
 
 obj-$(CONFIG_MACH_BRAVO) += board-bravo.o board-bravo-panel.o
 obj-$(CONFIG_MACH_BRAVO) += board-bravo-keypad.o board-bravo-mmc.o
