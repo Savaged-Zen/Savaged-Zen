@@ -157,7 +157,7 @@ static int get_ls_adc_level(uint8_t *data)
 	return 0;
 }
 
-void report_lightseneor_data(void)
+void report_lightsensor_data(void)
 {
 	uint8_t data[3];
 	int ret;
