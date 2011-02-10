@@ -192,6 +192,8 @@ source "drivers/input/tablet/Kconfig"
 
 source "drivers/input/touchscreen/Kconfig"
 
+source "drivers/input/opticaljoystick/Kconfig"
+
 source "drivers/input/misc/Kconfig"
 
 endif
