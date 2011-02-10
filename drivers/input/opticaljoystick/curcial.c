@@ -24,7 +24,7 @@
 #include <linux/input.h>
 #include <linux/interrupt.h>
 #include <linux/gpio.h>
-#include <mach/board-bravo-microp-common.h>
+#include <mach/atmega_microp.h>
 #include <linux/earlysuspend.h>
 #include <linux/curcial_oj.h>
 #include <mach/vreg.h>
