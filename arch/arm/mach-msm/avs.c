@@ -126,6 +126,10 @@ struct clkctl_acpu_speed acpu_vdd_tbl[] = {
 	{ 0 },
 };
 
+static int avs_debug = 0;
+module_param(avs_debug, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(avs_debug, "Toggle AVS debug printout");
+
 /*
  *  Update the AVS voltage vs frequency table, for current temperature
  *  Adjust based on the AVS delay circuit hardware status
@@ -166,8 +170,9 @@ static void avs_update_voltage_table(short *vdd_table)
 		AVSDEBUG("Voltage up at %d\n", cur_freq_idx);
 
 		if (cur_voltage >= VOLTAGE_MAX || cur_voltage >= acpu_vdd_tbl[cur_freq_idx].max_vdd)
-			AVSDEBUG(KERN_ERR
-				"AVS: Voltage can not get high enough!\n");
+			if (avs_debug)
+				printk(KERN_ERR
+					"AVS: Voltage can not get high enough!\n");
 
 		/* Raise the voltage for all frequencies */
 		for (i = 0; i < avs_state.freq_cnt; i++) {
@@ -210,11 +215,13 @@ static short avs_get_target_voltage(int freq_idx, bool update_table)
 		avs_update_voltage_table(vdd_table);
 
 	if (vdd_table[freq_idx] > acpu_vdd_tbl[freq_idx].max_vdd) {
-		AVSDEBUG("%dmV too high for %d.\n", vdd_table[freq_idx], acpu_vdd_tbl[freq_idx].acpu_khz);
+		if (avs_debug)
+			printk("%dmV too high for %d.\n", vdd_table[freq_idx], acpu_vdd_tbl[freq_idx].acpu_khz);
 		vdd_table[freq_idx] = acpu_vdd_tbl[freq_idx].max_vdd;
 	}
 	if (vdd_table[freq_idx] < acpu_vdd_tbl[freq_idx].min_vdd) {
-		AVSDEBUG("%dmV too low for %d.\n", vdd_table[freq_idx], acpu_vdd_tbl[freq_idx].acpu_khz);
+		if (avs_debug)
+			printk("%dmV too low for %d.\n", vdd_table[freq_idx], acpu_vdd_tbl[freq_idx].acpu_khz);
 		vdd_table[freq_idx] = acpu_vdd_tbl[freq_idx].min_vdd;
 	}
 
@@ -237,14 +244,16 @@ static int avs_set_target_voltage(int freq_idx, bool update_table)
 
 	new_voltage = avs_get_target_voltage(freq_idx, update_table);
 	if (avs_state.vdd != new_voltage) {
-		AVSDEBUG("AVS setting V to %d mV @%d MHz\n",
-			new_voltage, acpu_vdd_tbl[freq_idx].acpu_khz / 1000);
+		if (avs_debug)
+			printk("AVS setting V to %d mV @%d MHz\n",
+				new_voltage, acpu_vdd_tbl[freq_idx].acpu_khz / 1000);
 		rc = avs_state.set_vdd(new_voltage);
 		while (rc && ctr) {
 			rc = avs_state.set_vdd(new_voltage);
 			ctr--;
 			if (rc) {
-				AVSDEBUG(KERN_ERR "avs_set_target_voltage: Unable to set V to %d mV (attempt: %d)\n", new_voltage, 5 - ctr);
+				if (avs_debug)
+					printk(KERN_ERR "avs_set_target_voltage: Unable to set V to %d mV (attempt: %d)\n", new_voltage, 5 - ctr);
 				mdelay(1);
 			}
 		}
@@ -268,7 +277,8 @@ int avs_adjust_freq(u32 freq_idx, int begin)
 	}
 
 	if (freq_idx < 0 || freq_idx >= avs_state.freq_cnt) {
-		AVSDEBUG("Out of range :%d\n", freq_idx);
+		if (avs_debug)
+			printk("Out of range :%d\n", freq_idx);
 		return -EINVAL;
 	}
 
