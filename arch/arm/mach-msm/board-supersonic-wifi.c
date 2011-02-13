@@ -9,7 +9,7 @@
 #include <asm/gpio.h>
 #include <asm/io.h>
 #include <linux/skbuff.h>
-#include <linux/wifi_tiwlan.h>
+#include <linux/wlan_plat.h>
 
 #include "board-supersonic.h"
 
@@ -77,7 +77,7 @@ static struct resource supersonic_wifi_resources[] = {
 		.name		= "bcm4329_wlan_irq",
 		.start		= MSM_GPIO_TO_INT(SUPERSONIC_GPIO_WIFI_IRQ),
 		.end		= MSM_GPIO_TO_INT(SUPERSONIC_GPIO_WIFI_IRQ),
-		.flags          = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL,
+		.flags          = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL, | IORESOURCE_IRQ_SHAREABLE,
 	},
 };
 
@@ -115,7 +115,7 @@ static unsigned supersonic_wifi_update_nvs(char *str, int add_flag)
 	memcpy(&len, ptr + NVS_LEN_OFFSET, sizeof(len));
 
 	/* the last bye in NVRAM is 0, trim it */
-	if (ptr[NVS_DATA_OFFSET + len -1] == 0)
+	if (ptr[NVS_DATA_OFFSET + len - 1] == 0)
 		len -= 1;
 
 	if (add_flag) {
