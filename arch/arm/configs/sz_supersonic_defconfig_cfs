@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux/arm 2.6.37 Kernel Configuration
-# Sun Feb 13 20:50:02 2011
+# Sun Feb 13 21:51:20 2011
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -562,13 +562,13 @@ CONFIG_TCP_CONG_VEGAS=y
 # CONFIG_TCP_CONG_SCALABLE is not set
 # CONFIG_TCP_CONG_LP is not set
 # CONFIG_TCP_CONG_VENO is not set
-CONFIG_TCP_CONG_YEAH=y
+# CONFIG_TCP_CONG_YEAH is not set
 # CONFIG_TCP_CONG_ILLINOIS is not set
-# CONFIG_DEFAULT_CUBIC is not set
+CONFIG_DEFAULT_CUBIC=y
 # CONFIG_DEFAULT_VEGAS is not set
-CONFIG_DEFAULT_YEAH=y
+# CONFIG_DEFAULT_YEAH is not set
 # CONFIG_DEFAULT_RENO is not set
-CONFIG_DEFAULT_TCP_CONG="yeah"
+CONFIG_DEFAULT_TCP_CONG="cubic"
 # CONFIG_TCP_MD5SIG is not set
 CONFIG_IPV6=y
 CONFIG_IPV6_PRIVACY=y
@@ -761,12 +761,12 @@ CONFIG_NET_SCHED=y
 # Queueing/Scheduling
 #
 # CONFIG_NET_SCH_CBQ is not set
-# CONFIG_NET_SCH_HTB is not set
+CONFIG_NET_SCH_HTB=y
 # CONFIG_NET_SCH_HFSC is not set
 # CONFIG_NET_SCH_PRIO is not set
 # CONFIG_NET_SCH_MULTIQ is not set
 # CONFIG_NET_SCH_RED is not set
-CONFIG_NET_SCH_SFB=y
+# CONFIG_NET_SCH_SFB is not set
 # CONFIG_NET_SCH_SFQ is not set
 # CONFIG_NET_SCH_TEQL is not set
 # CONFIG_NET_SCH_TBF is not set
