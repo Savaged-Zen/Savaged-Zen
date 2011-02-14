@@ -56,15 +56,15 @@ enum {
 	GPIO_CFG_DISABLE,
 };
 
+extern void config_gpio_table(uint32_t *table, int len);
+extern int gpio_configure(unsigned int gpio, unsigned long flags);
+
 #define GPIO_CFG(gpio, func, dir, pull, drvstr) \
 	((((gpio) & 0x3FF) << 4)        |	  \
 	 ((func) & 0xf)                  |	  \
 	 (((dir) & 0x1) << 14)           |	  \
 	 (((pull) & 0x3) << 15)          |	  \
 	 (((drvstr) & 0xF) << 17))
-
-extern void config_gpio_table(uint32_t *table, int len);
-extern int gpio_configure(unsigned int gpio, unsigned long flags);
 
 /**
  * extract GPIO pin from bit-field used for gpio_tlmm_config
