@@ -231,7 +231,7 @@ config MSM_PROC_COMM
 	bool
 
 config MACH_SAPPHIRE
-	depends on ARCH_MSM7X00A && !MACH_TROUT && !MACH_HALIBUT
+	depends on ARCH_MSM7X00A
 	default y
 	bool "Sapphire"
 
