@@ -153,13 +153,13 @@ static uint32_t wifi_on_gpio_table[] = {
 };
 
 static uint32_t wifi_off_gpio_table[] = {
-	PCOM_GPIO_CFG(51, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT3 */
-	PCOM_GPIO_CFG(52, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT2 */
-	PCOM_GPIO_CFG(53, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT1 */
-	PCOM_GPIO_CFG(54, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT0 */
-	PCOM_GPIO_CFG(55, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* CMD */
+	PCOM_GPIO_CFG(51, 0, GPIO_INPUT, GPIO_PULL_UP, GPIO_4MA), /* DAT3 */
+	PCOM_GPIO_CFG(52, 0, GPIO_INPUT, GPIO_PULL_UP, GPIO_4MA), /* DAT2 */
+	PCOM_GPIO_CFG(53, 0, GPIO_INPUT, GPIO_PULL_UP, GPIO_4MA), /* DAT1 */
+	PCOM_GPIO_CFG(54, 0, GPIO_INPUT, GPIO_PULL_UP, GPIO_4MA), /* DAT0 */
+	PCOM_GPIO_CFG(55, 0, GPIO_INPUT, GPIO_PULL_UP, GPIO_4MA), /* CMD */
 	PCOM_GPIO_CFG(56, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* CLK */
-	PCOM_GPIO_CFG(152, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* WLAN IRQ */
+	PCOM_GPIO_CFG(152, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_4MA), /* WLAN IRQ */
 };
 
 /* BCM4329 returns wrong sdio_vsn(1) when we read cccr,
@@ -217,7 +217,7 @@ int supersonic_wifi_set_carddetect(int val)
 }
 EXPORT_SYMBOL(supersonic_wifi_set_carddetect);
 
-static init supersonic_wifi_power_state;
+static int supersonic_wifi_power_state;
 
 int supersonic_wifi_power(int on)
 {
@@ -240,7 +240,7 @@ int supersonic_wifi_power(int on)
 	return 0;
 }
 
-static init supersonic_wifi_reset_state;
+static int supersonic_wifi_reset_state;
 
 int supersonic_wifi_reset(int on)
 {
@@ -613,7 +613,6 @@ EXPORT_SYMBOL(mmc_wimax_enable_host_wakeup);
 int __init supersonic_init_mmc(unsigned int sys_rev)
 {
 	uint32_t id;
-
 
 	printk(KERN_INFO "%s()+\n", __func__);
 
