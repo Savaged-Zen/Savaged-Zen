@@ -8439,4 +8439,3 @@ void wl_iw_detach(void)
 	}
 #endif
 }
-

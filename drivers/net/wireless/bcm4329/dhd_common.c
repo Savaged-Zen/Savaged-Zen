@@ -1288,10 +1288,10 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 
 	/* Set Country code */
 	if (dhd->dhd_cspec.ccode[0] != 0) {
-    bcm_mkiovar("country", (char *)&dhd->dhd_cspec, \
-      sizeof(wl_country_t), iovbuf, sizeof(iovbuf));
-    if ((ret = dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf))) < 0) {
-	DHD_ERROR(("%s: country code setting failed\n", __FUNCTION__));
+		bcm_mkiovar("country", (char *)&dhd->dhd_cspec, \
+			sizeof(wl_country_t), iovbuf, sizeof(iovbuf));
+		if ((ret = dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf))) < 0) {
+			DHD_ERROR(("%s: country code setting failed\n", __FUNCTION__));
 		}
 	}
 
@@ -1905,20 +1905,20 @@ int dhd_pno_enable(dhd_pub_t *dhd, int pfn_enabled)
 		return ret;
 	}
 
-  memset(iovbuf, 0, sizeof(iovbuf));	
-	
-  /* Check if disassoc to enable pno */	
-  if ((pfn_enabled) && \	
-    ((ret = dhdcdc_set_ioctl(dhd, 0, WLC_GET_BSSID, \	
-         (char *)&bssid, ETHER_ADDR_LEN)) == BCME_NOTASSOCIATED)) {	
-      DHD_TRACE(("%s pno enable called in disassoc mode\n", __FUNCTION__));	
-  }	
-  else {
-      DHD_ERROR(("%s pno enable called in assoc mode ret=%d\n", \	
-                    __FUNCTION__, ret));	
-      return ret;
-  }
- 
+	memset(iovbuf, 0, sizeof(iovbuf));
+
+	/* Check if disassoc to enable pno */
+	if ((pfn_enabled) && \
+		((ret = dhdcdc_set_ioctl(dhd, 0, WLC_GET_BSSID, \
+				 (char *)&bssid, ETHER_ADDR_LEN)) == BCME_NOTASSOCIATED)) {
+			DHD_TRACE(("%s pno enable called in disassoc mode\n", __FUNCTION__));
+	}
+	else {
+			DHD_ERROR(("%s pno enable called in assoc mode ret=%d\n", \
+										__FUNCTION__, ret));
+			return ret;
+	}
+
 	/* Enable/disable PNO */
 	if ((ret = bcm_mkiovar("pfn", (char *)&pfn_enabled, 4, iovbuf, sizeof(iovbuf))) > 0) {
 		if ((ret = dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf))) < 0) {
@@ -1938,7 +1938,7 @@ int dhd_pno_enable(dhd_pub_t *dhd, int pfn_enabled)
 /* Function to execute combined scan */
 int
 dhd_pno_set(dhd_pub_t *dhd, wlc_ssid_t* ssids_local, int nssid, ushort scan_fr, \
-int pno_repeat, int pno_freq_expo_max)
+			int pno_repeat, int pno_freq_expo_max)
 {
 	int err = -1;
 	char iovbuf[128];
@@ -1985,21 +1985,21 @@ int pno_repeat, int pno_freq_expo_max)
 
 	/* check and set extra pno params */
 	if ((pno_repeat != 0) || (pno_freq_expo_max != 0)) {
-	pfn_param.flags |= htod16(ENABLE << ENABLE_ADAPTSCAN_BIT);
-	pfn_param.repeat_scan = htod32(pno_repeat);
-	pfn_param.max_freq_adjust = htod32(pno_freq_expo_max);
+		pfn_param.flags |= htod16(ENABLE << ENABLE_ADAPTSCAN_BIT);
+		pfn_param.repeat_scan = htod32(pno_repeat);
+		pfn_param.max_freq_adjust = htod32(pno_freq_expo_max);
 	}
 
 	/* set up pno scan fr */
 	if (scan_fr  != 0)
 		pfn_param.scan_freq = htod32(scan_fr);
 
-	  if (pfn_param.scan_freq > PNO_SCAN_MAX_FW_SEC) {	
-    DHD_ERROR(("%s pno freq above %d sec\n", __FUNCTION__, PNO_SCAN_MAX_FW_SEC));
-    return err;	
-  }	
-  if (pfn_param.scan_freq < PNO_SCAN_MIN_FW_SEC) {
-    DHD_ERROR(("%s pno freq less %d sec\n", __FUNCTION__, PNO_SCAN_MIN_FW_SEC)
+	if (pfn_param.scan_freq > PNO_SCAN_MAX_FW_SEC) {
+		DHD_ERROR(("%s pno freq above %d sec\n", __FUNCTION__, PNO_SCAN_MAX_FW_SEC));
+		return err;
+	}
+	if (pfn_param.scan_freq < PNO_SCAN_MIN_FW_SEC) {
+		DHD_ERROR(("%s pno freq less %d sec\n", __FUNCTION__, PNO_SCAN_MIN_FW_SEC));
 		return err;
 	}
 
@@ -2026,9 +2026,9 @@ int pno_repeat, int pno_freq_expo_max)
 				return err;
 			}
 			else
-		DHD_ERROR(("%s set OK with PNO time=%d repeat=%d max_adjust=%d\n", \
-		__FUNCTION__, pfn_param.scan_freq, \
-		pfn_param.repeat_scan, pfn_param.max_freq_adjust));
+				DHD_ERROR(("%s set OK with PNO time=%d repeat=%d max_adjust=%d\n", \
+					__FUNCTION__, pfn_param.scan_freq, \
+					pfn_param.repeat_scan, pfn_param.max_freq_adjust));
 		}
 		else DHD_ERROR(("%s failed err=%d\n", __FUNCTION__, err));
 	}

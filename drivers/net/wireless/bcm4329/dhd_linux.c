@@ -770,7 +770,7 @@ _dhd_set_multicast_list(dhd_info_t *dhd, int ifidx)
 #else
 	cnt = dev->mc_count;
 #endif
-	NETIF_ADDR_LOCK(dev);
+	NETIF_ADDR_UNLOCK(dev);
 
 	/* Determine initial value of allmulti flag */
 	allmulti = (dev->flags & IFF_ALLMULTI) ? TRUE : FALSE;
@@ -805,7 +805,7 @@ _dhd_set_multicast_list(dhd_info_t *dhd, int ifidx)
 		bufp += ETHER_ADDR_LEN;
 	}
 #endif
-	NETIF_ADDR_LOCK(dev);
+	NETIF_ADDR_UNLOCK(dev);
 
 	memset(&ioc, 0, sizeof(ioc));
 	ioc.cmd = WLC_SET_VAR;
@@ -3047,7 +3047,7 @@ dhd_dev_pno_enable(struct net_device *dev,  int pfn_enabled)
 /* Linux wrapper to call common dhd_pno_set */
 int
 dhd_dev_pno_set(struct net_device *dev, wlc_ssid_t* ssids_local, int nssid,
-	ushort  scan_fr, int pno_repeat, int pno_freq_expo_max)
+		ushort scan_fr, int pno_repeat, int pno_freq_expo_max)
 {
 	dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev);
 
