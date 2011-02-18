@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux/arm 2.6.37 Kernel Configuration
-# Mon Feb  7 20:55:00 2011
+# Wed Feb 16 09:35:00 2011
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -274,7 +274,7 @@ CONFIG_MSM_AMSS_VERSION_6225=y
 # Qualcomm MSM Board Type
 #
 # CONFIG_MACH_HALIBUT is not set
-# CONFIG_MACH_TROUT is not set
+CONFIG_MACH_TROUT=y
 CONFIG_MSM_DEBUG_UART_NONE=y
 # CONFIG_MSM_DEBUG_UART1 is not set
 # CONFIG_MSM_DEBUG_UART2 is not set
@@ -1567,7 +1567,7 @@ CONFIG_ANDROID_LOW_MEMORY_KILLER=y
 # CONFIG_POHMELFS is not set
 # CONFIG_AUTOFS_FS is not set
 # CONFIG_IIO is not set
-# CONFIG_ZRAM is not set
+CONFIG_ZRAM=m
 # CONFIG_BATMAN_ADV is not set
 # CONFIG_FB_SM7XX is not set
 

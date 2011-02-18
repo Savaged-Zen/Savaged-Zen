@@ -26,6 +26,7 @@
 #include <linux/workqueue.h>
 #include <linux/freezer.h>
 #include <linux/akm8976.h>
+#include <linux/mutex.h>
 
 #define DEBUG 0
 #define MAX_FAILURE_COUNT 10
@@ -473,29 +474,38 @@ static void AKECS_Report_StepCount(short count)
 	input_sync(data->input_dev);
 }
 
+static DEFINE_MUTEX(akmd_lock);
+
 static int AKECS_GetOpenStatus(void)
 {
+	mutex_unlock(&akmd_lock);
 	wait_event_interruptible(open_wq, (atomic_read(&open_flag) != 0));
+	mutex_lock(&akmd_lock);
 	return atomic_read(&open_flag);
 }
 
 static int AKECS_GetCloseStatus(void)
 {
+	mutex_unlock(&akmd_lock);
 	wait_event_interruptible(open_wq, (atomic_read(&open_flag) <= 0));
+	mutex_lock(&akmd_lock);
 	return atomic_read(&open_flag);
 }
 
 static void AKECS_CloseDone(void)
 {
+	mutex_lock(&akmd_lock);
 	atomic_set(&m_flag, 1);
 	atomic_set(&a_flag, 1);
 	atomic_set(&t_flag, 1);
 	atomic_set(&mv_flag, 1);
+	mutex_unlock(&akmd_lock);
 }
 
 static int akm_aot_open(struct inode *inode, struct file *file)
 {
 	int ret = -1;
+	mutex_lock(&akmd_lock);
 	if (atomic_cmpxchg(&open_count, 0, 1) == 0) {
 		if (atomic_cmpxchg(&open_flag, 0, 1) == 0) {
 			atomic_set(&reserve_open_flag, 1);
@@ -503,21 +513,23 @@ static int akm_aot_open(struct inode *inode, struct file *file)
 			ret = 0;
 		}
 	}
+	mutex_unlock(&akmd_lock);
 	return ret;
 }
 
 static int akm_aot_release(struct inode *inode, struct file *file)
 {
+	mutex_lock(&akmd_lock);
 	atomic_set(&reserve_open_flag, 0);
 	atomic_set(&open_flag, 0);
 	atomic_set(&open_count, 0);
 	wake_up(&open_wq);
+	mutex_unlock(&akmd_lock);
 	return 0;
 }
 
-static int
-akm_aot_ioctl(struct inode *inode, struct file *file,
-	      unsigned int cmd, unsigned long arg)
+static long
+akm_aot_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
 	short flag;
@@ -540,6 +552,7 @@ akm_aot_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 
+	mutex_lock(&akmd_lock);
 	switch (cmd) {
 	case ECS_IOCTL_APP_SET_MFLAG:
 		atomic_set(&m_flag, flag);
@@ -572,8 +585,10 @@ akm_aot_ioctl(struct inode *inode, struct file *file,
 		flag = akmd_delay;
 		break;
 	default:
+		mutex_unlock(&akmd_lock);
 		return -ENOTTY;
 	}
+	mutex_unlock(&akmd_lock);
 
 	switch (cmd) {
 	case ECS_IOCTL_APP_GET_MFLAG:
@@ -613,9 +628,8 @@ static int akm_pffd_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int
-akm_pffd_ioctl(struct inode *inode, struct file *file,
-	       unsigned int cmd, unsigned long arg)
+static long
+akm_pffd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
 	short flag;
@@ -630,11 +644,14 @@ akm_pffd_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 
+	mutex_lock(&akmd_lock);
 	switch (cmd) {
 	case ECS_IOCTL_APP_RESET_PEDOMETER:
 		ret = AKECS_Set_PERST();
-		if (ret < 0)
+		if (ret < 0) {
+			mutex_unlock(&akmd_lock);
 			return ret;
+		}
 		break;
 	case ECS_IOCTL_APP_SET_DELAY:
 		akmd_delay = flag;
@@ -643,8 +660,10 @@ akm_pffd_ioctl(struct inode *inode, struct file *file,
 		flag = akmd_delay;
 		break;
 	default:
+		mutex_unlock(&akmd_lock);
 		return -ENOTTY;
 	}
+	mutex_unlock(&akmd_lock);
 
 	switch (cmd) {
 	case ECS_IOCTL_APP_GET_DELAY:
@@ -669,9 +688,8 @@ static int akmd_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int
-akmd_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
-	   unsigned long arg)
+static long
+akmd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 
 	void __user *argp = (void __user *)arg;
@@ -703,38 +721,53 @@ akmd_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		break;
 	}
 
+	mutex_lock(&akmd_lock);
 	switch (cmd) {
 	case ECS_IOCTL_INIT:
 		ret = AKECS_Init();
-		if (ret < 0)
+		if (ret < 0) {
+			mutex_unlock(&akmd_lock);
 			return ret;
+		}
 		break;
 	case ECS_IOCTL_RESET:
 		AKECS_Reset();
 		break;
 	case ECS_IOCTL_READ:
-		if (rwbuf[0] < 1)
+		if (rwbuf[0] < 1) {
+			mutex_unlock(&akmd_lock);
 			return -EINVAL;
+		}
 		ret = AKI2C_RxData(&rwbuf[1], rwbuf[0]);
-		if (ret < 0)
+		if (ret < 0) {
+			mutex_unlock(&akmd_lock);
 			return ret;
+		}
 		break;
 	case ECS_IOCTL_WRITE:
-		if (rwbuf[0] < 2)
+		if (rwbuf[0] < 2) {
+			mutex_unlock(&akmd_lock);
 			return -EINVAL;
+		}
 		ret = AKI2C_TxData(&rwbuf[1], rwbuf[0]);
-		if (ret < 0)
+		if (ret < 0) {
+			mutex_unlock(&akmd_lock);
 			return ret;
+		}
 		break;
 	case ECS_IOCTL_SET_MODE:
 		ret = AKECS_SetMode((char)mode);
-		if (ret < 0)
+		if (ret < 0) {
+			mutex_unlock(&akmd_lock);
 			return ret;
+		}
 		break;
 	case ECS_IOCTL_GETDATA:
 		ret = AKECS_TransRBuff(msg, RBUFF_SIZE);
-		if (ret < 0)
+		if (ret < 0) {
+			mutex_unlock(&akmd_lock);
 			return ret;
+		}
 		break;
 	case ECS_IOCTL_GET_NUMFRQ:
 		numfrq[0] = cspec_num;
@@ -742,13 +775,17 @@ akmd_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		break;
 	case ECS_IOCTL_SET_PERST:
 		ret = AKECS_Set_PERST();
-		if (ret < 0)
+		if (ret < 0) {
+			mutex_unlock(&akmd_lock);
 			return ret;
+		}
 		break;
 	case ECS_IOCTL_SET_G0RST:
 		ret = AKECS_Set_G0RST();
-		if (ret < 0)
+		if (ret < 0) {
+			mutex_unlock(&akmd_lock);
 			return ret;
+		}
 		break;
 	case ECS_IOCTL_SET_YPR:
 		AKECS_Report_Value(value);
@@ -769,8 +806,10 @@ akmd_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		delay = akmd_delay;
 		break;
 	default:
+		mutex_unlock(&akmd_lock);
 		return -ENOTTY;
 	}
+	mutex_unlock(&akmd_lock);
 
 	switch (cmd) {
 	case ECS_IOCTL_READ:
