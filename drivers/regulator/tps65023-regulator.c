@@ -437,15 +437,11 @@ int tps65023_set_dcdc1_level(struct regulator_dev *dev, int mvolts)
 	else
 		val = ((mvolts - 800)/25) & 0x1F;
 
-	mutex_lock(&tps->io_lock);
-
 	ret = i2c_smbus_write_byte_data(tps->client, TPS65023_DEFCORE, val);
 
 	if (!ret)
 		ret = i2c_smbus_write_byte_data(tps->client,
 				TPS65023_CON_CTRL2, 0x80);
-
-	mutex_unlock(&tps->io_lock);
 
 	return ret;
 }
