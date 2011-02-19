@@ -852,7 +852,7 @@ void mem_cgroup_rotate_reclaimable_page(struct page *page)
 	/* unused or root page is not rotated. */
 	if (!PageCgroupUsed(pc) || mem_cgroup_is_root(pc->mem_cgroup))
 		return;
-	mz = page_cgroup_zoneinfo(pc->mem_cgroup, page);
+	mz = page_cgroup_zoneinfo(pc);
 	list_move_tail(&pc->lru, &mz->lists[lru]);
 }
 
