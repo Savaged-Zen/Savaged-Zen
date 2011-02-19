@@ -30,3 +30,8 @@ config BCM4329_ENABLE_CSCAN
 	depends on BCM4329
 	bool
 	default n
+
+config BCM4329_PNO_SUPPORT
+	depends on BCM4329
+	bool
+	default n

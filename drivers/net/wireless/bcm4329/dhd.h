@@ -65,6 +65,10 @@
 #endif
 #endif
 
+#ifdef CONFIG_BCM4329_PNO_SUPPORT
+# define PNO_SUPPORT
+#endif
+
 /* Forward decls */
 struct dhd_bus;
 struct dhd_prot;
