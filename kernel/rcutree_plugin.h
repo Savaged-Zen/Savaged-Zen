@@ -1226,7 +1226,7 @@ static void rcu_initiate_boost(struct rcu_node *rnp)
 {
 	struct task_struct *t;
 
-	if (!rcu_preempt_blocked_readers_cgp(rnp) && rnp->exp_tasks != NULL) {
+	if (!rcu_preempt_blocked_readers_cgp(rnp) && rnp->exp_tasks == NULL) {
 		rnp->n_balk_exp_gp_tasks++;
 		return;
 	}
