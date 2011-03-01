@@ -696,8 +696,17 @@ static int get_img(struct mdp_img *img, struct fb_info *info,
 		return -1;
 
 	if (MAJOR(file->f_dentry->d_inode->i_rdev) == FB_MAJOR) {
-		*start = info->fix.smem_start;
-		*len = info->fix.smem_len;
+        struct fb_info *fb = registered_fb[MINOR(file->f_dentry->d_inode->i_rdev)];
+        if (fb)
+        {
+            *start = fb->fix.smem_start;
+            *len = fb->fix.smem_len;
+        }
+        else
+        {
+            *start = info->fix.smem_start;
+            *len = info->fix.smem_len;
+        }
 		ret = 0;
 	} else
 		ret = -1;
