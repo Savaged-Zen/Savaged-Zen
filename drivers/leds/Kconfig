@@ -210,13 +210,6 @@ config LEDS_LP5523
 	  Driver provides direct control via LED class and interface for
 	  programming the engines.
 
-config LEDS_CPLD
-	tristate "LED Support for CPLD connected LEDs"
-	default y
-	depends on LEDS_CLASS
-	help
-	  This option enables support for the LEDs connected to CPLD
-
 config LEDS_CLEVO_MAIL
 	tristate "Mail LED on Clevo notebook"
 	depends on LEDS_CLASS
@@ -442,12 +435,6 @@ config LEDS_TRIGGER_DEFAULT_ON
 	help
 	  This allows LEDs to be initialised in the ON state.
 	  If unsure, say Y.
-
-config LEDS_TRIGGER_SLEEP
-	tristate "LED Sleep Mode Trigger"
-	depends on LEDS_TRIGGERS && HAS_EARLYSUSPEND
-	help
-	  This turns LEDs on when the screen is off but the cpu still running.
 
 comment "iptables trigger is under Netfilter config (LED target)"
 	depends on LEDS_TRIGGERS

@@ -1045,12 +1045,12 @@ config SMC911X
 	help
 	  This is a driver for SMSC's LAN911x series of Ethernet chipsets
 	  including the new LAN9115, LAN9116, LAN9117, and LAN9118.
-	  Say Y if you want it compiled into the kernel,
+	  Say Y if you want it compiled into the kernel, 
 	  and read the Ethernet-HOWTO, available from
 	  <http://www.tldp.org/docs.html#howto>.
 
-	  This driver is also available as a module. The module will be
-	  called smc911x.  If you want to compile it as a module, say M
+	  This driver is also available as a module. The module will be 
+	  called smc911x.  If you want to compile it as a module, say M 
 	  here and read <file:Documentation/kbuild/modules.txt>
 
 config SMSC911X
@@ -1525,9 +1525,9 @@ config E100
 	select MII
 	---help---
 	  This driver supports Intel(R) PRO/100 family of adapters.
-	  To verify that your adapter is supported, find the board ID number
-	  on the adapter. Look for a label that has a barcode and a number
-	  in the format 123456-001 (six digits hyphen three digits).
+	  To verify that your adapter is supported, find the board ID number 
+	  on the adapter. Look for a label that has a barcode and a number 
+	  in the format 123456-001 (six digits hyphen three digits). 
 
 	  Use the above information and the Adapter & Driver ID Guide at:
 
@@ -1539,7 +1539,7 @@ config E100
 
 	  <http://www.intel.com/p/en_US/support/highlights/network/pro100plus>
 
-	  More specific information on configuring the driver is in
+	  More specific information on configuring the driver is in 
 	  <file:Documentation/networking/e100.txt>.
 
 	  To compile this driver as a module, choose M here. The module
@@ -2087,7 +2087,7 @@ config E1000
 	depends on PCI
 	---help---
 	  This driver supports Intel(R) PRO/1000 gigabit ethernet family of
-	  adapters.  For more information on how to identify your adapter, go
+	  adapters.  For more information on how to identify your adapter, go 
 	  to the Adapter & Driver ID Guide at:
 
 	  <http://support.intel.com/support/network/adapter/pro100/21397.htm>
@@ -2097,7 +2097,7 @@ config E1000
 
 	  <http://support.intel.com>
 
-	  More specific information on configuring the driver is in
+	  More specific information on configuring the driver is in 
 	  <file:Documentation/networking/e1000.txt>.
 
 	  To compile this driver as a module, choose M here. The module
@@ -2286,7 +2286,7 @@ config SKGE
 	  and related Gigabit Ethernet adapters. It is a new smaller driver
 	  with better performance and more complete ethtool support.
 
-	  It does not support the link failover and network management
+	  It does not support the link failover and network management 
 	  features that "portable" vendor supplied sk98lin driver does.
 
 	  This driver supports adapters based on the original Yukon chipset:
@@ -2765,7 +2765,7 @@ config IXGB
 
 	  <http://support.intel.com>
 
-	  More specific information on configuring the driver is in
+	  More specific information on configuring the driver is in 
 	  <file:Documentation/networking/ixgb.txt>.
 
 	  To compile this driver as a module, choose M here. The module
@@ -2775,8 +2775,8 @@ config S2IO
 	tristate "S2IO 10Gbe XFrame NIC"
 	depends on PCI
 	---help---
-	  This driver supports the 10Gbe XFrame NIC of S2IO.
-	  More specific information on configuring the driver is in
+	  This driver supports the 10Gbe XFrame NIC of S2IO. 
+	  More specific information on configuring the driver is in 
 	  <file:Documentation/networking/s2io.txt>.
 
 config VXGE
@@ -3259,9 +3259,9 @@ config PPPOE
 	  Support for PPP over Ethernet.
 
 	  This driver requires the latest version of pppd from the CVS
-	  repository at cvs.samba.org.  Alternatively, see the
+	  repository at cvs.samba.org.  Alternatively, see the 
 	  RoaringPenguin package (<http://www.roaringpenguin.com/pppoe>)
-	  which contains instruction on how to use this driver (under
+	  which contains instruction on how to use this driver (under 
 	  the heading "Kernel mode PPPoE").
 
 config PPTP
@@ -3291,23 +3291,6 @@ config PPPOL2TP
 	  Support for PPP-over-L2TP socket family. L2TP is a protocol
 	  used by ISPs and enterprises to tunnel PPP traffic over UDP
 	  tunnels. L2TP is replacing PPTP for VPN uses.
-
-config PPPOLAC
-	tristate "PPP on L2TP Access Concentrator"
-	depends on PPP && INET
-	help
-	  L2TP (RFC 2661) is a tunneling protocol widely used in virtual private
-	  networks. This driver handles L2TP data packets between a UDP socket
-	  and a PPP channel, but only permits one session per socket. Thus it is
-	  fairly simple and suited for clients.
-
-config PPPOPNS
-	tristate "PPP on PPTP Network Server"
-	depends on PPP && INET
-	help
-	  PPTP (RFC 2637) is a tunneling protocol widely used in virtual private
-	  networks. This driver handles PPTP data packets between a RAW socket
-	  and a PPP channel. It is fairly simple and easy to use.
 
 config SLIP
 	tristate "SLIP (serial line) support"
@@ -3400,21 +3383,6 @@ config NETCONSOLE
 	If you want to log kernel messages over the network, enable this.
 	See <file:Documentation/networking/netconsole.txt> for details.
 
-config MSM_RMNET
-	tristate "MSM RMNET Virtual Network Device"
-	depends on ARCH_MSM
-	default y
-	help
-	  Virtual ethernet interface for MSM RMNET transport.
-
-config MSM_RMNET_DEBUG
-	bool "MSM RMNET debug interface"
-	depends on MSM_RMNET
-	default n
-	help
-	  Debug stats on wakeup counts.
-
-
 config NETCONSOLE_DYNAMIC
 	bool "Dynamic reconfiguration of logging targets"
 	depends on NETCONSOLE && SYSFS
@@ -3450,14 +3418,5 @@ config VMXNET3
          This driver supports VMware's vmxnet3 virtual ethernet NIC.
          To compile this driver as a module, choose M here: the
          module will be called vmxnet3.
-
-config GAN_ETH
-        tristate "Kineto GAN compatibility"
-	depends on INET
-        default n
-        help
-          A virutual ethernet device that adds/removes IP/UDP headers,
-	  as required by Kineto GAN.
-
 
 endif # NETDEVICES

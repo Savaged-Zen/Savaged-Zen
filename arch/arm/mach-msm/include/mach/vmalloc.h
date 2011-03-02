@@ -16,8 +16,7 @@
 #ifndef __ASM_ARCH_MSM_VMALLOC_H
 #define __ASM_ARCH_MSM_VMALLOC_H
 
-/* IO devices are mapped at 0xF8000000 and above */
-#define VMALLOC_END	  0xf8000000UL
+#define VMALLOC_END	  0xd0000000UL
 
 #endif
 

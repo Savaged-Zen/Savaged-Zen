@@ -75,12 +75,6 @@ config BATTERY_DS2782
 	  Say Y here to enable support for the DS2782/DS2786 standalone battery
 	  gas-gauge.
 
-config BATTERY_DS2784
-	tristate "DS2784 battery driver "
-	select W1
-	help
-	  Say Y here to enable support for batteries with ds2784 chip.
-
 config BATTERY_PMU
 	tristate "Apple PMU battery"
 	depends on PPC32 && ADB_PMU
@@ -190,11 +184,5 @@ config CHARGER_TWL4030
 	depends on TWL4030_CORE
 	help
 	  Say Y here to enable support for TWL4030 Battery Charge Interface.
-
-config CHARGER_PM8058
-	bool "Qualcomm PM8058 pmic charger driver"
-	depends on PM8058
-	help
-	  Say Y to include support for the pm8058 charge controller
 
 endif # POWER_SUPPLY

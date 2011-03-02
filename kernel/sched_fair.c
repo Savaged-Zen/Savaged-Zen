@@ -688,7 +688,7 @@ static void enqueue_sleeper(struct cfs_rq *cfs_rq, struct sched_entity *se)
 		se->statistics.sum_sleep_runtime += delta;
 
 		if (tsk) {
-			if (tsk->sched_in_iowait) {
+			if (tsk->in_iowait) {
 				se->statistics.iowait_sum += delta;
 				se->statistics.iowait_count++;
 				trace_sched_stat_iowait(tsk, delta);
@@ -802,8 +802,6 @@ static void clear_buddies(struct cfs_rq *cfs_rq, struct sched_entity *se)
 static void
 dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 {
-	u64 min_vruntime;
-
 	/*
 	 * Update run-time statistics of the 'current'.
 	 */
@@ -828,8 +826,6 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 	if (se != cfs_rq->curr)
 		__dequeue_entity(cfs_rq, se);
 	account_entity_dequeue(cfs_rq, se);
-
-	min_vruntime = cfs_rq->min_vruntime;
 	update_min_vruntime(cfs_rq);
 
 	/*
@@ -838,7 +834,7 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 	 * movement in our normalized position.
 	 */
 	if (!(flags & DEQUEUE_SLEEP))
-		se->vruntime -= min_vruntime;
+		se->vruntime -= cfs_rq->min_vruntime;
 }
 
 /*

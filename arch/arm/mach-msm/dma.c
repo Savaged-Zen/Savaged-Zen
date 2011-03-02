@@ -1,8 +1,6 @@
 /* linux/arch/arm/mach-msm/dma.c
  *
  * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2008 QUALCOMM Incorporated.
- * Copyright (c) 2008 QUALCOMM USA, INC.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -19,11 +17,10 @@
 #include <linux/err.h>
 #include <linux/io.h>
 #include <linux/interrupt.h>
-#include <linux/module.h>
+#include <linux/completion.h>
 #include <mach/dma.h>
 
 #define MSM_DMOV_CHANNEL_COUNT 16
-#define MMC_ID 8
 
 enum {
 	MSM_DMOV_PRINT_ERRORS = 1,
@@ -54,9 +51,8 @@ void msm_dmov_stop_cmd(unsigned id, struct msm_dmov_cmd *cmd, int graceful)
 {
 	writel((graceful << 31), DMOV_FLUSH0(id));
 }
-EXPORT_SYMBOL(msm_dmov_stop_cmd);
 
-void msm_dmov_enqueue_cmd_ext(unsigned id, struct msm_dmov_cmd *cmd)
+void msm_dmov_enqueue_cmd(unsigned id, struct msm_dmov_cmd *cmd)
 {
 	unsigned long irq_flags;
 	unsigned int status;
@@ -93,29 +89,6 @@ void msm_dmov_enqueue_cmd_ext(unsigned id, struct msm_dmov_cmd *cmd)
 	}
 	spin_unlock_irqrestore(&msm_dmov_lock, irq_flags);
 }
-EXPORT_SYMBOL(msm_dmov_enqueue_cmd_ext);
-
-void msm_dmov_enqueue_cmd(unsigned id, struct msm_dmov_cmd *cmd)
-{
-	/* Disable callback function (for backwards compatibility) */
-	cmd->execute_func = NULL;
-
-	msm_dmov_enqueue_cmd_ext(id, cmd);
-}
-EXPORT_SYMBOL(msm_dmov_enqueue_cmd);
-
-void msm_dmov_flush(unsigned int id)
-{
-	unsigned long irq_flags;
-	spin_lock_irqsave(&msm_dmov_lock, irq_flags);
-	/* XXX not checking if flush cmd sent already */
-	if (!list_empty(&active_commands[id])) {
-		PRINT_IO("msm_dmov_flush(%d), send flush cmd\n", id);
-		writel(DMOV_FLUSH_TYPE, DMOV_FLUSH0(id));
-	}
-	spin_unlock_irqrestore(&msm_dmov_lock, irq_flags);
-}
-EXPORT_SYMBOL(msm_dmov_flush);
 
 struct msm_dmov_exec_cmdptr_cmd {
 	struct msm_dmov_cmd dmov_cmd;
@@ -171,14 +144,12 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 	unsigned int ch_status;
 	unsigned int ch_result;
 	struct msm_dmov_cmd *cmd;
-	unsigned char done_complete_flag;
 
 	spin_lock_irqsave(&msm_dmov_lock, irq_flags);
 
 	int_status = readl(DMOV_ISR); /* read and clear interrupt */
 	PRINT_FLOW("msm_datamover_irq_handler: DMOV_ISR %x\n", int_status);
 
-	done_complete_flag = 0x0;
 	while (int_status) {
 		mask = int_status & -int_status;
 		id = fls(mask) - 1;
@@ -187,10 +158,6 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 		ch_status = readl(DMOV_STATUS(id));
 		if (!(ch_status & DMOV_STATUS_RSLT_VALID)) {
 			PRINT_FLOW("msm_datamover_irq_handler id %d, result not valid %x\n", id, ch_status);
-			if (id == MMC_ID)
-				printk(KERN_INFO "[dma.c] "
-				"msm_datamover_irq_handler"
-				" id %d, result not valid%x\n", id, ch_status);
 			continue;
 		}
 		do {
@@ -200,9 +167,6 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 					"with no active command, status %x, result %x\n",
 					id, ch_status, ch_result);
 				cmd = NULL;
-				if (id == MMC_ID)
-					printk(KERN_INFO "[dma.c]"
-					" cmd is NULL\n");
 			} else
 				cmd = list_entry(active_commands[id].next, typeof(*cmd), list);
 			PRINT_FLOW("msm_datamover_irq_handler id %d, status %x, result %x\n", id, ch_status, ch_result);
@@ -215,7 +179,6 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 					list_del(&cmd->list);
 					dsb();
 					cmd->complete_func(cmd, ch_result, NULL);
-					done_complete_flag |= 0x01;
 				}
 			}
 			if (ch_result & DMOV_RSLT_FLUSH) {
@@ -233,7 +196,6 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 					list_del(&cmd->list);
 					dsb();
 					cmd->complete_func(cmd, ch_result, &errdata);
-					done_complete_flag |= 0x02;
 				}
 			}
 			if (ch_result & DMOV_RSLT_ERROR) {
@@ -252,7 +214,6 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 					list_del(&cmd->list);
 					dsb();
 					cmd->complete_func(cmd, ch_result, &errdata);
-					done_complete_flag |= 0x04;
 				}
 				/* this does not seem to work, once we get an error */
 				/* the datamover will no longer accept commands */
@@ -273,19 +234,6 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 		if (list_empty(&active_commands[id]) && list_empty(&ready_commands[id]))
 			channel_active &= ~(1U << id);
 		PRINT_FLOW("msm_datamover_irq_handler id %d, status %x\n", id, ch_status);
-		if (id == MMC_ID && done_complete_flag == 0) {
-			printk(KERN_INFO "[dma.c] complete_func is not normal"
-			" executed, result %x\n", ch_result);
-			if (cmd) {
-				list_del(&cmd->list);
-				dsb();
-				cmd->complete_func(cmd, ch_result, NULL);
-			} else {
-				printk(KERN_INFO "[dma.c] cmd is NULL, "
-				"do not execute complete_func "
-				", result %x\n", ch_result);
-			}
-		}
 	}
 
 	if (!channel_active) {
@@ -320,3 +268,4 @@ static int __init msm_init_datamover(void)
 }
 
 arch_initcall(msm_init_datamover);
+

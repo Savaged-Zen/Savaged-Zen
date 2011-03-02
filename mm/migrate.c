@@ -739,9 +739,10 @@ skip_unmap:
 
 	if (rc && remap_swapcache)
 		remove_migration_ptes(page, page);
+
 	/* Drop an anon_vma reference if we took one */
 	if (anon_vma)
-		put_anon_vma(anon_vma);
+		drop_anon_vma(anon_vma);
 
 uncharge:
 	if (!charge)
@@ -822,6 +823,7 @@ static int unmap_and_move_huge_page(new_page_t get_new_page,
 		if (anon_vma) {
 			get_anon_vma(anon_vma);
 			page_unlock_anon_vma(anon_vma);
+		}
 	}
 
 	try_to_unmap(hpage, TTU_MIGRATION|TTU_IGNORE_MLOCK|TTU_IGNORE_ACCESS);
