@@ -2249,7 +2249,6 @@ static ssize_t generic_perform_write(struct file *file,
 	long status = 0;
 	ssize_t written = 0;
 	unsigned int flags = 0;
-	unsigned int dirty;
 
 	/*
 	 * Copies from kernel address space cannot fail (NFSD is a big user).
@@ -2298,7 +2297,6 @@ again:
 		pagefault_enable();
 		flush_dcache_page(page);
 
-		dirty = PageDirty(page);
 		mark_page_accessed(page);
 		status = a_ops->write_end(file, mapping, pos, bytes, copied,
 						page, fsdata);
@@ -2325,8 +2323,7 @@ again:
 		pos += copied;
 		written += copied;
 
-		if (!dirty)
-			balance_dirty_pages_ratelimited(mapping);
+		balance_dirty_pages_ratelimited(mapping);
 
 	} while (iov_iter_count(i));
 

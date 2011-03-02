@@ -39,8 +39,6 @@ static ssize_t mmc_type_show(struct device *dev,
 		return sprintf(buf, "SDIO\n");
 	case MMC_TYPE_SD_COMBO:
 		return sprintf(buf, "SDcombo\n");
-	case MMC_TYPE_SDIO_WIMAX:
-		return sprintf(buf, "SDwimax\n");
 	default:
 		return -EFAULT;
 	}
@@ -80,9 +78,6 @@ mmc_bus_uevent(struct device *dev, struct kobj_uevent_env *env)
 		break;
 	case MMC_TYPE_SD_COMBO:
 		type = "SDcombo";
-		break;
-	case MMC_TYPE_SDIO_WIMAX:
-		type = "SDwimax";
 		break;
 	default:
 		type = NULL;
@@ -289,10 +284,6 @@ int mmc_add_card(struct mmc_card *card)
 		type = "SD-combo";
 		if (mmc_card_blockaddr(card))
 			type = "SDHC-combo";
-		break;
-	case MMC_TYPE_SDIO_WIMAX:
-		type = "SD-WiMAX";
-		break;
 	default:
 		type = "?";
 		break;

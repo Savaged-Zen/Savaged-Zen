@@ -563,8 +563,7 @@ static inline int __sock_sendmsg(struct kiocb *iocb, struct socket *sock,
 	if (err)
 		return err;
 
-	err = sock->ops->sendmsg(iocb, sock, msg, size);
-	return err;
+	return sock->ops->sendmsg(iocb, sock, msg, size);
 }
 
 int sock_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
@@ -681,7 +680,6 @@ EXPORT_SYMBOL_GPL(__sock_recv_ts_and_drops);
 static inline int __sock_recvmsg_nosec(struct kiocb *iocb, struct socket *sock,
 				       struct msghdr *msg, size_t size, int flags)
 {
-	int err;
 	struct sock_iocb *si = kiocb_to_siocb(iocb);
 
 	sock_update_classid(sock->sk);
@@ -692,8 +690,7 @@ static inline int __sock_recvmsg_nosec(struct kiocb *iocb, struct socket *sock,
 	si->size = size;
 	si->flags = flags;
 
-	err = sock->ops->recvmsg(iocb, sock, msg, size, flags);
-	return err;
+	return sock->ops->recvmsg(iocb, sock, msg, size, flags);
 }
 
 static inline int __sock_recvmsg(struct kiocb *iocb, struct socket *sock,

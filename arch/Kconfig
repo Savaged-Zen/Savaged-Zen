@@ -175,7 +175,4 @@ config HAVE_PERF_EVENTS_NMI
 config HAVE_ARCH_JUMP_LABEL
 	bool
 
-config HAVE_RCU_TABLE_FREE
-	bool
-
 source "kernel/gcov/Kconfig"

@@ -94,7 +94,6 @@ extern char core_pattern[];
 extern unsigned int core_pipe_limit;
 extern int pid_max;
 extern int min_free_kbytes;
-extern int min_free_order_shift;
 extern int pid_max_min, pid_max_max;
 extern int sysctl_drop_caches;
 extern int percpu_pagelist_fraction;
@@ -118,12 +117,7 @@ static int zero;
 static int __maybe_unused one = 1;
 static int __maybe_unused two = 2;
 static unsigned long one_ul = 1;
-static int __maybe_unused one_hundred = 100;
-#ifdef CONFIG_SCHED_BFS
-extern int rr_interval;
-extern int sched_iso_cpu;
-static int __read_mostly one_thousand = 1000;
-#endif
+static int one_hundred = 100;
 #ifdef CONFIG_PRINTK
 static int ten_thousand = 10000;
 #endif
@@ -259,7 +253,7 @@ static struct ctl_table root_table[] = {
 	{ }
 };
 
-#if defined(CONFIG_SCHED_DEBUG) && !defined(CONFIG_SCHED_BFS)
+#ifdef CONFIG_SCHED_DEBUG
 static int min_sched_granularity_ns = 100000;		/* 100 usecs */
 static int max_sched_granularity_ns = NSEC_PER_SEC;	/* 1 second */
 static int min_wakeup_granularity_ns;			/* 0 usecs */
@@ -276,7 +270,6 @@ static int max_extfrag_threshold = 1000;
 #endif
 
 static struct ctl_table kern_table[] = {
-#ifndef CONFIG_SCHED_BFS
 	{
 		.procname	= "sched_child_runs_first",
 		.data		= &sysctl_sched_child_runs_first,
@@ -390,18 +383,6 @@ static struct ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
 	},
-#endif /* !CONFIG_SCHED_BFS */
-#ifdef CONFIG_SCHED_AUTOGROUP
-	{
-		.procname	= "sched_autogroup_enabled",
-		.data		= &sysctl_sched_autogroup_enabled,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
-		.extra1		= &zero,
-		.extra2		= &one,
-	},
-#endif
 #ifdef CONFIG_PROVE_LOCKING
 	{
 		.procname	= "prove_locking",
@@ -835,26 +816,6 @@ static struct ctl_table kern_table[] = {
 		.proc_handler	= proc_dointvec,
 	},
 #endif
-#ifdef CONFIG_SCHED_BFS
-	{
-		.procname	= "rr_interval",
-		.data		= &rr_interval,
-		.maxlen		= sizeof (int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_minmax,
-		.extra1		= &one,
-		.extra2		= &one_thousand,
-	},
-	{
-		.procname	= "iso_cpu",
-		.data		= &sched_iso_cpu,
-		.maxlen		= sizeof (int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_minmax,
-		.extra1		= &zero,
-		.extra2		= &one_hundred,
-	},
-#endif
 #if defined(CONFIG_S390) && defined(CONFIG_SMP)
 	{
 		.procname	= "spin_retry",
@@ -1202,13 +1163,6 @@ static struct ctl_table vm_table[] = {
 		.mode		= 0644,
 		.proc_handler	= min_free_kbytes_sysctl_handler,
 		.extra1		= &zero,
-	},
-	{
-		.procname	= "min_free_order_shift",
-		.data		= &min_free_order_shift,
-		.maxlen		= sizeof(min_free_order_shift),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec
 	},
 	{
 		.procname	= "percpu_pagelist_fraction",
