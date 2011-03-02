@@ -33,3 +33,11 @@ config MMC_PARANOID_SD_INIT
 	  about re-trying SD init requests. This can be a useful
 	  work-around for buggy controllers and hardware. Enable
 	  if you are experiencing issues with SD detection.
+
+config MMC_USE_ONLY_HOST_DEFINED_FREQUENCY
+    bool "Use only host defined frequency"
+    help
+        By default MMC CORE try 400000, 300000, 200000, 100000 
+        and host defined frequency
+        
+        If you say Y here, it only use the host defined frequency
