@@ -39,6 +39,11 @@ extern void start_drawing_late_resume(struct early_suspend *h);
 static void msmfb_resume_handler(struct early_suspend *h);
 static void msmfb_resume(struct work_struct *work);
 
+extern int g_frame_done;
+extern int g_blit_busy;
+void mirroring_lock();
+void mirroring_unlock();
+
 #define MSMFB_DEBUG 1
 #ifdef CONFIG_FB_MSM_LOGO
 #define INIT_IMAGE_FILE "/logo.rle"
@@ -189,6 +194,11 @@ static void msmfb_handle_dma_interrupt(struct msmfb_callback *callback)
 
 	spin_lock_irqsave(&msmfb->update_lock, irq_flags);
 	msmfb->frame_done = msmfb->frame_requested;
+    g_frame_done = msmfb->frame_done;
+
+    // If mirroring, release our mutex
+    mirroring_unlock();
+
 	if (msmfb->sleeping == UPDATING &&
 	    msmfb->frame_done == msmfb->update_frame) {
 		DLOG(SUSPEND_RESUME, "full update completed\n");
@@ -219,6 +229,17 @@ static int msmfb_start_dma(struct msmfb_info *msmfb)
 	s64 time_since_request;
 	struct msm_panel_data *panel = msmfb->panel;
 
+    if (g_blit_busy)
+    {
+        // We're going to drop this pan/update request
+        mirroring_unlock();
+        if (panel->clear_vsync)
+            panel->clear_vsync(panel);
+        msmfb->frame_done = msmfb->frame_requested;
+        wake_up(&msmfb->frame_wq);
+        return;
+    }
+
 	spin_lock_irqsave(&msmfb->update_lock, irq_flags);
 	time_since_request = ktime_to_ns(ktime_sub(ktime_get(),
 			     msmfb->vsync_request_time));
@@ -230,11 +251,13 @@ static int msmfb_start_dma(struct msmfb_info *msmfb)
 	}
 	if (msmfb->frame_done == msmfb->frame_requested) {
 		spin_unlock_irqrestore(&msmfb->update_lock, irq_flags);
+        mirroring_unlock();
 		return -1;
 	}
 	if (msmfb->sleeping == SLEEPING) {
 		DLOG(SUSPEND_RESUME, "tried to start dma while asleep\n");
 		spin_unlock_irqrestore(&msmfb->update_lock, irq_flags);
+        mirroring_unlock();
 		return -1;
 	}
 	x = msmfb->update_info.left;
@@ -263,6 +286,7 @@ static int msmfb_start_dma(struct msmfb_info *msmfb)
 	return 0;
 error:
 	spin_unlock_irqrestore(&msmfb->update_lock, irq_flags);
+    mirroring_unlock();
 	/* some clients need to clear their vsync interrupt */
 	if (panel->clear_vsync)
 		panel->clear_vsync(panel);
@@ -306,6 +330,12 @@ static void msmfb_pan_update(struct fb_info *info, uint32_t left, uint32_t top,
 	t1 = ktime_get();
 #endif
 
+    if (g_blit_busy)
+    {
+        // We're going to drop this pan/update request
+        return;
+    }
+
 	DLOG(SHOW_UPDATES, "update %d %d %d %d %d %d\n",
 		left, top, eright, ebottom, yoffset, pan_display);
 
@@ -326,13 +356,21 @@ static void msmfb_pan_update(struct fb_info *info, uint32_t left, uint32_t top,
                 DLOG(SUSPEND_RESUME, "pan_update in state(%d)\n", msmfb->sleeping);
 
 restart:
-	spin_lock_irqsave(&msmfb->update_lock, irq_flags);
+    if (g_blit_busy)
+    {
+        // We're going to drop this pan/update request
+        return;
+    }
+    mirroring_lock();
+
+    spin_lock_irqsave(&msmfb->update_lock, irq_flags);
 
 	/* if we are sleeping, on a pan_display wait 10ms (to throttle back
 	 * drawing otherwise return */
 	if (msmfb->sleeping == SLEEPING) {
 		DLOG(SUSPEND_RESUME, "drawing while asleep\n");
 		spin_unlock_irqrestore(&msmfb->update_lock, irq_flags);
+        mirroring_unlock();
 		if (pan_display)
 			wait_event_interruptible_timeout(msmfb->frame_wq,
 				msmfb->sleeping != SLEEPING, HZ/10);
@@ -345,6 +383,7 @@ restart:
 			    sleeping == UPDATING)) {
 		int ret;
 		spin_unlock_irqrestore(&msmfb->update_lock, irq_flags);
+        mirroring_unlock();
 		ret = wait_event_interruptible_timeout(msmfb->frame_wq,
 			msmfb->frame_done == msmfb->frame_requested &&
 			msmfb->sleeping != UPDATING, 5 * HZ);

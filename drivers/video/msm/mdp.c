@@ -172,6 +172,11 @@ static irqreturn_t mdp_isr(int irq, void *data)
 		mdp_dma_timer_enable = 0;
 	}
 
+    if (status & MDP_LCDC_UNDERFLOW)
+    {
+        pr_err("%s: LCDC Underflow\n", __func__);
+    }
+
 	status &= mdp_irq_mask;
 #ifdef CONFIG_MSM_MDP40
 	if (mdp->mdp_dev.overrides & MSM_MDP4_MDDI_DMA_SWITCH) {

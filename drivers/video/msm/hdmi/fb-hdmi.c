@@ -46,8 +46,21 @@
 #define HDMI_DBG(s...) do {} while (0)
 #endif
 
+<<<<<<< HEAD
 #define BITS_PER_PIXEL 16
 
+=======
+DEFINE_MUTEX(blit_dma_mutex);
+static int mutexUsed = 0;
+static int mirroring = 0;
+
+#define BITS_PER_PIXEL 16
+
+int g_frame_done = 0;
+int g_last_blit = 0;
+int g_blit_busy = 0;
+
+>>>>>>> a8f436c... video: msm: hdmi: changes to fix blitting in mirror mode, enabling tear free mirroring
 struct update_info_t {
 	int left;
 	int top;
@@ -159,6 +172,24 @@ static int hdmifb_set_par(struct fb_info *info)
 	return 0;
 }
 
+void mirroring_lock()
+{
+    if (mirroring) {
+        mutex_lock(&blit_dma_mutex);
+        mutexUsed = 1;
+    }
+    return;
+}
+
+void mirroring_unlock()
+{
+    if (mutexUsed)
+    {
+        mutex_unlock(&blit_dma_mutex);
+    }
+    return;
+}
+
 /* core update function */
 static void
 hdmifb_pan_update(struct fb_info *info, uint32_t left, uint32_t top,
@@ -265,13 +296,7 @@ static int hdmifb_pause(struct fb_info *fb, unsigned int mode)
 		if (atomic_inc_return(&hdmi_fb->use_count) == 1) {
 			hdmi_pre_change(info);
 			ret = panel->unblank(panel);
-/*
-			// set timing again to prevent TV been out of range
-			var = &fb->var;
-			timing = hdmi->set_res(hdmi, var);
-			panel->adjust_timing(panel, timing, var->xres, var->yres);
-			hdmi_post_change(info, var);
-*/
+
 			set_bit(hdmi_enabled, &hdmi_fb->state);
 #ifdef CONFIG_HTC_HEADSET_MGR
 			switch_send_event(BIT_HDMI_AUDIO, 1);
@@ -290,9 +315,17 @@ static int hdmifb_blit(struct fb_info *info, void __user *p)
 	int i;
 	int ret;
 
+    // We never want to re-blit the same frame that we've already done. There's just no good reason.
+    if (mirroring && g_frame_done == g_last_blit)
+    {
+        return 0;
+    }
+    g_last_blit = g_frame_done;
+
 	if (copy_from_user(&req_list, p, sizeof(req_list)))
 		return -EFAULT;
 
+<<<<<<< HEAD
 	for (i = 0; i < req_list.count; i++) {
 		struct mdp_blit_req_list *list =
 			(struct mdp_blit_req_list *)p;
@@ -334,6 +367,27 @@ static int hdmifb_blit(struct fb_info *info, void __user *p)
 			return ret;
 	}
 	return 0;
+=======
+    // We want to cancel any pending panel DMA to release the mutex ASAP
+    g_blit_busy = 1;
+    mirroring_lock();
+    g_blit_busy = 0;
+    for (i = 0; i < req_list.count; i++) {
+        struct mdp_blit_req_list *list =
+            (struct mdp_blit_req_list *)p;
+        if (copy_from_user(&req, &list->req[i], sizeof(req)))
+        {
+            ret = -EFAULT;
+            break;
+        }
+        req.flags |= MDP_DITHER;
+        ret = mdp->blit(mdp, info, &req);
+        if (ret)
+            break;
+    }
+    mirroring_unlock();
+	return ret;
+>>>>>>> a8f436c... video: msm: hdmi: changes to fix blitting in mirror mode, enabling tear free mirroring
 }
 
 void reportUnderflow(void)
@@ -481,7 +535,13 @@ static int hdmifb_ioctl(struct fb_info *p, unsigned int cmd, unsigned long arg)
 		get_user(val, (unsigned __user *) arg);
 		//pr_info("[hdmi] SET_MODE: %d\n", val);
 		ret = hdmifb_change_mode(p, val);
+<<<<<<< HEAD
         _hdmi_fb->mirroring = 0;
+=======
+
+        if (val == 0)   mirroring = 1;
+        else            mirroring = 0;
+>>>>>>> a8f436c... video: msm: hdmi: changes to fix blitting in mirror mode, enabling tear free mirroring
 		break;
 	case HDMI_GET_MODE:
 /*
@@ -759,11 +819,7 @@ static void hdmi_handle_vsync(struct msmfb_callback *callback)
 	spin_unlock_irqrestore(&hdmi->update_lock, irq_flags);
 
 	addr = ((hdmi->xres * (yoffset + y) + x) * 2);
-	if (test_bit(hdmi_mode, &hdmi->state) == 0) {
-		mdp->dma(mdp, addr + mirror_fb->fix.smem_start,
-			hdmi->xres * 2, w, h, x, y, &hdmi->dma_callback,
-			panel->interface_type);
-	} else {
+	if (!mirroring) {
 		fb_hdmi = hdmi->fb;
 		mdp->dma(mdp, addr + fb_hdmi->fix.smem_start,
 			hdmi->xres * 2, w, h, x, y, &hdmi->dma_callback,
