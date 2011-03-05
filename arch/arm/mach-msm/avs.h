@@ -30,9 +30,10 @@
 #ifndef AVS_H
 #define AVS_H
 
-#define VOLTAGE_MIN  800 /* mV */
-#define VOLTAGE_MAX  1400
-#define VOLTAGE_STEP 25
+#define VOLTAGE_MIN  		INCREDIBLEC_MIN_UV_MV /* mV */
+#define VOLTAGE_MAX  		INCREDIBLEC_MAX_UV_MV
+#define	VOLTAGE_MIN_START	900	// Minimum value to start off with
+#define VOLTAGE_STEP 		5
 
 int __init avs_init(int (*set_vdd)(int), u32 freq_cnt, u32 freq_idx);
 void __exit avs_exit(void);
@@ -67,7 +68,7 @@ static inline void avs_set_tscsr(u32 to_tscsr) {}
 static inline void avs_disable(void) {}
 #endif
 
-/*#define AVSDEBUG(x...) pr_info("AVS: " x);*/
+//#define AVSDEBUG(x...) pr_info("AVS: " x);
 #define AVSDEBUG(...)
 
 #define AVS_DISABLE(cpu) do {			\
