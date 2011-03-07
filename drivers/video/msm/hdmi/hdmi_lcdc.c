@@ -187,7 +187,7 @@ static int lcdc_resume(struct msm_panel_data *fb_panel)
 
 static int
 lcdc_adjust_timing(struct msm_panel_data *fb_panel,
-		struct msm_lcdc_timing *timing, u32 xres, u32 yres)
+		struct msm_lcdc_timing *timing, u32 xres, u32 yres, u32 bpp)
 {
 	struct mdp_lcdc_info *lcdc = panel_to_lcdc(fb_panel);
 	unsigned int hsync_period;
@@ -260,16 +260,28 @@ lcdc_adjust_timing(struct msm_panel_data *fb_panel,
 	mdp_writel(lcdc->mdp, (((yres & 0x7ff) << 16) |
 			       (xres & 0x7ff)),
 		   MDP_DMA_P_SIZE);
-	/* TODO: pull in the bpp info from somewhere else? */
-	mdp_writel(lcdc->mdp, xres * 2,
+
+    /* Handle bpp information */
+    mdp_writel(lcdc->mdp, xres * (bpp / 8),
 		   MDP_DMA_P_IBUF_Y_STRIDE);
 	mdp_writel(lcdc->mdp, 0, MDP_DMA_P_OUT_XY);
 
 	dma_cfg = (DMA_PACK_ALIGN_LSB |
-		   DMA_PACK_PATTERN_RGB |
-		   DMA_DITHER_EN);
+           DMA_DITHER_EN);
 	dma_cfg |= DMA_OUT_SEL_LCDC;
-	dma_cfg |= DMA_IBUF_FORMAT_RGB565;
+    switch (bpp)
+    {
+    case 16:
+    default:
+        dma_cfg |= DMA_IBUF_FORMAT_RGB565 | DMA_PACK_PATTERN_RGB;
+        break;
+    case 24:
+        dma_cfg |= DMA_IBUF_FORMAT_RGB888 | DMA_PACK_PATTERN_BGR;
+        break;
+    case 32:
+        dma_cfg |= DMA_IBUF_FORMAT_XRGB8888 | DMA_PACK_PATTERN_BGR;
+        break;
+    }
 	dma_cfg |= DMA_DSTC0G_8BITS | DMA_DSTC1B_8BITS | DMA_DSTC2R_8BITS;
 
 	mdp_writel(lcdc->mdp, dma_cfg, MDP_DMA_P_CONFIG);

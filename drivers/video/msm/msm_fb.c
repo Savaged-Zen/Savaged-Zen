@@ -33,6 +33,7 @@
 #include <linux/debugfs.h>
 #include <linux/dma-mapping.h>
 #include <linux/android_pmem.h>
+#include <linux/htc_hdmi.h>           /* For mirror_statistics */
 #include "mdp_hw.h"
 
 extern void start_drawing_late_resume(struct early_suspend *h);
@@ -41,8 +42,12 @@ static void msmfb_resume(struct work_struct *work);
 
 extern int g_frame_done;
 extern int g_blit_busy;
-void mirroring_lock();
-void mirroring_unlock();
+extern int g_panel_state;
+
+void mirroring_lock(void);
+void mirroring_unlock(void);
+
+extern struct mirror_statistics mirror_stats;
 
 #define MSMFB_DEBUG 1
 #ifdef CONFIG_FB_MSM_LOGO
@@ -232,12 +237,13 @@ static int msmfb_start_dma(struct msmfb_info *msmfb)
     if (g_blit_busy)
     {
         // We're going to drop this pan/update request
+        mirror_stats.droppedPanelFrames++;
         mirroring_unlock();
         if (panel->clear_vsync)
             panel->clear_vsync(panel);
         msmfb->frame_done = msmfb->frame_requested;
         wake_up(&msmfb->frame_wq);
-        return;
+        return 0;
     }
 
 	spin_lock_irqsave(&msmfb->update_lock, irq_flags);
@@ -329,6 +335,8 @@ static void msmfb_pan_update(struct fb_info *info, uint32_t left, uint32_t top,
 	static uint64_t dt;
 	t1 = ktime_get();
 #endif
+
+    mirror_stats.panelFramesRequested++;
 
     if (g_blit_busy)
     {
@@ -454,19 +462,26 @@ restart:
 		msmfb->yoffset);
 	spin_unlock_irqrestore(&msmfb->update_lock, irq_flags);
 
-	/* if the panel is all the way on wait for vsync, otherwise sleep
-	 * for 16 ms (long enough for the dma to panel) and then begin dma */
-	msmfb->vsync_request_time = ktime_get();
-	if (panel->request_vsync && (sleeping == AWAKE)) {
-		wake_lock_timeout(&msmfb->idle_lock, HZ/4);
-		panel->request_vsync(panel, &msmfb->vsync_callback);
-	} else {
-		if (!hrtimer_active(&msmfb->fake_vsync)) {
-			hrtimer_start(&msmfb->fake_vsync,
-				      ktime_set(0, NSEC_PER_SEC/60),
-				      HRTIMER_MODE_REL);
-		}
-	}
+    if (g_panel_state == PANEL_REDUCED)
+    {
+        msmfb_start_dma(msmfb);
+    }
+    else
+    {
+        /* if the panel is all the way on wait for vsync, otherwise sleep
+         * for 16 ms (long enough for the dma to panel) and then begin dma */
+        msmfb->vsync_request_time = ktime_get();
+        if (panel->request_vsync && (sleeping == AWAKE)) {
+            wake_lock_timeout(&msmfb->idle_lock, HZ/4);
+            panel->request_vsync(panel, &msmfb->vsync_callback);
+        } else {
+            if (!hrtimer_active(&msmfb->fake_vsync)) {
+                hrtimer_start(&msmfb->fake_vsync,
+                          ktime_set(0, NSEC_PER_SEC/60),
+                          HRTIMER_MODE_REL);
+            }
+        }
+    }
 }
 
 static void msmfb_update(struct fb_info *info, uint32_t left, uint32_t top,

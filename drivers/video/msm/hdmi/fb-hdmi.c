@@ -59,6 +59,7 @@ static int mirroring = 0;
 int g_frame_done = 0;
 int g_last_blit = 0;
 int g_blit_busy = 0;
+int g_panel_state = PANEL_FULL;
 
 >>>>>>> a8f436c... video: msm: hdmi: changes to fix blitting in mirror mode, enabling tear free mirroring
 struct update_info_t {
@@ -93,6 +94,8 @@ struct hdmifb_info {
 
 static struct mdp_device *mdp;
 static struct hdmi_device *hdmi;
+
+struct mirror_statistics mirror_stats;
 
 static unsigned PP[16];
 
@@ -161,7 +164,7 @@ static int hdmifb_set_par(struct fb_info *info)
 
 	HDMI_DBG("set res (%d, %d)\n", var->xres, var->yres);
 	timing = hdmi->set_res(hdmi, var);
-	panel->adjust_timing(panel, timing, var->xres, var->yres);
+	panel->adjust_timing(panel, timing, var->xres, var->yres, var->bits_per_pixel);
 	hdmi_post_change(hinfo, var);
 
 	mdp->set_output_format(mdp, var->bits_per_pixel);
@@ -385,6 +388,7 @@ static int hdmifb_blit(struct fb_info *info, void __user *p)
         if (ret)
             break;
     }
+    mirror_stats.blitsCompleted++;
     mirroring_unlock();
 	return ret;
 >>>>>>> a8f436c... video: msm: hdmi: changes to fix blitting in mirror mode, enabling tear free mirroring
@@ -539,7 +543,12 @@ static int hdmifb_ioctl(struct fb_info *p, unsigned int cmd, unsigned long arg)
         _hdmi_fb->mirroring = 0;
 =======
 
-        if (val == 0)   mirroring = 1;
+        if (val == 0)
+        {
+            mirroring = 1;
+            memset(&mirror_stats, 0, sizeof(struct mirror_statistics));
+            mirror_stats.statisticsTime = ktime_to_ns(ktime_get());
+        }
         else            mirroring = 0;
 >>>>>>> a8f436c... video: msm: hdmi: changes to fix blitting in mirror mode, enabling tear free mirroring
 		break;
@@ -559,6 +568,8 @@ static int hdmifb_ioctl(struct fb_info *p, unsigned int cmd, unsigned long arg)
 	case HDMI_ENABLE:
 		get_user(val, (unsigned __user *) arg);
 		ret = hdmifb_pause(p, 0);
+        memset(&mirror_stats, 0, sizeof(struct mirror_statistics));
+        mirror_stats.statisticsTime = ktime_to_ns(ktime_get());
 		break;
 	case HDMI_GET_STATE:
 		ret = put_user(test_bit(hdmi_enabled, &hdmi_fb->state),
@@ -603,6 +614,7 @@ static int hdmifb_ioctl(struct fb_info *p, unsigned int cmd, unsigned long arg)
 			&dinfo, sizeof(dinfo));
 		break;
 	}
+<<<<<<< HEAD
 
     case HDMI_GET_MIRRORING:
         ret = put_user(hdmi_fb->mirroring, (unsigned __user *) arg);
@@ -632,6 +644,29 @@ static int hdmifb_ioctl(struct fb_info *p, unsigned int cmd, unsigned long arg)
     case HDMI_SET_VSYNC_MODE:
         get_user(val, (unsigned __user *) arg);
         hdmi_fb->vsyncMode = val;
+=======
+    case HDMI_GET_STATISTICS:
+        {
+            struct mirror_statistics temp;
+            memcpy(&temp, &mirror_stats, sizeof(struct mirror_statistics));
+            temp.statisticsTime = ktime_to_ns(ktime_get()) - mirror_stats.statisticsTime;
+            ret = copy_to_user((unsigned __user *) arg, &temp, sizeof(struct mirror_statistics));
+
+            /* This little dirty secret allows us to force a new blit */
+            g_last_blit = 0;
+
+            /* And we clear the stats, because we often want to measure in "blocks" */
+            memset(&mirror_stats, 0, sizeof(struct mirror_statistics));
+            mirror_stats.statisticsTime = ktime_to_ns(ktime_get());
+        }
+        break;
+    case HDMI_GET_PANEL_STATE:
+        ret = put_user(g_panel_state, (unsigned __user *) arg);
+        break;
+    case HDMI_SET_PANEL_STATE:
+        get_user(val, (unsigned __user *) arg);
+        g_panel_state = val;
+>>>>>>> 3124f89... Moer improvementz
         ret = 0;
         break;
 	default:
