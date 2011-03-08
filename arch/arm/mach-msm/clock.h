@@ -27,11 +27,15 @@
 #define CLKFLAG_NOINVERT		0x00000002
 #define CLKFLAG_NONEST			0x00000004
 #define CLKFLAG_NORESET			0x00000008
+#define CLKFLAG_HANDLE			0x00000010
 
 #define CLK_FIRST_AVAILABLE_FLAG	0x00000100
 #define CLKFLAG_AUTO_OFF		0x00000200
 #define CLKFLAG_MIN			0x00000400
 #define CLKFLAG_MAX			0x00000800
+#define CLKFLAG_SHARED			0x00001000
+#define CLKFLAG_ARCH_QSD8X50		(0x00020000)
+#define CLKFLAG_ARCH_ALL		(0xffff0000)
 
 struct clk_ops {
 	int (*enable)(unsigned id);
@@ -55,8 +59,15 @@ struct clk {
 	const char *name;
 	struct clk_ops *ops;
 	const char *dbg_name;
-	struct list_head list;
+	struct hlist_node list;
 	struct device *dev;
+	struct hlist_head handles;
+};
+
+struct clk_handle {
+	struct clk clk;
+	struct clk *source;
+	unsigned long rate;
 };
 
 #define A11S_CLK_CNTL_ADDR		(MSM_CSR_BASE + 0x100)
@@ -69,10 +80,10 @@ struct clk {
 #define CLOCK_DBG_NAME(x)
 #endif
 
-#define CLOCK(clk_name, clk_id, clk_dev, clk_flags) {	\
+#define CLOCK(clk_name, clk_id, clk_dev, clk_flags, clk_arch) {	\
 	.name = clk_name, \
 	.id = clk_id, \
-	.flags = clk_flags, \
+	.flags = (clk_flags) | ((clk_arch) & CLKFLAG_ARCH_ALL), \
 	.dev = clk_dev, \
 	 CLOCK_DBG_NAME(#clk_id) \
 	}
@@ -104,6 +115,9 @@ int msm_clock_require_tcxo(unsigned long *reason, int nbits);
 int msm_clock_get_name(uint32_t id, char *name, uint32_t size);
 int ebi1_clk_set_min_rate(enum clkvote_client client, unsigned long rate);
 unsigned long clk_get_max_axi_khz(void);
+
+void clk_enter_sleep(int from_idle);
+void clk_exit_sleep(void);
 
 #endif
 

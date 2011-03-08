@@ -324,7 +324,8 @@ unsigned long invalidate_mapping_pages(struct address_space *mapping,
 {
 	struct pagevec pvec;
 	pgoff_t next = start;
-	unsigned long ret = 0;
+	unsigned long ret;
+	unsigned long count = 0;
 	int i;
 
 	pagevec_init(&pvec, 0);
@@ -351,8 +352,16 @@ unsigned long invalidate_mapping_pages(struct address_space *mapping,
 			if (lock_failed)
 				continue;
 
-			ret += invalidate_inode_page(page);
-
+			ret = invalidate_inode_page(page);
+			/*
+			 * If the page is dirty or under writeback, we can not
+			 * invalidate it now.  But we assume that attempted
+			 * invalidation is a hint that the page is no longer
+			 * of interest and try to speed up its reclaim.
+			 */
+			if (!ret && (PageDirty(page) || PageWriteback(page)))
+				deactivate_page(page);
+			count += ret;
 			unlock_page(page);
 			if (next > end)
 				break;
@@ -361,7 +370,7 @@ unsigned long invalidate_mapping_pages(struct address_space *mapping,
 		mem_cgroup_uncharge_end();
 		cond_resched();
 	}
-	return ret;
+	return count;
 }
 EXPORT_SYMBOL(invalidate_mapping_pages);
 

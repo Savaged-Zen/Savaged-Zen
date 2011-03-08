@@ -28,7 +28,35 @@ config IRQ_WORK
 	bool
 	depends on HAVE_IRQ_WORK
 
+config GINGERBREAD
+	bool "Build for Android 2.3+ (lose compatibility)"
+	select BCM4329_ENABLE_CSCAN 
+	select BCM4329_PNO_SUPPORT
+	default y
+	---help---
+	  Select this option to build the kernel to work completely with
+	  Android 2.3+ (Gingerbread or higher roms). If building for 
+	  Android 2.2 (Froyo) or lower, say N here.
+
+	  ***WARNING***
+	  Saying Y here will potentially cause issues on older (pre-2.3)
+	  android versions. Saying N here could cause some odd driver behavior
+	  on 2.3 roms.
+
 menu "General setup"
+
+config SCHED_BFS
+	bool "BFS cpu scheduler"
+	---help---
+	  The Brain Fuck CPU Scheduler for excellent interactivity and
+	  responsiveness on the desktop and solid scalability on normal
+          hardware. Not recommended for 4096 CPUs.
+
+	  Currently incompatible with the Group CPU scheduler, and RCU TORTURE
+          TEST so these options are disabled.
+
+          Say Y here.
+	default y
 
 config EXPERIMENTAL
 	bool "Prompt for development and/or incomplete code/drivers"
@@ -563,6 +591,7 @@ config PROC_PID_CPUSET
 
 config CGROUP_CPUACCT
 	bool "Simple CPU accounting cgroup subsystem"
+	depends on !SCHED_BFS
 	help
 	  Provides a simple Resource Controller for monitoring the
 	  total CPU consumed by the tasks in a cgroup.
@@ -629,7 +658,7 @@ config CGROUP_MEM_RES_CTLR_SWAP_ENABLED
 
 menuconfig CGROUP_SCHED
 	bool "Group CPU scheduler"
-	depends on EXPERIMENTAL
+	depends on EXPERIMENTAL && !SCHED_BFS
 	default n
 	help
 	  This feature lets CPU scheduler recognize task groups and control CPU
@@ -741,6 +770,20 @@ config NET_NS
 
 endif # NAMESPACES
 
+config SCHED_AUTOGROUP
+	bool "Automatic process group scheduling"
+	select EVENTFD
+	select CGROUPS
+	select CGROUP_SCHED
+	select FAIR_GROUP_SCHED
+	depends on !SCHED_BFS
+	help
+	  This option optimizes the scheduler for common desktop workloads by
+	  automatically creating and populating task groups.  This separation
+	  of workloads isolates aggressive CPU burners (like build jobs) from
+	  desktop applications.  Task group autogeneration is currently based
+	  upon task session.
+
 config MM_OWNER
 	bool
 
@@ -829,6 +872,12 @@ config SYSCTL
 
 config ANON_INODES
 	bool
+
+config PANIC_TIMEOUT
+	int "Default panic timeout"
+	default 0
+	help
+	  Set default panic timeout.
 
 menuconfig EMBEDDED
 	bool "Configure standard kernel features (for small systems)"
@@ -1002,6 +1051,15 @@ config SHMEM
 	  option replaces shmem and tmpfs with the much simpler ramfs code,
 	  which may be appropriate on small systems without swap.
 
+config ASHMEM
+	bool "Enable the Anonymous Shared Memory Subsystem"
+	default n
+	depends on SHMEM || TINY_SHMEM
+	help
+	  The ashmem subsystem is a new shared memory allocator, similar to
+	  POSIX SHM but with different behavior and sporting a simpler
+	  file-based API.
+
 config AIO
 	bool "Enable AIO support" if EMBEDDED
 	default y
@@ -1120,7 +1178,7 @@ config COMPAT_BRK
 
 choice
 	prompt "Choose SLAB allocator"
-	default SLUB
+	default SLQB
 	help
 	   This option allows to select a slab allocator.
 
@@ -1140,6 +1198,11 @@ config SLUB
 	   of queues of objects. SLUB can use memory efficiently
 	   and has enhanced diagnostics. SLUB is the default choice for
 	   a slab allocator.
+
+config SLQB
+	bool "SLQB (Queued allocator)"
+	help
+	  SLQB is a proposed new slab allocator.
 
 config SLOB
 	depends on EMBEDDED
@@ -1197,7 +1260,7 @@ config HAVE_GENERIC_DMA_COHERENT
 config SLABINFO
 	bool
 	depends on PROC_FS
-	depends on SLAB || SLUB_DEBUG
+	depends on SLAB || SLUB_DEBUG || SLQB
 	default y
 
 config RT_MUTEXES

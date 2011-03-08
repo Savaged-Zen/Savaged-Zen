@@ -21,12 +21,29 @@
 #define PHYS_OFFSET		UL(0x00000000)
 #elif defined(CONFIG_ARCH_QSD8X50)
 #define PHYS_OFFSET		UL(0x20000000)
+#define RESET_VECTOR		UL(0x00000000)
 #elif defined(CONFIG_ARCH_MSM7X30)
 #define PHYS_OFFSET		UL(0x00200000)
+#define RESET_VECTOR		UL(0x00000000)
 #elif defined(CONFIG_ARCH_MSM8X60)
 #define PHYS_OFFSET		UL(0x40200000)
+#define RESET_VECTOR		UL(0x00000000)
+#else
+#ifdef CONFIG_MACH_SAPPHIRE
+#define PHYS_OFFSET		UL(0x02000000)
+#define RESET_VECTOR		UL(0x00000000)
 #else
 #define PHYS_OFFSET		UL(0x10000000)
+#define RESET_VECTOR		UL(0x00000000)
+#endif
+#endif
+
+#define HAS_ARCH_IO_REMAP_PFN_RANGE
+
+#define CONSISTENT_DMA_SIZE (4*SZ_1M)
+
+#ifdef CONFIG_ARCH_MSM_SCORPION
+#define arch_has_speculative_dfetch()  1
 #endif
 
 #endif

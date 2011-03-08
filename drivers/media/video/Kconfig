@@ -961,7 +961,11 @@ config USB_S2255
 	  This driver can be compiled as a module, called s2255drv.
 
 endif # V4L_USB_DRIVERS
+
 endif # VIDEO_CAPTURE_DRIVERS
+
+# MSM camera does not require V4L2
+source "drivers/media/video/msm/Kconfig"
 
 menuconfig V4L_MEM2MEM_DRIVERS
 	bool "Memory-to-memory multimedia devices"

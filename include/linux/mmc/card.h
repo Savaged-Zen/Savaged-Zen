@@ -109,6 +109,8 @@ struct mmc_card {
 #define MMC_TYPE_SD		1		/* SD card */
 #define MMC_TYPE_SDIO		2		/* SDIO card */
 #define MMC_TYPE_SD_COMBO	3		/* SD combo (IO+mem) card */
+#define MMC_TYPE_SDIO_WIMAX	4		/* SDIO card of WIMAX */
+
 	unsigned int		state;		/* (our) card state */
 #define MMC_STATE_PRESENT	(1<<0)		/* present in sysfs */
 #define MMC_STATE_READONLY	(1<<1)		/* card is read-only */
@@ -146,6 +148,7 @@ struct mmc_card {
 	struct sdio_func_tuple	*tuples;	/* unknown common tuples */
 
 	struct dentry		*debugfs_root;
+	unsigned int		removed;
 };
 
 #define mmc_card_mmc(c)		((c)->type == MMC_TYPE_MMC)
