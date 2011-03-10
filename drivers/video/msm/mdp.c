@@ -29,10 +29,13 @@
 #include <mach/msm_iomap.h>
 #include <mach/msm_fb.h>
 #include <linux/platform_device.h>
+#include <linux/htc_hdmi.h>
 
 #include "mdp_hw.h"
 #include "mdp_ppp.h"
 #include <asm/mach-types.h>
+
+extern struct mirror_statistics mirror_stats;
 
 struct class *mdp_class;
 
@@ -175,6 +178,7 @@ static irqreturn_t mdp_isr(int irq, void *data)
     if (status & MDP_LCDC_UNDERFLOW)
     {
         pr_err("%s: LCDC Underflow\n", __func__);
+        mirror_stats.underflows++;
     }
 
 	status &= mdp_irq_mask;

@@ -54,6 +54,14 @@ DEFINE_MUTEX(blit_dma_mutex);
 static int mutexUsed = 0;
 static int mirroring = 0;
 
+/* For reference, sleeping 16.6666 milliseconds is 60 fps */
+#define MIN_WAIT_TIME_DMA_TO_DMA            0
+#define MIN_WAIT_TIME_DMA_TO_BLIT           4
+#define MIN_WAIT_TIME_BLIT_TO_BLIT          4
+#define MIN_WAIT_TIME_BLIT_TO_DMA           0
+
+#define POST_BLIT_SLEEP                     3
+
 #define BITS_PER_PIXEL 16
 
 int g_frame_done = 0;
@@ -61,7 +69,13 @@ int g_last_blit = 0;
 int g_blit_busy = 0;
 int g_panel_state = PANEL_FULL;
 
+<<<<<<< HEAD
 >>>>>>> a8f436c... video: msm: hdmi: changes to fix blitting in mirror mode, enabling tear free mirroring
+=======
+static int g_lastLockIoctl = -1;
+static ktime_t g_lastLockRelease;
+
+>>>>>>> 9cf33ed... Alpha+1
 struct update_info_t {
 	int left;
 	int top;
@@ -177,11 +191,39 @@ static int hdmifb_set_par(struct fb_info *info)
 	return 0;
 }
 
-void mirroring_lock(void)
+void mirroring_lock(int ioctl)
 {
+    int minWaitTime;
+
     if (mirroring) {
         mutex_lock(&blit_dma_mutex);
         mutexUsed = 1;
+
+        if (ioctl == g_lastLockIoctl)
+        {
+            if (ioctl == HDMI_BLIT)     minWaitTime = MIN_WAIT_TIME_BLIT_TO_BLIT;
+            else                        minWaitTime = MIN_WAIT_TIME_DMA_TO_DMA;
+        }
+        else
+        {
+            if (ioctl == HDMI_BLIT)     minWaitTime = MIN_WAIT_TIME_DMA_TO_BLIT;
+            else                        minWaitTime = MIN_WAIT_TIME_BLIT_TO_DMA;
+        }
+    
+        if (minWaitTime)
+        {
+            ktime_t now = ktime_get();
+            int64_t dt = ktime_to_ns(ktime_sub(now, g_lastLockRelease));
+            do_div(dt, NSEC_PER_SEC / 1000);
+        
+            if (dt >= 0 && dt < minWaitTime)
+            {
+                int sleepTime = (int) minWaitTime - dt;
+                msleep(sleepTime);
+            }
+        }
+    
+        g_lastLockIoctl = ioctl;
     }
     return;
 }
@@ -190,6 +232,8 @@ void mirroring_unlock(void)
 {
     if (mutexUsed)
     {
+        if (g_lastLockIoctl == HDMI_BLIT)   msleep(POST_BLIT_SLEEP);
+        g_lastLockRelease = ktime_get();
         mutex_unlock(&blit_dma_mutex);
     }
     return;
@@ -375,7 +419,7 @@ static int hdmifb_blit(struct fb_info *info, void __user *p)
 =======
     // We want to cancel any pending panel DMA to release the mutex ASAP
     g_blit_busy = 1;
-    mirroring_lock();
+    mirroring_lock(HDMI_BLIT);
     g_blit_busy = 0;
     for (i = 0; i < req_list.count; i++) {
         struct mdp_blit_req_list *list =
@@ -884,6 +928,7 @@ static int hdmifb_probe(struct platform_device *pdev)
 	printk(KERN_DEBUG "%s\n", __func__);
 
     failed_callback.func = 1;
+    g_lastLockRelease = ktime_get();
 
 	if (!panel) {
 		pr_err("hdmi_fb_probe: no platform data\n");

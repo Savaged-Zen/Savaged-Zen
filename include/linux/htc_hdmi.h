@@ -83,6 +83,7 @@ struct mirror_statistics {
     unsigned int    droppedPanelFrames;     /* Number of pan_update requests to panel we dropped */
     unsigned int    panelFramesRequested;   /* Number of panel frames requested */
     unsigned int    blitsCompleted;         /* Number of completed blits */
+    unsigned int    underflows;             /* Number of times we underflowed the LCDC */
     s64             statisticsTime;         /* Mirror time, in ns */
 };
 

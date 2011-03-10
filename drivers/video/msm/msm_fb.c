@@ -44,7 +44,7 @@ extern int g_frame_done;
 extern int g_blit_busy;
 extern int g_panel_state;
 
-void mirroring_lock(void);
+void mirroring_lock(int ioctl);
 void mirroring_unlock(void);
 
 extern struct mirror_statistics mirror_stats;
@@ -201,9 +201,6 @@ static void msmfb_handle_dma_interrupt(struct msmfb_callback *callback)
 	msmfb->frame_done = msmfb->frame_requested;
     g_frame_done = msmfb->frame_done;
 
-    // If mirroring, release our mutex
-    mirroring_unlock();
-
 	if (msmfb->sleeping == UPDATING &&
 	    msmfb->frame_done == msmfb->update_frame) {
 		DLOG(SUSPEND_RESUME, "full update completed\n");
@@ -223,6 +220,10 @@ static void msmfb_handle_dma_interrupt(struct msmfb_callback *callback)
 #endif
 	spin_unlock_irqrestore(&msmfb->update_lock, irq_flags);
 	wake_up(&msmfb->frame_wq);
+
+    // If mirroring, release our mutex
+    mirroring_unlock();
+
 }
 
 static int msmfb_start_dma(struct msmfb_info *msmfb)
@@ -341,6 +342,7 @@ static void msmfb_pan_update(struct fb_info *info, uint32_t left, uint32_t top,
     if (g_blit_busy)
     {
         // We're going to drop this pan/update request
+        mirror_stats.droppedPanelFrames++;
         return;
     }
 
@@ -360,8 +362,8 @@ static void msmfb_pan_update(struct fb_info *info, uint32_t left, uint32_t top,
 	/* Jay, 8/1/09' */
 	msmfb_set_var(msmfb->fb->screen_base, yoffset);
 #endif
-        if (msmfb->sleeping != AWAKE)
-                DLOG(SUSPEND_RESUME, "pan_update in state(%d)\n", msmfb->sleeping);
+    if (msmfb->sleeping != AWAKE)
+            DLOG(SUSPEND_RESUME, "pan_update in state(%d)\n", msmfb->sleeping);
 
 restart:
     if (g_blit_busy)
@@ -369,7 +371,7 @@ restart:
         // We're going to drop this pan/update request
         return;
     }
-    mirroring_lock();
+    mirroring_lock(0);
 
     spin_lock_irqsave(&msmfb->update_lock, irq_flags);
 
