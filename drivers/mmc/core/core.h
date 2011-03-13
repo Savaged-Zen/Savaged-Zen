@@ -62,8 +62,6 @@ int mmc_attach_mmc(struct mmc_host *host);
 int mmc_attach_sd(struct mmc_host *host);
 int mmc_attach_sdio(struct mmc_host *host);
 
-void mmc_fixup_device(struct mmc_card *card);
-
 /* Module parameters */
 extern int use_spi_crc;
 
