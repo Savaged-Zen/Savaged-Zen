@@ -581,7 +581,7 @@ static int samsung_oled_panel_unblank(struct msm_lcdc_panel_ops *ops)
 	gpio_set_value(INCREDIBLEC_LCD_RST_ID1, 0);
 	udelay(20);
 	gpio_set_value(INCREDIBLEC_LCD_RST_ID1, 1);
-	msleep(20);
+	hr_msleep(20);
 
 	clk_enable(spi_clk);
 
@@ -593,7 +593,7 @@ static int samsung_oled_panel_unblank(struct msm_lcdc_panel_ops *ops)
 	table_sel_idx = 0;
 	gamma_table_bank_select();
 	samsung_oled_set_gamma_val(last_val);
-	msleep(250);
+	hr_msleep(250);
 	lcm_writeb(0x14, 0x03);
 	clk_disable(spi_clk);
 
@@ -613,7 +613,7 @@ static int samsung_oled_panel_blank(struct msm_lcdc_panel_ops *ops)
 	mdelay(1);
 	lcm_writeb(0x1d, 0xa1);
 	clk_disable(spi_clk);
-	msleep(200);
+	hr_msleep(200);
 
 	gpio_set_value(INCREDIBLEC_LCD_RST_ID1, 0);
 	samsung_oled_panel_gpio_switch(0);
@@ -960,19 +960,19 @@ static int sony_tft_panel_unblank(struct msm_lcdc_panel_ops *ops)
 	}
 
 	sony_tft_panel_power(1);
-	msleep(45);
+	hr_msleep(45);
 
 	clk_enable(spi_clk);
 	qspi_send_9bit(0x0, 0x11);
-	msleep(5);
+	hr_msleep(5);
 	qspi_send_9bit(0x0, 0x3a);
 	if (is_sony_RGB666())
 		qspi_send_9bit(0x1, 0x06);
 	else
 		qspi_send_9bit(0x1, 0x05);
-	msleep(100);
+	hr_msleep(100);
 	qspi_send_9bit(0x0, 0x29);
-	msleep(20);
+	hr_msleep(20);
 
 	//init gamma setting
 	if(!is_sony_with_gamma())
@@ -995,7 +995,7 @@ static int sony_tft_panel_unblank(struct msm_lcdc_panel_ops *ops)
 		qspi_send_9bit(0x1, 0x12);
 	}
 	clk_disable(spi_clk);
-	msleep(100);
+	hr_msleep(100);
 	tft_panel_on = 1;
 	sony_tft_set_pwm_val(last_val);
 
@@ -1017,7 +1017,7 @@ static int sony_tft_panel_blank(struct msm_lcdc_panel_ops *ops)
 	qspi_send_9bit(0x0, 0x10);
 	clk_disable(spi_clk);
 
-	msleep(40);
+	hr_msleep(40);
 	sony_tft_panel_power(0);
 	tft_panel_on = 0;
 
