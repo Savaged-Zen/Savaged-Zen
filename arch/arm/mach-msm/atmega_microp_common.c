@@ -78,7 +78,7 @@ static int i2c_read_block(struct i2c_client *client, uint8_t addr,
 
 	cdata = i2c_get_clientdata(client);
 	mutex_lock(&cdata->microp_i2c_rw_mutex);
-	msleep(1);
+	hr_msleep(1);
 	for (retry = 0; retry <= I2C_READ_RETRY_TIMES; retry++) {
 		if (i2c_transfer(client->adapter, msgs, 2) == 2)
 			break;
@@ -127,7 +127,7 @@ static int i2c_write_block(struct i2c_client *client, uint8_t addr,
 		buf[i+1] = data[i];
 
 	mutex_lock(&cdata->microp_i2c_rw_mutex);
-	msleep(1);
+	hr_msleep(1);
 	for (retry = 0; retry <= I2C_WRITE_RETRY_TIMES; retry++) {
 		if (i2c_transfer(client->adapter, msg, 1) == 1)
 			break;
