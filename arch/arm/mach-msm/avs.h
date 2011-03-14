@@ -30,8 +30,9 @@
 #ifndef AVS_H
 #define AVS_H
 
-#define VOLTAGE_MIN  925 /* mV */
-#define VOLTAGE_MAX  1400
+#define VOLTAGE_MIN SUPERSONIC_MIN_UV_MV /* mV */
+#define VOLTAGE_MAX SUPERSONIC_MAX_UV_MV
+#define VOLTAGE_MIN_START 900 // Minimum value to start off with
 #define VOLTAGE_STEP 25
 
 int __init avs_init(int (*set_vdd)(int), u32 freq_cnt, u32 freq_idx);
@@ -83,4 +84,5 @@ static inline void avs_disable(void) {}
 	} while (0);
 
 #endif /* AVS_H */
+
 

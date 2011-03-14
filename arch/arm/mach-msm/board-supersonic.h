@@ -17,6 +17,9 @@
 
 #include <mach/board.h>
 
+#define SUPERSONIC_MIN_UV_MV	(925)
+#define SUPERSONIC_MAX_UV_MV	(1400)
+
 #define MSM_SMI_BASE		0x02B00000
 #define MSM_SMI_SIZE		0x01500000
 
