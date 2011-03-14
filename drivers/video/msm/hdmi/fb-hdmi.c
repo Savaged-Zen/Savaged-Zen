@@ -397,6 +397,13 @@ static int hdmifb_blit(struct fb_info *info, void __user *p)
                 {
                     _hdmi_fb->doubleBuffering = 1;
                 }
+                else
+                {
+                    // Switch us back to buffer 0
+                    mdp->dma(mdp, _hdmi_fb->fb->fix.smem_start, _hdmi_fb->fb->var.xres * 2, 
+                             _hdmi_fb->fb->var.xres, _hdmi_fb->fb->var.yres, 0, 0, 
+                             &_hdmi_fb->dma_callback, _hdmi_fb->panel->interface_type);
+                }
             }
         }
 
