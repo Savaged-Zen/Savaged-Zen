@@ -129,7 +129,7 @@ struct clkctl_acpu_speed acpu_vdd_tbl[] = {
 	{ 1075200, 1275, VOLTAGE_MAX },
 	{ 1113600, 1275, VOLTAGE_MAX },
 	{ 1152000, 1350, VOLTAGE_MAX },
-	{ 1190400, 1350, VOLTAGE_MAX }
+	{ 1190400, 1350, VOLTAGE_MAX },
 	{ 0 },
 };
 
