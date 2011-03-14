@@ -64,6 +64,10 @@
 #include <linux/workqueue.h>
 #include <linux/slab.h>
 
+#ifdef CONFIG_CPU_FREQ_VDD_LEVELS
+#include "board-supersonic.h"
+#endif
+
 #include "avs.h"
 
 #define AVSDSCR_INPUT 0x01004860 /* magic # from circuit designer */
@@ -95,36 +99,86 @@ struct clkctl_acpu_speed {
 	int	 max_vdd;
 };
 
+#ifndef MAX
+# define MAX(A,B) (A>B?A:B)
+#endif // !ndef MAX
 
 struct clkctl_acpu_speed acpu_vdd_tbl[] = {
-	{  19200, 925, 950 },
-	{ 128000, 925, 950 },
-	{ 245000, 900, 925 },
-//  	{ 256000, 950, 975 },
-	{ 384000, 925, 950 },
-	{ 422400, 950, 975 },
-	{ 460800, 950, 975 },
-	{ 499200, 950, 975 },
-	{ 537600, 975, 1000 },
-	{ 576000, 1000, 1050 },
-	{ 614400, 1025, 1075 },
-	{ 652800, 1050, 1100 },
-	{ 691200, 1075, 1125 },
-	{ 729600, 1100, 1150 },
-	{ 768000, 1125, 1175 },
+	{  19200, VOLTAGE_MIN_START, 925 },
+	{ 128000, VOLTAGE_MIN_START, 925 },
+	{ 245000, VOLTAGE_MIN_START, 925 },
+//  	{ 256000, VOLTAGE_MIN_START, 950 },
+	{ 384000, VOLTAGE_MIN_START, 950 },
+	{ 422400, VOLTAGE_MIN_START, 975 },
+	{ 460800, VOLTAGE_MIN_START, 975 },
+	{ 499200, MAX(VOLTAGE_MIN_START,950), 975 },
+	{ 537600, MAX(VOLTAGE_MIN_START,975), 1000 },
+	{ 576000, MAX(VOLTAGE_MIN_START,1000), 1050 },
+	{ 614400, MAX(VOLTAGE_MIN_START,1025), 1075 },
+	{ 652800, MAX(VOLTAGE_MIN_START,1050), 1100 },
+	{ 691200, MAX(VOLTAGE_MIN_START,1075), 1125 },
+	{ 729600, MAX(VOLTAGE_MIN_START,1100), 1150 },
+	{ 768000, MAX(VOLTAGE_MIN_START,1125), 1175 },
 	{ 806400, 1150, 1200 },
 	{ 844800, 1175, 1225 },
 	{ 883200, 1200, 1250 },
 	{ 921600, 1225, 1275 },
 	{ 960000, 1225, 1275 },
 	{ 998400, 1225, 1275 },
-	{ 1036800, 1275, 1325 },
-	{ 1075200, 1275, 1325 },
-	{ 1113600, 1275, 1325 },
-	{ 1152000, 1350, 1400 },
-	{ 1190400, 1350, 1400 },
+	{ 1036800, 1275, VOLTAGE_MAX },
+	{ 1075200, 1275, VOLTAGE_MAX },
+	{ 1113600, 1275, VOLTAGE_MAX },
+	{ 1152000, 1350, VOLTAGE_MAX },
+	{ 1190400, 1350, VOLTAGE_MAX }
 	{ 0 },
 };
+
+#if defined(CONFIG_CPU_FREQ_VDD_LEVELS) && defined(CONFIG_MSM_CPU_AVS)
+ssize_t acpuclk_get_vdd_levels_havs_str(char *buf)
+{
+	int i, len = 0;
+	if (buf)
+	{
+	  for (i = 0; acpu_vdd_tbl[i].acpu_khz; i++) 
+	    {
+	      len += sprintf(buf + len, "%8u: %4d %4d\n", acpu_vdd_tbl[i].acpu_khz, acpu_vdd_tbl[i].min_vdd, acpu_vdd_tbl[i].max_vdd);
+	    }
+	}
+	return len;
+}
+
+void acpuclk_set_vdd_havs(unsigned acpu_khz, int min_vdd, int max_vdd    ) {
+	int i;
+	min_vdd = min_vdd / 25 * 25;	//! regulator only accepts multiples of 25 (mV)
+	max_vdd=max_vdd/25*25;
+
+	mutex_lock(&avs_lock);
+
+	for (i = 0; acpu_vdd_tbl[i].acpu_khz; i++) {
+		if (acpu_khz == 0) {
+			acpu_vdd_tbl[i].min_vdd = min(max((acpu_vdd_tbl[i].min_vdd + min_vdd), SUPERSONIC_MIN_UV_MV), SUPERSONIC_MAX_UV_MV);
+			acpu_vdd_tbl[i].max_vdd = min(max((acpu_vdd_tbl[i].max_vdd + max_vdd), SUPERSONIC_MIN_UV_MV), SUPERSONIC_MAX_UV_MV);
+		} else if (acpu_vdd_tbl[i].acpu_khz == acpu_khz) {
+			acpu_vdd_tbl[i].min_vdd = min(max(min_vdd, SUPERSONIC_MIN_UV_MV), SUPERSONIC_MAX_UV_MV);
+			acpu_vdd_tbl[i].max_vdd = min(max(max_vdd, SUPERSONIC_MIN_UV_MV), SUPERSONIC_MAX_UV_MV);
+		}
+	}
+
+	/*  for (i = 0; i < TEMPRS*avs_state.freq_cnt; i++) {
+	avs_state.avs_v[i] = VOLTAGE_MAX;
+	}*/
+
+	avs_reset_delays(AVSDSCR_INPUT);
+	avs_set_tscsr(TSCSR_INPUT);
+	//avs_state.changing = 0;
+	//avs_state.freq_idx = -1;
+	//avs_state.vdd = -1;
+	//avs_adjust_freq(freq_idx, 0);
+
+	mutex_unlock(&avs_lock);
+}
+
+#endif // CONFIG_CPU_FREQ_VDD_LEVELS
 
 static int avs_debug = 0;
 module_param(avs_debug, int, S_IRUGO|S_IWUSR);
@@ -148,7 +202,8 @@ static void avs_update_voltage_table(short *vdd_table)
 	cur_voltage = avs_state.vdd;
 
 	avscsr = avs_test_delays();
-	AVSDEBUG("avscsr=%x, avsdscr=%x\n", avscsr, avs_get_avsdscr());
+	AVSDEBUG("vdd_table=0x%X\n", (unsigned int)vdd_table);
+	AVSDEBUG("avscsr=%x, avsdscr=%x, cur_voltage=%d\n", avscsr, avs_get_avsdscr(), cur_voltage);
 
 	/*
 	 * Read the results for the various unit's AVS delay circuits
@@ -157,6 +212,7 @@ static void avs_update_voltage_table(short *vdd_table)
 	cpu = ((avscsr >> 23) & 2) + ((avscsr >> 16) & 1);
 	vu  = ((avscsr >> 28) & 2) + ((avscsr >> 21) & 1);
 	l2  = ((avscsr >> 29) & 2) + ((avscsr >> 22) & 1);
+	AVSDEBUG("cpu=%d, vu=%d, l2=%d\n", cpu, vu, l2);
 
 	if ((cpu == 3) || (vu == 3) || (l2 == 3)) {
 		printk(KERN_ERR "AVS: Dly Synth O/P error\n");
@@ -183,6 +239,7 @@ static void avs_update_voltage_table(short *vdd_table)
 				vdd_table[i] = acpu_vdd_tbl[i].max_vdd;
 		}
 	} else if ((cpu == 1) && (l2 == 1) && (vu == 1)) {
+	  AVSDEBUG("cur_voltage=%d, min_vdd=%d, vdd_table=%d\n", cur_voltage, acpu_vdd_tbl[cur_freq_idx].min_vdd, vdd_table[cur_freq_idx]);
 		if ((cur_voltage - VOLTAGE_STEP >= VOLTAGE_MIN) &&
 		    (cur_voltage - VOLTAGE_STEP >= acpu_vdd_tbl[cur_freq_idx].min_vdd) &&
 		    (cur_voltage <= vdd_table[cur_freq_idx])) {
@@ -205,14 +262,17 @@ static void avs_update_voltage_table(short *vdd_table)
  */
 static short avs_get_target_voltage(int freq_idx, bool update_table)
 {
-	unsigned cur_tempr = GET_TEMPR();
-	unsigned temp_index = cur_tempr*avs_state.freq_cnt;
+	unsigned	cur_tempr = GET_TEMPR();
+	unsigned	temp_index = cur_tempr*avs_state.freq_cnt;
+	short		*vdd_table;
 
 	/* Table of voltages vs frequencies for this temp */
-	short *vdd_table = avs_state.avs_v + temp_index;
+	vdd_table = avs_state.avs_v + temp_index;
 
-	if (update_table)
+	AVSDEBUG("vdd_table[%d]=%d\n", freq_idx, vdd_table[freq_idx]);
+	if ((update_table) || (vdd_table[freq_idx]==VOLTAGE_MAX)) {
 		avs_update_voltage_table(vdd_table);
+	}
 
 	if (vdd_table[freq_idx] > acpu_vdd_tbl[freq_idx].max_vdd) {
 		if (avs_debug)
@@ -238,7 +298,8 @@ static int avs_set_target_voltage(int freq_idx, bool update_table)
 	int ctr = 5, rc = 0, new_voltage;
 
 	if (freq_idx < 0 || freq_idx >= avs_state.freq_cnt) {
-		AVSDEBUG("Out of range :%d\n", freq_idx);
+		if (avs_debug)
+			printk("Out of range :%d\n", freq_idx);
 		return -EINVAL;
 	}
 
@@ -339,7 +400,6 @@ static int __init avs_work_init(void)
 		printk(KERN_ERR "AVS initialization failed\n");
 		return -EFAULT;
 	}
-	printk(KERN_ERR "AVS initialization success\n");
 	avs_timer_init();
 
 	return 1;
