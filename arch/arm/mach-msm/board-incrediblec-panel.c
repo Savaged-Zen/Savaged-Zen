@@ -593,7 +593,7 @@ static int samsung_oled_panel_unblank(struct msm_lcdc_panel_ops *ops)
 	table_sel_idx = 0;
 	gamma_table_bank_select();
 	samsung_oled_set_gamma_val(last_val);
-	hr_msleep(250);
+	hr_msleep(100);
 	lcm_writeb(0x14, 0x03);
 	clk_disable(spi_clk);
 
@@ -613,7 +613,7 @@ static int samsung_oled_panel_blank(struct msm_lcdc_panel_ops *ops)
 	mdelay(1);
 	lcm_writeb(0x1d, 0xa1);
 	clk_disable(spi_clk);
-	hr_msleep(200);
+	hr_msleep(100);
 
 	gpio_set_value(INCREDIBLEC_LCD_RST_ID1, 0);
 	samsung_oled_panel_gpio_switch(0);
