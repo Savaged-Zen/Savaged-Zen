@@ -33,7 +33,6 @@
 #include "../../../../arch/arm/mach-msm/proc_comm.h"
 #include "../../../../arch/arm/mach-msm/clock-pcom.h"
 
-
 #if 1
 #define HDMI_DBG(s...) printk("[hdmi/lcdc]" s)
 #else

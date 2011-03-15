@@ -73,23 +73,24 @@ struct mdp_lcdc_info {
 	struct msm_lcdc_platform_data	*pdata;
 	uint32_t fb_start;
 
-	struct msmfb_callback		frame_start_cb;
-	wait_queue_head_t		vsync_waitq;
-	int				got_vsync;
-	unsigned			color_format;
+	struct msmfb_callback frame_start_cb;
+	wait_queue_head_t vsync_waitq;
+	int got_vsync;
+	unsigned color_format;
+
 	struct {
-		uint32_t	clk_rate;
-		uint32_t	hsync_ctl;
-		uint32_t	vsync_period;
-		uint32_t	vsync_pulse_width;
-		uint32_t	display_hctl;
-		uint32_t	display_vstart;
-		uint32_t	display_vend;
-		uint32_t	hsync_skew;
-		uint32_t	polarity;
+		uint32_t clk_rate;
+		uint32_t hsync_ctl;
+		uint32_t vsync_period;
+		uint32_t vsync_pulse_width;
+		uint32_t display_hctl;
+		uint32_t display_vstart;
+		uint32_t display_vend;
+		uint32_t hsync_skew;
+		uint32_t polarity;
 	} parms;
-	atomic_t        blank_count;
-	struct mutex    blank_lock;
+	atomic_t	blank_count;
+	struct mutex	blank_lock;
 };
 
 struct panel_icm_info {
