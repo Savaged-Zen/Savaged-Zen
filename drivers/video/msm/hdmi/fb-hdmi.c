@@ -46,41 +46,8 @@
 #define HDMI_DBG(s...) do {} while (0)
 #endif
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 #define BITS_PER_PIXEL 16
 
-=======
-DEFINE_MUTEX(blit_dma_mutex);
-static int mutexUsed = 0;
-static int mirroring = 0;
-
-/* For reference, sleeping 16.6666 milliseconds is 60 fps */
-#define MIN_WAIT_TIME_DMA_TO_DMA            0
-#define MIN_WAIT_TIME_DMA_TO_BLIT           4
-#define MIN_WAIT_TIME_BLIT_TO_BLIT          4
-#define MIN_WAIT_TIME_BLIT_TO_DMA           0
-
-#define POST_BLIT_SLEEP                     3
-
-#define BITS_PER_PIXEL 16
-
-int g_frame_done = 0;
-int g_last_blit = 0;
-int g_blit_busy = 0;
-int g_panel_state = PANEL_FULL;
-
-<<<<<<< HEAD
->>>>>>> a8f436c... video: msm: hdmi: changes to fix blitting in mirror mode, enabling tear free mirroring
-=======
-static int g_lastLockIoctl = -1;
-static ktime_t g_lastLockRelease;
-
->>>>>>> 9cf33ed... Alpha+1
-=======
-#define BITS_PER_PIXEL 16
-
->>>>>>> e2e0a18... Beta Build
 struct update_info_t {
 	int left;
 	int top;
@@ -326,10 +293,6 @@ static int hdmifb_blit(struct fb_info *info, void __user *p)
 	if (copy_from_user(&req_list, p, sizeof(req_list)))
 		return -EFAULT;
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> e2e0a18... Beta Build
 	for (i = 0; i < req_list.count; i++) {
 		struct mdp_blit_req_list *list =
 			(struct mdp_blit_req_list *)p;
@@ -339,50 +302,6 @@ static int hdmifb_blit(struct fb_info *info, void __user *p)
 
         /* Copy the requested blit in case we're mirroring */
         if (_hdmi_fb->mirroring)
-<<<<<<< HEAD
-        {
-            int previousValue = _hdmi_fb->doubleBuffering;
-
-            memcpy(&_hdmi_fb->mirrorReq, &req, sizeof(struct mdp_blit_req));
-
-            /* Default double-buffering off */
-            _hdmi_fb->doubleBuffering = 0;
-
-            /* Are we rotating? */
-            if ((req.flags & MDP_ROT_MASK) == MDP_ROT_90 || (req.flags & MDP_ROT_MASK) == MDP_ROT_270)
-            {
-                /* Are we scaling at the same time? */
-                if (req.src_rect.w != req.dst_rect.w || req.src_rect.h != req.dst_rect.h)
-                {
-                    _hdmi_fb->doubleBuffering = 1;
-                }
-            }
-
-            if (previousValue == 1 && _hdmi_fb->doubleBuffering == 0)
-            {
-                // Switch us back to buffer 0
-                mdp->dma(mdp, _hdmi_fb->fb->fix.smem_start, _hdmi_fb->fb->var.xres * 2, 
-                         _hdmi_fb->fb->var.xres, _hdmi_fb->fb->var.yres, 0, 0, 
-                         &_hdmi_fb->dma_callback, _hdmi_fb->panel->interface_type);
-            }
-        }
-
-        ret = mdp->blit(mdp, info, &req);
-		if (ret)
-			return ret;
-	}
-	return 0;
-=======
-    // We want to cancel any pending panel DMA to release the mutex ASAP
-    g_blit_busy = 1;
-    mirroring_lock(HDMI_BLIT);
-    g_blit_busy = 0;
-    for (i = 0; i < req_list.count; i++) {
-        struct mdp_blit_req_list *list =
-            (struct mdp_blit_req_list *)p;
-        if (copy_from_user(&req, &list->req[i], sizeof(req)))
-=======
->>>>>>> e2e0a18... Beta Build
         {
             memcpy(&_hdmi_fb->mirrorReq, &req, sizeof(struct mdp_blit_req));
 
@@ -477,78 +396,6 @@ void hdmi_DoBlit(int fb0Offset)
             yoffset = 0;
         }
     }
-<<<<<<< HEAD
-    mirror_stats.blitsCompleted++;
-    mirroring_unlock();
-	return ret;
->>>>>>> a8f436c... video: msm: hdmi: changes to fix blitting in mirror mode, enabling tear free mirroring
-}
-
-void reportUnderflow(void)
-{
-    if (_hdmi_fb)   _hdmi_fb->mirror_stats.underflows++;
-}
-
-int hdmi_usePanelSync(void)
-{
-    if (_hdmi_fb->mirroring && 
-        (_hdmi_fb->vsyncMode == VSYNC_NONE || _hdmi_fb->vsyncMode == VSYNC_HDMI_ONLY))
-        return 0;
-    return 1;
-}
-
-int hdmi_useHdmiSync(void)
-{
-    if (_hdmi_fb->mirroring && 
-        (_hdmi_fb->vsyncMode == VSYNC_NONE || _hdmi_fb->vsyncMode == VSYNC_PANEL_ONLY))
-        return 0;
-    return 1;
-}
-
-void blit_on_vsync(struct mdp_blit_req* blitReq)
-{
-    struct msm_panel_data *panel = _hdmi_fb->panel;
-
-    /* Request mirror blit and vsync callback */
-    _hdmi_fb->vsyncBlitReq = blitReq;
-    panel->request_vsync(panel, &_hdmi_fb->vsync_callback);
-    return;
-}
-
-void hdmi_DoBlit(int fb0Offset)
-{
-    int yoffset = 0;
-
-    /* Always track frame counts, so we can measure FPS of panel-only mode */
-    _hdmi_fb->mirror_stats.frames++;
-
-    /* This handles the disabled case */
-    if (_hdmi_fb->mirroring == 0 || _hdmi_fb->mirrorReq.src.width == 0)
-        return;
-
-    /* Verify HDMI is enabled */
-    if ((test_bit(fb_enabled, &_hdmi_fb->state) == 0) ||
-        (test_bit(hdmi_enabled, &_hdmi_fb->state) == 0))
-        return;
-
-    /* Set the proper offsets */
-    _hdmi_fb->mirrorReq.src.offset = fb0Offset;
-
-    if (_hdmi_fb->doubleBuffering)
-    {
-        if (_hdmi_fb->mirrorReq.dst.offset == 0)
-        {
-            yoffset = _hdmi_fb->mirrorReq.dst.height;
-            _hdmi_fb->mirrorReq.dst.offset = yoffset * _hdmi_fb->mirrorReq.dst.width * BITS_PER_PIXEL / 8;
-        }
-        else
-        {
-            _hdmi_fb->mirrorReq.dst.offset = 0;
-            yoffset = 0;
-        }
-    }
-=======
->>>>>>> e2e0a18... Beta Build
     else
     {
         if (_hdmi_fb->mirrorReq.dst.offset != 0)
@@ -631,22 +478,7 @@ static int hdmifb_ioctl(struct fb_info *p, unsigned int cmd, unsigned long arg)
 		get_user(val, (unsigned __user *) arg);
 		//pr_info("[hdmi] SET_MODE: %d\n", val);
 		ret = hdmifb_change_mode(p, val);
-<<<<<<< HEAD
-<<<<<<< HEAD
         _hdmi_fb->mirroring = 0;
-=======
-
-        if (val == 0)
-        {
-            mirroring = 1;
-            memset(&mirror_stats, 0, sizeof(struct mirror_statistics));
-            mirror_stats.statisticsTime = ktime_to_ns(ktime_get());
-        }
-        else            mirroring = 0;
->>>>>>> a8f436c... video: msm: hdmi: changes to fix blitting in mirror mode, enabling tear free mirroring
-=======
-        _hdmi_fb->mirroring = 0;
->>>>>>> e2e0a18... Beta Build
 		break;
 	case HDMI_GET_MODE:
 /*
@@ -708,10 +540,6 @@ static int hdmifb_ioctl(struct fb_info *p, unsigned int cmd, unsigned long arg)
 			&dinfo, sizeof(dinfo));
 		break;
 	}
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> e2e0a18... Beta Build
 
     case HDMI_GET_MIRRORING:
         ret = put_user(hdmi_fb->mirroring, (unsigned __user *) arg);
@@ -722,7 +550,6 @@ static int hdmifb_ioctl(struct fb_info *p, unsigned int cmd, unsigned long arg)
         memset(&hdmi_fb->mirror_stats, 0, sizeof(struct mirror_statistics));
         hdmi_fb->mirror_stats.statisticsTime = ktime_to_ns(ktime_get());
         break;
-<<<<<<< HEAD
     case HDMI_GET_STATISTICS:
         {
             struct mirror_statistics temp;
@@ -742,33 +569,6 @@ static int hdmifb_ioctl(struct fb_info *p, unsigned int cmd, unsigned long arg)
     case HDMI_SET_VSYNC_MODE:
         get_user(val, (unsigned __user *) arg);
         hdmi_fb->vsyncMode = val;
-=======
-=======
->>>>>>> e2e0a18... Beta Build
-    case HDMI_GET_STATISTICS:
-        {
-            struct mirror_statistics temp;
-
-            memcpy(&temp, &hdmi_fb->mirror_stats, sizeof(struct mirror_statistics));
-            temp.statisticsTime = ktime_to_ns(ktime_get()) - hdmi_fb->mirror_stats.statisticsTime;
-            ret = copy_to_user((unsigned __user *) arg, &temp, sizeof(struct mirror_statistics));
-        }
-        break;
-    case HDMI_CLEAR_STATISTICS:
-        memset(&hdmi_fb->mirror_stats, 0, sizeof(struct mirror_statistics));
-        hdmi_fb->mirror_stats.statisticsTime = ktime_to_ns(ktime_get());
-        break;
-    case HDMI_GET_VSYNC_MODE:
-        ret = put_user(hdmi_fb->vsyncMode, (unsigned __user *) arg);
-        break;
-    case HDMI_SET_VSYNC_MODE:
-        get_user(val, (unsigned __user *) arg);
-<<<<<<< HEAD
-        g_panel_state = val;
->>>>>>> 3124f89... Moer improvementz
-=======
-        hdmi_fb->vsyncMode = val;
->>>>>>> e2e0a18... Beta Build
         ret = 0;
         break;
 	default:
