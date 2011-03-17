@@ -57,10 +57,10 @@ static void print_one_rcu_data(struct seq_file *m, struct rcu_data *rdp)
 		   rdp->passed_quiesc, rdp->passed_quiesc_completed,
 		   rdp->qs_pending);
 #ifdef CONFIG_NO_HZ
-	seq_printf(m, " dt=%d/%d dn=%d df=%lu",
-		   rdp->dynticks->dynticks,
+	seq_printf(m, " dt=%d/%d/%d df=%lu",
+		   atomic_read(&rdp->dynticks->dynticks),
 		   rdp->dynticks->dynticks_nesting,
-		   rdp->dynticks->dynticks_nmi,
+		   rdp->dynticks->dynticks_nmi_nesting,
 		   rdp->dynticks_fqs);
 #endif /* #ifdef CONFIG_NO_HZ */
 	seq_printf(m, " of=%lu ri=%lu", rdp->offline_fqs, rdp->resched_ipi);
@@ -115,9 +115,9 @@ static void print_one_rcu_data_csv(struct seq_file *m, struct rcu_data *rdp)
 		   rdp->qs_pending);
 #ifdef CONFIG_NO_HZ
 	seq_printf(m, ",%d,%d,%d,%lu",
-		   rdp->dynticks->dynticks,
+		   atomic_read(&rdp->dynticks->dynticks),
 		   rdp->dynticks->dynticks_nesting,
-		   rdp->dynticks->dynticks_nmi,
+		   rdp->dynticks->dynticks_nmi_nesting,
 		   rdp->dynticks_fqs);
 #endif /* #ifdef CONFIG_NO_HZ */
 	seq_printf(m, ",%lu,%lu", rdp->offline_fqs, rdp->resched_ipi);
@@ -130,7 +130,7 @@ static int show_rcudata_csv(struct seq_file *m, void *unused)
 {
 	seq_puts(m, "\"CPU\",\"Online?\",\"c\",\"g\",\"pq\",\"pqc\",\"pq\",");
 #ifdef CONFIG_NO_HZ
-	seq_puts(m, "\"dt\",\"dt nesting\",\"dn\",\"df\",");
+	seq_puts(m, "\"dt\",\"dt nesting\",\"dt NMI nesting\",\"df\",");
 #endif /* #ifdef CONFIG_NO_HZ */
 	seq_puts(m, "\"of\",\"ri\",\"ql\",\"b\",\"ci\",\"co\",\"ca\"\n");
 #ifdef CONFIG_TREE_PREEMPT_RCU
@@ -157,34 +157,97 @@ static const struct file_operations rcudata_csv_fops = {
 	.release = single_release,
 };
 
+#ifdef CONFIG_RCU_BOOST
+
+static void print_one_rcu_node_boost(struct seq_file *m, struct rcu_node *rnp)
+{
+	seq_printf(m,  "%d:%d tasks=%c%c%c%c ntb=%lu neb=%lu nnb=%lu "
+		   "j=%04x bt=%04x\n",
+		   rnp->grplo, rnp->grphi,
+		   "T."[list_empty(&rnp->blkd_tasks)],
+		   "N."[!rnp->gp_tasks],
+		   "E."[!rnp->exp_tasks],
+		   "B."[!rnp->boost_tasks],
+		   rnp->n_tasks_boosted, rnp->n_exp_boosts,
+		   rnp->n_normal_boosts,
+		   (int)(jiffies & 0xffff),
+		   (int)(rnp->boost_time & 0xffff));
+	seq_printf(m, "%s: nt=%lu egt=%lu bt=%lu nb=%lu ny=%lu nos=%lu\n",
+	           "     balk",
+		   rnp->n_balk_blkd_tasks,
+		   rnp->n_balk_exp_gp_tasks,
+		   rnp->n_balk_boost_tasks,
+		   rnp->n_balk_notblocked,
+		   rnp->n_balk_notyet,
+		   rnp->n_balk_nos);
+}
+
+static int show_rcu_node_boost(struct seq_file *m, void *unused)
+{
+	struct rcu_node *rnp;
+	
+	rcu_for_each_leaf_node(rcu_preempt_state, rnp)
+		print_one_rcu_node_boost(m, rnp);
+	return 0;
+}
+
+static int rcu_node_boost_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, show_rcu_node_boost, NULL);
+}
+
+static const struct file_operations rcu_node_boost_fops = {
+	.owner = THIS_MODULE,
+	.open = rcu_node_boost_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+/*
+ * Create the rcuboost debugfs entry.  Note that the return value
+ * is the standard zero for success, non-zero for failure.
+ */
+static int rcu_boost_trace_create_file(struct dentry *rcudir)
+{
+	return IS_ERR_VALUE(debugfs_create_file("rcuboost", 0444, rcudir, NULL,
+						&rcu_node_boost_fops));
+}
+
+#else /* #ifdef CONFIG_RCU_BOOST */
+
+static int rcu_boost_trace_create_file(struct dentry *rcudir)
+{
+	return 0;  /* There cannot be an error if we didn't create it! */
+}
+
+#endif /* #else #ifdef CONFIG_RCU_BOOST */
+
 static void print_one_rcu_state(struct seq_file *m, struct rcu_state *rsp)
 {
 	unsigned long gpnum;
 	int level = 0;
-	int phase;
 	struct rcu_node *rnp;
 
 	gpnum = rsp->gpnum;
 	seq_printf(m, "c=%lu g=%lu s=%d jfq=%ld j=%x "
-		      "nfqs=%lu/nfqsng=%lu(%lu) fqlh=%lu oqlen=%ld\n",
+		      "nfqs=%lu/nfqsng=%lu(%lu) fqlh=%lu\n",
 		   rsp->completed, gpnum, rsp->signaled,
 		   (long)(rsp->jiffies_force_qs - jiffies),
 		   (int)(jiffies & 0xffff),
 		   rsp->n_force_qs, rsp->n_force_qs_ngp,
 		   rsp->n_force_qs - rsp->n_force_qs_ngp,
-		   rsp->n_force_qs_lh, rsp->orphan_qlen);
+		   rsp->n_force_qs_lh);
 	for (rnp = &rsp->node[0]; rnp - &rsp->node[0] < NUM_RCU_NODES; rnp++) {
 		if (rnp->level != level) {
 			seq_puts(m, "\n");
 			level = rnp->level;
 		}
-		phase = gpnum & 0x1;
-		seq_printf(m, "%lx/%lx %c%c>%c%c %d:%d ^%d    ",
+		seq_printf(m, "%lx/%lx %c%c>%c %d:%d ^%d    ",
 			   rnp->qsmask, rnp->qsmaskinit,
-			   "T."[list_empty(&rnp->blocked_tasks[phase])],
-			   "E."[list_empty(&rnp->blocked_tasks[phase + 2])],
-			   "T."[list_empty(&rnp->blocked_tasks[!phase])],
-			   "E."[list_empty(&rnp->blocked_tasks[!phase + 2])],
+			   ".G"[rnp->gp_tasks != NULL],
+			   ".E"[rnp->exp_tasks != NULL],
+			   ".T"[!list_empty(&rnp->blkd_tasks)],
 			   rnp->grplo, rnp->grphi, rnp->grpnum);
 	}
 	seq_puts(m, "\n");
@@ -300,36 +363,40 @@ static const struct file_operations rcu_pending_fops = {
 
 static struct dentry *rcudir;
 
-static int __init rcuclassic_trace_init(void)
+static int __init rcutree_trace_init(void)
 {
 	struct dentry *retval;
 
 	rcudir = debugfs_create_dir("rcu", NULL);
-	if (!rcudir)
+	if (IS_ERR_VALUE(rcudir))
 		goto free_out;
 
 	retval = debugfs_create_file("rcudata", 0444, rcudir,
 						NULL, &rcudata_fops);
-	if (!retval)
+	if (IS_ERR_VALUE(retval))
 		goto free_out;
 
 	retval = debugfs_create_file("rcudata.csv", 0444, rcudir,
 						NULL, &rcudata_csv_fops);
-	if (!retval)
+	if (IS_ERR_VALUE(retval))
+		goto free_out;
+
+	retval = rcu_boost_trace_create_file(rcudir);
+	if (retval)
 		goto free_out;
 
 	retval = debugfs_create_file("rcugp", 0444, rcudir, NULL, &rcugp_fops);
-	if (!retval)
+	if (IS_ERR_VALUE(retval))
 		goto free_out;
 
 	retval = debugfs_create_file("rcuhier", 0444, rcudir,
 						NULL, &rcuhier_fops);
-	if (!retval)
+	if (IS_ERR_VALUE(retval))
 		goto free_out;
 
 	retval = debugfs_create_file("rcu_pending", 0444, rcudir,
 						NULL, &rcu_pending_fops);
-	if (!retval)
+	if (IS_ERR_VALUE(retval))
 		goto free_out;
 	return 0;
 free_out:
@@ -337,14 +404,14 @@ free_out:
 	return 1;
 }
 
-static void __exit rcuclassic_trace_cleanup(void)
+static void __exit rcutree_trace_cleanup(void)
 {
 	debugfs_remove_recursive(rcudir);
 }
 
 
-module_init(rcuclassic_trace_init);
-module_exit(rcuclassic_trace_cleanup);
+module_init(rcutree_trace_init);
+module_exit(rcutree_trace_cleanup);
 
 MODULE_AUTHOR("Paul E. McKenney");
 MODULE_DESCRIPTION("Read-Copy Update tracing for hierarchical implementation");
