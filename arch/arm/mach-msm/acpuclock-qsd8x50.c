@@ -32,7 +32,11 @@
 #include "proc_comm.h"
 
 #ifdef CONFIG_CPU_FREQ_VDD_LEVELS
+#ifdef CONFIG_MACH_INCREDIBLEC
 #include "board-incrediblec.h"
+#elif CONFIG_MACH_SUPERSONIC
+#include "board-supersonic.h"
+#endif
 #endif
 
 
@@ -114,16 +118,16 @@ struct clkctl_acpu_speed acpu_freq_tbl[] = {
         { 921600, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x18, 0, 1275, 128000 },
         { 960000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x19, 0, 1275, 128000 },
         { 998400, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x1A, 0, 1275, 128000 },
-	{ 1036800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1B, 0, 1275, 128000 },
-	{ 1075200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1C, 0, 1275, 128000 },
-	{ 1113600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1D, 0, 1275, 128000 },
+		{ 1036800, CCTL(CLK_TCXO, 1),			SRC_SCPLL, 0x1B, 0, 1275, 128000 },
+		{ 1075200, CCTL(CLK_TCXO, 1),			SRC_SCPLL, 0x1C, 0, 1275, 128000 },
+		{ 1113600, CCTL(CLK_TCXO, 1),			SRC_SCPLL, 0x1D, 0, 1275, 128000 },
 #ifdef CONFIG_JESUS_PHONE
-	{ 1152000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1E, 0, 1300, 128000 },
-	{ 1190400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1F, 0, 1325, 128000 },
-	{ 1228800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x20, 0, 1350, 128000 },
-	{ 1267200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x21, 0, 1350, 128000 },
+		{ 1152000, CCTL(CLK_TCXO, 1),			SRC_SCPLL, 0x1E, 0, 1300, 128000 },
+		{ 1190400, CCTL(CLK_TCXO, 1),			SRC_SCPLL, 0x1F, 0, 1325, 128000 },
+		{ 1228800, CCTL(CLK_TCXO, 1),			SRC_SCPLL, 0x20, 0, 1350, 128000 },
+		{ 1267200, CCTL(CLK_TCXO, 1),			SRC_SCPLL, 0x21, 0, 1350, 128000 },
 #endif
-	{ 0 },
+		{ 0 },
 };
 
 /* select the standby clock that is used when switching scpll
@@ -645,6 +649,8 @@ ssize_t acpuclk_get_vdd_levels_str(char *buf)
 	return len;
 }
 
+#ifdef CONFIG_MACH_INCREDIBLEC
+
 void acpuclk_set_vdd(unsigned acpu_khz, int vdd)
 {
 	int i;
@@ -662,6 +668,28 @@ void acpuclk_set_vdd(unsigned acpu_khz, int vdd)
 	}
 	mutex_unlock(&drv_state.lock);
 }
+
+#elif CONFIG_MACH_SUPERSONIC
+
+void acpuclk_set_vdd(unsigned acpu_khz, int vdd)
+{
+	int i;
+	vdd = vdd / 25 * 25;	//! regulator only accepts multiples of 25 (mV)
+	mutex_lock(&drv_state.lock);
+	for (i = 0; acpu_freq_tbl[i].acpu_khz; i++)
+	{
+		if (freq_table[i].frequency != CPUFREQ_ENTRY_INVALID)
+		{
+			if (acpu_khz == 0)
+				acpu_freq_tbl[i].vdd = min(max((acpu_freq_tbl[i].vdd + vdd), SUPERSONIC_MIN_UV_MV), SUPERSONIC_MAX_UV_MV);
+			else if (acpu_freq_tbl[i].acpu_khz == acpu_khz)
+				acpu_freq_tbl[i].vdd = min(max(vdd, SUPERSONIC_MIN_UV_MV), SUPERSONIC_MAX_UV_MV);
+		}
+	}
+	mutex_unlock(&drv_state.lock);
+}
+
+#endif
 
 #endif
 

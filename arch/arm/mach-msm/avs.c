@@ -65,7 +65,11 @@
 #include <linux/slab.h>
 
 #ifdef CONFIG_CPU_FREQ_VDD_LEVELS
+#ifdef CONFIG_MACH_INCREDIBLEC
 #include "board-incrediblec.h"
+#elif CONFIG_MACH_SUPERSONIC
+#include "board-supersonic.h"
+#endif
 #endif
 
 #include "avs.h"
@@ -151,7 +155,9 @@ void acpuclk_set_vdd_havs(unsigned acpu_khz, int min_vdd, int max_vdd    ) {
   max_vdd=max_vdd/25*25;
 
   mutex_lock(&avs_lock);
- 
+
+#ifdef CONFIG_MACH_INCREDIBLEC
+
   for (i = 0; acpu_vdd_tbl[i].acpu_khz; i++) {
     if (acpu_khz == 0) {
       acpu_vdd_tbl[i].min_vdd = min(max((acpu_vdd_tbl[i].min_vdd + min_vdd), INCREDIBLEC_MIN_UV_MV), INCREDIBLEC_MAX_UV_MV);
@@ -161,6 +167,20 @@ void acpuclk_set_vdd_havs(unsigned acpu_khz, int min_vdd, int max_vdd    ) {
       acpu_vdd_tbl[i].max_vdd = min(max(max_vdd, INCREDIBLEC_MIN_UV_MV), INCREDIBLEC_MAX_UV_MV);
     }
   }
+
+#elif CONFIG_MACH_SUPERSONIC
+
+  for (i = 0; acpu_vdd_tbl[i].acpu_khz; i++) {
+    if (acpu_khz == 0) {
+      acpu_vdd_tbl[i].min_vdd = min(max((acpu_vdd_tbl[i].min_vdd + min_vdd), SUPERSONIC_MIN_UV_MV), SUPERSONIC_MAX_UV_MV);
+      acpu_vdd_tbl[i].max_vdd = min(max((acpu_vdd_tbl[i].max_vdd + max_vdd), SUPERSONIC_MIN_UV_MV), SUPERSONIC_MAX_UV_MV);
+    } else if (acpu_vdd_tbl[i].acpu_khz == acpu_khz) {
+      acpu_vdd_tbl[i].min_vdd = min(max(min_vdd, SUPERSONIC_MIN_UV_MV), SUPERSONIC_MAX_UV_MV);
+      acpu_vdd_tbl[i].max_vdd = min(max(max_vdd, SUPERSONIC_MIN_UV_MV), SUPERSONIC_MAX_UV_MV);
+    }
+  }
+
+#endif
 
   /*  for (i = 0; i < TEMPRS*avs_state.freq_cnt; i++) {
     avs_state.avs_v[i] = VOLTAGE_MAX;

@@ -30,8 +30,13 @@
 #ifndef AVS_H
 #define AVS_H
 
+#ifdef CONFIG_MACH_INCREDIBLEC
 #define VOLTAGE_MIN  		INCREDIBLEC_MIN_UV_MV /* mV */
 #define VOLTAGE_MAX  		INCREDIBLEC_MAX_UV_MV
+#elif CONFIG_MACH_SUPERSONIC
+#define VOLTAGE_MIN  		SUPERSONIC_MIN_UV_MV /* mV */
+#define VOLTAGE_MAX  		SUPERSONIC_MAX_UV_MV
+#endif
 #define	VOLTAGE_MIN_START	900	// Minimum value to start off with
 #define VOLTAGE_STEP 		5
 
