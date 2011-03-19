@@ -318,7 +318,7 @@ int hfsplus_file_fsync(struct file *file, int datasync)
 	/*
 	 * Sync inode metadata into the catalog and extent trees.
 	 */
-	sync_inode_metadata(inode, 1);
+	sync_inode_metadata(inode, datasync, 1);
 
 	/*
 	 * And explicitly write out the btrees.
