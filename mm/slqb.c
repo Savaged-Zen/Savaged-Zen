@@ -2711,7 +2711,7 @@ static void kmem_cache_reap(void)
 	struct kmem_cache *s;
 	int node;
 
-	lock_memory_hotplug();
+	down_read(&slqb_lock);
 	on_each_cpu(kmem_cache_reap_percpu, (void *)0, 1);
 	on_each_cpu(kmem_cache_reap_percpu, (void *)1, 1);
 
@@ -2731,7 +2731,7 @@ static void kmem_cache_reap(void)
 			spin_unlock_irq(&n->list_lock);
 		}
 	}
-	unlock_memory_hotplug();
+	up_read(&slqb_lock);
 }
 #endif
 

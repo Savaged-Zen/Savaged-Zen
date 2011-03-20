@@ -1381,8 +1381,7 @@ static int check_prlimit_permission(struct task_struct *task)
 	const struct cred *cred = current_cred(), *tcred;
 
 	tcred = __task_cred(task);
-	if (current != task &&
-	    (cred->uid != tcred->euid ||
+	if ((cred->uid != tcred->euid ||
 	     cred->uid != tcred->suid ||
 	     cred->uid != tcred->uid  ||
 	     cred->gid != tcred->egid ||

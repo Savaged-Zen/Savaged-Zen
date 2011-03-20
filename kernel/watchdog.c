@@ -27,7 +27,7 @@
 #include <asm/irq_regs.h>
 #include <linux/perf_event.h>
 
-int watchdog_enabled = 1;
+int watchdog_enabled;
 int __read_mostly softlockup_thresh = 60;
 
 static DEFINE_PER_CPU(unsigned long, watchdog_touch_ts);
@@ -42,6 +42,9 @@ static DEFINE_PER_CPU(unsigned long, hrtimer_interrupts);
 static DEFINE_PER_CPU(unsigned long, hrtimer_interrupts_saved);
 static DEFINE_PER_CPU(struct perf_event *, watchdog_ev);
 #endif
+
+static int no_watchdog;
+
 
 /* boot commands */
 /*
@@ -72,7 +75,7 @@ __setup("softlockup_panic=", softlockup_panic_setup);
 
 static int __init nowatchdog_setup(char *str)
 {
-	watchdog_enabled = 0;
+	no_watchdog = 1;
 	return 1;
 }
 __setup("nowatchdog", nowatchdog_setup);
@@ -80,7 +83,7 @@ __setup("nowatchdog", nowatchdog_setup);
 /* deprecated */
 static int __init nosoftlockup_setup(char *str)
 {
-	watchdog_enabled = 0;
+	no_watchdog = 1;
 	return 1;
 }
 __setup("nosoftlockup", nosoftlockup_setup);
@@ -427,6 +430,9 @@ static int watchdog_enable(int cpu)
 		wake_up_process(p);
 	}
 
+	/* if any cpu succeeds, watchdog is considered enabled for the system */
+	watchdog_enabled = 1;
+
 	return 0;
 }
 
@@ -454,16 +460,12 @@ static void watchdog_disable(int cpu)
 static void watchdog_enable_all_cpus(void)
 {
 	int cpu;
-
-	watchdog_enabled = 0;
+	int result = 0;
 
 	for_each_online_cpu(cpu)
-		if (!watchdog_enable(cpu))
-			/* if any cpu succeeds, watchdog is considered
-			   enabled for the system */
-			watchdog_enabled = 1;
+		result += watchdog_enable(cpu);
 
-	if (!watchdog_enabled)
+	if (result)
 		printk(KERN_ERR "watchdog: failed to be enabled on some cpus\n");
 
 }
@@ -471,6 +473,9 @@ static void watchdog_enable_all_cpus(void)
 static void watchdog_disable_all_cpus(void)
 {
 	int cpu;
+
+	if (no_watchdog)
+		return;
 
 	for_each_online_cpu(cpu)
 		watchdog_disable(cpu);
@@ -491,12 +496,10 @@ int proc_dowatchdog_enabled(struct ctl_table *table, int write,
 {
 	proc_dointvec(table, write, buffer, length, ppos);
 
-	if (write) {
-		if (watchdog_enabled)
-			watchdog_enable_all_cpus();
-		else
-			watchdog_disable_all_cpus();
-	}
+	if (watchdog_enabled)
+		watchdog_enable_all_cpus();
+	else
+		watchdog_disable_all_cpus();
 	return 0;
 }
 
@@ -525,8 +528,7 @@ cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
 		break;
 	case CPU_ONLINE:
 	case CPU_ONLINE_FROZEN:
-		if (watchdog_enabled)
-			err = watchdog_enable(hotcpu);
+		err = watchdog_enable(hotcpu);
 		break;
 #ifdef CONFIG_HOTPLUG_CPU
 	case CPU_UP_CANCELED:
@@ -550,6 +552,9 @@ static int __init spawn_watchdog_task(void)
 {
 	void *cpu = (void *)(long)smp_processor_id();
 	int err;
+
+	if (no_watchdog)
+		return 0;
 
 	err = cpu_callback(&cpu_nfb, CPU_UP_PREPARE, cpu);
 	WARN_ON(notifier_to_errno(err));

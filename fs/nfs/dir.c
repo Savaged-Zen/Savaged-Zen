@@ -33,6 +33,7 @@
 #include <linux/namei.h>
 #include <linux/mount.h>
 #include <linux/sched.h>
+#include <linux/vmalloc.h>
 #include <linux/kmemleak.h>
 
 #include "delegation.h"
@@ -458,26 +459,25 @@ out:
 /* Perform conversion from xdr to cache array */
 static
 int nfs_readdir_page_filler(nfs_readdir_descriptor_t *desc, struct nfs_entry *entry,
-				struct page **xdr_pages, struct page *page, unsigned int buflen)
+				void *xdr_page, struct page *page, unsigned int buflen)
 {
 	struct xdr_stream stream;
-	struct xdr_buf buf = {
-		.pages = xdr_pages,
-		.page_len = buflen,
-		.buflen = buflen,
-		.len = buflen,
-	};
-	struct page *scratch;
+	struct xdr_buf buf;
+	__be32 *ptr = xdr_page;
 	struct nfs_cache_array *array;
 	unsigned int count = 0;
 	int status;
 
-	scratch = alloc_page(GFP_KERNEL);
-	if (scratch == NULL)
-		return -ENOMEM;
+	buf.head->iov_base = xdr_page;
+	buf.head->iov_len = buflen;
+	buf.tail->iov_len = 0;
+	buf.page_base = 0;
+	buf.page_len = 0;
+	buf.buflen = buf.head->iov_len;
+	buf.len = buf.head->iov_len;
 
-	xdr_init_decode(&stream, &buf, NULL);
-	xdr_set_scratch_buffer(&stream, page_address(scratch), PAGE_SIZE);
+	xdr_init_decode(&stream, &buf, ptr);
+
 
 	do {
 		status = xdr_decode(desc, entry, &stream);
@@ -506,8 +506,6 @@ int nfs_readdir_page_filler(nfs_readdir_descriptor_t *desc, struct nfs_entry *en
 		} else
 			status = PTR_ERR(array);
 	}
-
-	put_page(scratch);
 	return status;
 }
 
@@ -523,6 +521,7 @@ static
 void nfs_readdir_free_large_page(void *ptr, struct page **pages,
 		unsigned int npages)
 {
+	vm_unmap_ram(ptr, npages);
 	nfs_readdir_free_pagearray(pages, npages);
 }
 
@@ -531,8 +530,9 @@ void nfs_readdir_free_large_page(void *ptr, struct page **pages,
  * to nfs_readdir_free_large_page
  */
 static
-int nfs_readdir_large_page(struct page **pages, unsigned int npages)
+void *nfs_readdir_large_page(struct page **pages, unsigned int npages)
 {
+	void *ptr;
 	unsigned int i;
 
 	for (i = 0; i < npages; i++) {
@@ -541,11 +541,13 @@ int nfs_readdir_large_page(struct page **pages, unsigned int npages)
 			goto out_freepages;
 		pages[i] = page;
 	}
-	return 0;
 
+	ptr = vm_map_ram(pages, npages, 0, PAGE_KERNEL);
+	if (!IS_ERR_OR_NULL(ptr))
+		return ptr;
 out_freepages:
 	nfs_readdir_free_pagearray(pages, i);
-	return -ENOMEM;
+	return NULL;
 }
 
 static
@@ -575,8 +577,8 @@ int nfs_readdir_xdr_to_array(nfs_readdir_descriptor_t *desc, struct page *page, 
 	memset(array, 0, sizeof(struct nfs_cache_array));
 	array->eof_index = -1;
 
-	status = nfs_readdir_large_page(pages, array_size);
-	if (status < 0)
+	pages_ptr = nfs_readdir_large_page(pages, array_size);
+	if (!pages_ptr)
 		goto out_release_array;
 	do {
 		unsigned int pglen;
@@ -585,7 +587,7 @@ int nfs_readdir_xdr_to_array(nfs_readdir_descriptor_t *desc, struct page *page, 
 		if (status < 0)
 			break;
 		pglen = status;
-		status = nfs_readdir_page_filler(desc, &entry, pages, page, pglen);
+		status = nfs_readdir_page_filler(desc, &entry, pages_ptr, page, pglen);
 		if (status < 0) {
 			if (status == -ENOSPC)
 				status = 0;
@@ -1577,7 +1579,6 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode,
 {
 	struct iattr attr;
 	int error;
-	int open_flags = 0;
 
 	dfprintk(VFS, "NFS: create(%s/%ld), %s\n",
 			dir->i_sb->s_id, dir->i_ino, dentry->d_name.name);
@@ -1585,10 +1586,7 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode,
 	attr.ia_mode = mode;
 	attr.ia_valid = ATTR_MODE;
 
-	if ((nd->flags & LOOKUP_CREATE) != 0)
-		open_flags = nd->intent.open.flags;
-
-	error = NFS_PROTO(dir)->create(dir, dentry, &attr, open_flags, NULL);
+	error = NFS_PROTO(dir)->create(dir, dentry, &attr, 0, NULL);
 	if (error != 0)
 		goto out_err;
 	return 0;
