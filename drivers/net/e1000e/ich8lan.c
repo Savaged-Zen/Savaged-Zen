@@ -338,17 +338,12 @@ static s32 e1000_init_phy_params_pchlan(struct e1000_hw *hw)
 	}
 
 	phy->id = e1000_phy_unknown;
-	switch (hw->mac.type) {
-	default:
-		ret_val = e1000e_get_phy_id(hw);
-		if (ret_val)
-			goto out;
-		if ((phy->id != 0) && (phy->id != PHY_REVISION_MASK))
-			break;
-		/* fall-through */
-	case e1000_pch2lan:
+	ret_val = e1000e_get_phy_id(hw);
+	if (ret_val)
+		goto out;
+	if ((phy->id == 0) || (phy->id == PHY_REVISION_MASK)) {
 		/*
-		 * In case the PHY needs to be in mdio slow mode,
+		 * In case the PHY needs to be in mdio slow mode (eg. 82577),
 		 * set slow mode and try to get the PHY id again.
 		 */
 		ret_val = e1000_set_mdio_slow_mode_hv(hw);
@@ -357,7 +352,6 @@ static s32 e1000_init_phy_params_pchlan(struct e1000_hw *hw)
 		ret_val = e1000e_get_phy_id(hw);
 		if (ret_val)
 			goto out;
-		break;
 	}
 	phy->type = e1000e_get_phy_type_from_id(phy->id);
 
