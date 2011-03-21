@@ -177,6 +177,11 @@ struct tag {
 		struct tag_initrd	initrd;
 		struct tag_serialnr	serialnr;
 		struct tag_revision	revision;
+#ifdef CONFIG_MICROP_COMMON
+		struct tag_microp_version       microp_version;
+		struct tag_als_kadc als_kadc;
+		struct tag_ps_kparam    ps_kparam;
+#endif
 		struct tag_videolfb	videolfb;
 		struct tag_cmdline	cmdline;
 

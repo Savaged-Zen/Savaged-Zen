@@ -1319,6 +1319,16 @@ config SERIAL_MSM_CONSOLE
 	depends on SERIAL_MSM=y
 	select SERIAL_CORE_CONSOLE
 
+config SERIAL_VT8500
+	bool "VIA VT8500 on-chip serial port support"
+	depends on ARM && ARCH_VT8500
+	select SERIAL_CORE
+
+config SERIAL_VT8500_CONSOLE
+	bool "VIA VT8500 serial console support"
+	depends on SERIAL_VT8500=y
+	select SERIAL_CORE_CONSOLE
+
 config SERIAL_MSM_CLOCK_CONTROL
 	bool "Allow tty clients to make clock requests to msm uarts."
 	depends on SERIAL_MSM=y
@@ -1350,16 +1360,6 @@ config SERIAL_BCM_BT_LPM
 	default n
 	help
 	  Select this module for Broadcom Bluetooth low power management.
-
-config SERIAL_VT8500
-	bool "VIA VT8500 on-chip serial port support"
-	depends on ARM && ARCH_VT8500
-	select SERIAL_CORE
-
-config SERIAL_VT8500_CONSOLE
-	bool "VIA VT8500 serial console support"
-	depends on SERIAL_VT8500=y
-	select SERIAL_CORE_CONSOLE
 
 config SERIAL_NETX
 	tristate "NetX serial port support"
