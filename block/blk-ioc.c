@@ -65,7 +65,7 @@ static void hlist_sched_exit(struct io_context *ioc, struct hlist_head *list)
 	rcu_read_unlock();
 }
 
-/* Called by the exitting task */
+/* Called by the exiting task */
 void exit_io_context(struct task_struct *task)
 {
 	struct io_context *ioc;

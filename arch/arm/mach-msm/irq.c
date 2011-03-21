@@ -71,6 +71,7 @@ module_param_named(debug_mask, msm_irq_debug_mask, int, S_IRUGO | S_IWUSR | S_IW
 #define VIC_IRQ_VEC_RD      VIC_REG(0x00D0)  /* pending int # */
 #define VIC_IRQ_VEC_PEND_RD VIC_REG(0x00D4)  /* pending vector addr */
 #define VIC_IRQ_VEC_WR      VIC_REG(0x00D8)
+#define VIC_INT_CLEAR0      VIC_REG(0x00B0)
 
 #if defined(CONFIG_ARCH_MSM_SCORPION)
 #define VIC_FIQ_VEC_RD      VIC_REG(0x00DC)
@@ -175,19 +176,18 @@ static uint8_t msm_irq_to_smsm[NR_MSM_IRQS + NR_SIRC_IRQS] = {
 #endif
 };
 
-static void msm_irq_ack(unsigned int irq)
+static void msm_irq_ack(struct irq_data *d)
 {
-	void __iomem *reg = VIC_INT_CLEAR(__bank(irq));
-	irq = 1 << (irq & 31);
-	writel(irq, reg);
+	void __iomem *reg = VIC_INT_CLEAR0 + ((d->irq & 32) ? 4 : 0);
+	writel(1 << (d->irq & 31), reg);
 }
 
-static void msm_irq_mask(unsigned int irq)
+static void msm_irq_mask(struct irq_data *d)
 {
-	void __iomem *reg = VIC_INT_ENCLEAR(__bank(irq));
-	unsigned index = __bank(irq);
-	uint32_t mask = 1UL << (irq & 31);
-	int smsm_irq = msm_irq_to_smsm[irq];
+	void __iomem *reg = VIC_INT_ENCLEAR(__bank(d->irq));
+	unsigned index = __bank(d->irq);
+	uint32_t mask = 1UL << (d->irq & 31);
+	int smsm_irq = msm_irq_to_smsm[d->irq];
 
 	msm_irq_shadow_reg[index].int_en[0] &= ~mask;
 	writel(mask, reg);
@@ -199,12 +199,12 @@ static void msm_irq_mask(unsigned int irq)
 	}
 }
 
-static void msm_irq_unmask(unsigned int irq)
+static void msm_irq_unmask(struct irq_data *d)
 {
-	void __iomem *reg = VIC_INT_ENSET(__bank(irq));
-	unsigned index = __bank(irq);
-	uint32_t mask = 1UL << (irq & 31);
-	int smsm_irq = msm_irq_to_smsm[irq];
+	void __iomem *reg = VIC_INT_ENSET(__bank(d->irq));
+	unsigned index = __bank(d->irq);
+	uint32_t mask = 1UL << (d->irq & 31);
+	int smsm_irq = msm_irq_to_smsm[d->irq];
 
 	msm_irq_shadow_reg[index].int_en[0] |= mask;
 	writel(mask, reg);
@@ -217,14 +217,14 @@ static void msm_irq_unmask(unsigned int irq)
 	}
 }
 
-static int msm_irq_set_wake(unsigned int irq, unsigned int on)
+static int msm_irq_set_wake(struct irq_data *d, unsigned int on)
 {
-	unsigned index = __bank(irq);
-	uint32_t mask = 1UL << (irq & 31);
-	int smsm_irq = msm_irq_to_smsm[irq];
+	unsigned index = __bank(d->irq);
+	uint32_t mask = 1UL << (d->irq & 31);
+	int smsm_irq = msm_irq_to_smsm[d->irq];
 
 	if (smsm_irq == 0) {
-		printk(KERN_ERR "msm_irq_set_wake: bad wakeup irq %d\n", irq);
+		printk(KERN_ERR "msm_irq_set_wake: bad wakeup irq %d\n", d->irq);
 		return -EINVAL;
 	}
 	if (on)
@@ -243,12 +243,12 @@ static int msm_irq_set_wake(unsigned int irq, unsigned int on)
 	return 0;
 }
 
-static int msm_irq_set_type(unsigned int irq, unsigned int flow_type)
+static int msm_irq_set_type(struct irq_data *d, unsigned int flow_type)
 {
-	void __iomem *treg = VIC_INT_TYPE(__bank(irq));
-	void __iomem *preg = VIC_INT_POLARITY(__bank(irq));
-	unsigned index = __bank(irq);
-	int b = 1 << (irq & 31);
+	void __iomem *treg = VIC_INT_TYPE(__bank(d->irq));
+	void __iomem *preg = VIC_INT_POLARITY(__bank(d->irq));
+	unsigned index = __bank(d->irq);
+	int b = 1 << (d->irq & 31);
 	uint32_t polarity;
 	uint32_t type;
 
@@ -263,11 +263,11 @@ static int msm_irq_set_type(unsigned int irq, unsigned int flow_type)
 	type = msm_irq_shadow_reg[index].int_type;
 	if (flow_type & (IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING)) {
 		type |= b;
-		irq_desc[irq].handle_irq = handle_edge_irq;
+		irq_desc[d->irq].handle_irq = handle_edge_irq;
 	}
 	if (flow_type & (IRQF_TRIGGER_HIGH | IRQF_TRIGGER_LOW)) {
 		type &= ~b;
-		irq_desc[irq].handle_irq = handle_level_irq;
+		irq_desc[d->irq].handle_irq = handle_level_irq;
 	}
 	writel(type, treg);
 	msm_irq_shadow_reg[index].int_type = type;
@@ -481,13 +481,12 @@ void msm_irq_exit_sleep3(void)
 }
 
 static struct irq_chip msm_irq_chip = {
-	.name      = "msm",
-	.disable   = msm_irq_mask,
-	.ack       = msm_irq_ack,
-	.mask      = msm_irq_mask,
-	.unmask    = msm_irq_unmask,
-	.set_wake  = msm_irq_set_wake,
-	.set_type  = msm_irq_set_type,
+	.name          = "msm",
+	.irq_ack       = msm_irq_ack,
+	.irq_mask      = msm_irq_mask,
+	.irq_unmask    = msm_irq_unmask,
+	.irq_set_wake  = msm_irq_set_wake,
+	.irq_set_type  = msm_irq_set_type,
 };
 
 void __init msm_init_irq(void)

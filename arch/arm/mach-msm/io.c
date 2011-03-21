@@ -122,6 +122,7 @@ static struct map_desc msm8x60_io_desc[] __initdata = {
 	MSM_DEVICE(QGIC_DIST),
 	MSM_DEVICE(QGIC_CPU),
 	MSM_DEVICE(TMR),
+	MSM_DEVICE(TMR0),
 	MSM_DEVICE(ACC),
 	MSM_DEVICE(GCC),
 };
@@ -175,7 +176,7 @@ __msm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
 #ifdef CONFIG_ARCH_MSM_ARM11
 	if (mtype == MT_DEVICE) {
 		/* The peripherals in the 88000000 - D0000000 range
-		 * are only accessable by type MT_DEVICE_NONSHARED.
+		 * are only accessible by type MT_DEVICE_NONSHARED.
 		 * Adjust mtype as necessary to make this "just work."
 		 */
 		if ((phys_addr >= 0x88000000) && (phys_addr < 0xD0000000))

@@ -665,19 +665,19 @@ void msm_pm_flush_console(void)
 
 	printk("\n");
 	printk(KERN_EMERG "Restarting %s\n", linux_banner);
-	if (!try_acquire_console_sem()) {
-		release_console_sem();
+	if (console_trylock()) {
+		console_unlock();
 		return;
 	}
 
 	mdelay(50);
 
 	local_irq_disable();
-	if (try_acquire_console_sem())
+	if (!console_trylock())
 		printk(KERN_EMERG "msm_restart: Console was locked! Busting\n");
 	else
 		printk(KERN_EMERG "msm_restart: Console was locked!\n");
-	release_console_sem();
+	console_unlock();
 }
 
 static void msm_pm_restart(char str)
