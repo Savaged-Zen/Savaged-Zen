@@ -2902,7 +2902,6 @@ static int relocate_file_extent_cluster(struct inode *inode,
 	struct file_ra_state *ra;
 	int nr = 0;
 	int ret = 0;
-	int dirtied;
 
 	if (!cluster->nr)
 		return 0;
@@ -2979,7 +2978,7 @@ static int relocate_file_extent_cluster(struct inode *inode,
 		}
 
 		btrfs_set_extent_delalloc(inode, page_start, page_end, NULL);
-		dirtied = set_page_dirty(page);
+		set_page_dirty(page);
 
 		unlock_extent(&BTRFS_I(inode)->io_tree,
 			      page_start, page_end, GFP_NOFS);
@@ -2987,8 +2986,7 @@ static int relocate_file_extent_cluster(struct inode *inode,
 		page_cache_release(page);
 
 		index++;
-		if (dirtied)
-			balance_dirty_pages_ratelimited(inode->i_mapping);
+		balance_dirty_pages_ratelimited(inode->i_mapping);
 		btrfs_throttle(BTRFS_I(inode)->root);
 	}
 	WARN_ON(nr != cluster->nr);

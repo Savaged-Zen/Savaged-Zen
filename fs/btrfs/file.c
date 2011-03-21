@@ -804,8 +804,7 @@ static int prepare_uptodate_page(struct page *page, u64 pos)
 static noinline int prepare_pages(struct btrfs_root *root, struct file *file,
 			 struct page **pages, size_t num_pages,
 			 loff_t pos, unsigned long first_index,
-			 unsigned long last_index, size_t write_bytes,
-			 int *nr_dirtied)
+			 unsigned long last_index, size_t write_bytes)
 {
 	struct extent_state *cached_state = NULL;
 	int i;
@@ -882,8 +881,7 @@ again:
 				     GFP_NOFS);
 	}
 	for (i = 0; i < num_pages; i++) {
-		if (!clear_page_dirty_for_io(pages[i]))
-			(*nr_dirtied)++;
+		clear_page_dirty_for_io(pages[i]);
 		set_page_extent_mapped(pages[i]);
 		WARN_ON(!PageLocked(pages[i]));
 	}
@@ -997,8 +995,9 @@ static ssize_t btrfs_file_aio_write(struct kiocb *iocb,
 	}
 
 	iov_iter_init(&i, iov, nr_segs, count, num_written);
-	nrptrs = min(DIV_ROUND_UP(iov_iter_count(&i), PAGE_CACHE_SIZE),
-		     min(16UL, PAGE_CACHE_SIZE / (sizeof(struct page *))));
+	nrptrs = min((iov_iter_count(&i) + PAGE_CACHE_SIZE - 1) /
+		     PAGE_CACHE_SIZE, PAGE_CACHE_SIZE /
+		     (sizeof(struct page *)));
 	pages = kmalloc(nrptrs * sizeof(struct page *), GFP_KERNEL);
 	if (!pages) {
 		ret = -ENOMEM;
@@ -1044,7 +1043,6 @@ static ssize_t btrfs_file_aio_write(struct kiocb *iocb,
 					 offset);
 		size_t num_pages = (write_bytes + PAGE_CACHE_SIZE - 1) >>
 					PAGE_CACHE_SHIFT;
-		int nr_dirtied = 0;
 
 		WARN_ON(num_pages > nrptrs);
 		memset(pages, 0, sizeof(struct page *) * nrptrs);
@@ -1065,7 +1063,7 @@ static ssize_t btrfs_file_aio_write(struct kiocb *iocb,
 
 		ret = prepare_pages(root, file, pages, num_pages,
 				    pos, first_index, last_index,
-				    write_bytes, &nr_dirtied);
+				    write_bytes);
 		if (ret) {
 			btrfs_delalloc_release_space(inode,
 					num_pages << PAGE_CACHE_SHIFT);
@@ -1112,7 +1110,7 @@ static ssize_t btrfs_file_aio_write(struct kiocb *iocb,
 			} else {
 				balance_dirty_pages_ratelimited_nr(
 							inode->i_mapping,
-							nr_dirtied);
+							dirty_pages);
 				if (dirty_pages <
 				(root->leafsize >> PAGE_CACHE_SHIFT) + 1)
 					btrfs_btree_balance_dirty(root, 1);
