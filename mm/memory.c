@@ -193,83 +193,6 @@ static void check_sync_rss_stat(struct task_struct *task)
 
 #endif
 
-#ifdef CONFIG_HAVE_RCU_TABLE_FREE
-
-/*
- * See the comment near struct mmu_table_batch.
- */
-
-static void tlb_remove_table_smp_sync(void *arg)
-{
-	/* Simply deliver the interrupt */
-}
-
-static void tlb_remove_table_one(void *table)
-{
-	/*
-	 * This isn't an RCU grace period and hence the page-tables cannot be
-	 * assumed to be actually RCU-freed.
-	 *
-	 * It is however sufficient for software page-table walkers that rely on
-	 * IRQ disabling. See the comment near struct mmu_table_batch.
-	 */
-	smp_call_function(tlb_remove_table_smp_sync, NULL, 1);
-	__tlb_remove_table(table);
-}
-
-static void tlb_remove_table_rcu(struct rcu_head *head)
-{
-	struct mmu_table_batch *batch;
-	int i;
-
-	batch = container_of(head, struct mmu_table_batch, rcu);
-
-	for (i = 0; i < batch->nr; i++)
-		__tlb_remove_table(batch->tables[i]);
-
-	free_page((unsigned long)batch);
-}
-
-void tlb_table_flush(struct mmu_gather *tlb)
-{
-	struct mmu_table_batch **batch = &tlb->batch;
-
-	if (*batch) {
-		call_rcu_sched(&(*batch)->rcu, tlb_remove_table_rcu);
-		*batch = NULL;
-	}
-}
-
-void tlb_remove_table(struct mmu_gather *tlb, void *table)
-{
-	struct mmu_table_batch **batch = &tlb->batch;
-
-	tlb->need_flush = 1;
-
-	/*
-	 * When there's less then two users of this mm there cannot be a
-	 * concurrent page-table walk.
-	 */
-	if (atomic_read(&tlb->mm->mm_users) < 2) {
-		__tlb_remove_table(table);
-		return;
-	}
-
-	if (*batch == NULL) {
-		*batch = (struct mmu_table_batch *)__get_free_page(GFP_ATOMIC);
-		if (*batch == NULL) {
-			tlb_remove_table_one(table);
-			return;
-		}
-		(*batch)->nr = 0;
-	}
-	(*batch)->tables[(*batch)->nr++] = table;
-	if ((*batch)->nr == MAX_TABLE_BATCH)
-		tlb_table_flush(tlb);
-}
-
-#endif
-
 /*
  * If a p?d_bad entry is found while walking page tables, report
  * the error, before resetting entry to p?d_none.  Usually (but
@@ -986,8 +909,7 @@ int copy_page_range(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 static unsigned long zap_pte_range(struct mmu_gather *tlb,
 				struct vm_area_struct *vma, pmd_t *pmd,
 				unsigned long addr, unsigned long end,
-				long *zap_work, struct zap_details *details,
-				bool activate)
+				long *zap_work, struct zap_details *details)
 {
 	struct mm_struct *mm = tlb->mm;
 	pte_t *pte;
@@ -1045,8 +967,7 @@ static unsigned long zap_pte_range(struct mmu_gather *tlb,
 				if (pte_dirty(ptent))
 					set_page_dirty(page);
 				if (pte_young(ptent) &&
-				    likely(!VM_SequentialReadHint(vma)) &&
-					activate)
+				    likely(!VM_SequentialReadHint(vma)))
 					mark_page_accessed(page);
 				rss[MM_FILEPAGES]--;
 			}
@@ -1086,8 +1007,7 @@ static unsigned long zap_pte_range(struct mmu_gather *tlb,
 static inline unsigned long zap_pmd_range(struct mmu_gather *tlb,
 				struct vm_area_struct *vma, pud_t *pud,
 				unsigned long addr, unsigned long end,
-				long *zap_work, struct zap_details *details,
-				bool activate)
+				long *zap_work, struct zap_details *details)
 {
 	pmd_t *pmd;
 	unsigned long next;
@@ -1110,7 +1030,7 @@ static inline unsigned long zap_pmd_range(struct mmu_gather *tlb,
 			continue;
 		}
 		next = zap_pte_range(tlb, vma, pmd, addr, next,
-					zap_work, details, activate);
+						zap_work, details);
 	} while (pmd++, addr = next, (addr != end && *zap_work > 0));
 
 	return addr;
@@ -1119,8 +1039,7 @@ static inline unsigned long zap_pmd_range(struct mmu_gather *tlb,
 static inline unsigned long zap_pud_range(struct mmu_gather *tlb,
 				struct vm_area_struct *vma, pgd_t *pgd,
 				unsigned long addr, unsigned long end,
-				long *zap_work, struct zap_details *details,
-				bool activate)
+				long *zap_work, struct zap_details *details)
 {
 	pud_t *pud;
 	unsigned long next;
@@ -1133,7 +1052,7 @@ static inline unsigned long zap_pud_range(struct mmu_gather *tlb,
 			continue;
 		}
 		next = zap_pmd_range(tlb, vma, pud, addr, next,
-					zap_work, details, activate);
+						zap_work, details);
 	} while (pud++, addr = next, (addr != end && *zap_work > 0));
 
 	return addr;
@@ -1142,8 +1061,7 @@ static inline unsigned long zap_pud_range(struct mmu_gather *tlb,
 static unsigned long unmap_page_range(struct mmu_gather *tlb,
 				struct vm_area_struct *vma,
 				unsigned long addr, unsigned long end,
-				long *zap_work, struct zap_details *details,
-				bool activate)
+				long *zap_work, struct zap_details *details)
 {
 	pgd_t *pgd;
 	unsigned long next;
@@ -1162,7 +1080,7 @@ static unsigned long unmap_page_range(struct mmu_gather *tlb,
 			continue;
 		}
 		next = zap_pud_range(tlb, vma, pgd, addr, next,
-						zap_work, details, activate);
+						zap_work, details);
 	} while (pgd++, addr = next, (addr != end && *zap_work > 0));
 	tlb_end_vma(tlb, vma);
 	mem_cgroup_uncharge_end();
@@ -1185,7 +1103,6 @@ static unsigned long unmap_page_range(struct mmu_gather *tlb,
  * @end_addr: virtual address at which to end unmapping
  * @nr_accounted: Place number of unmapped pages in vm-accountable vma's here
  * @details: details of nonlinear truncation or shared cache invalidation
- * @activate: whether pages included in the vma should be activated or not
  *
  * Returns the end address of the unmapping (restart addr if interrupted).
  *
@@ -1204,14 +1121,17 @@ static unsigned long unmap_page_range(struct mmu_gather *tlb,
  * ensure that any thus-far unmapped pages are flushed before unmap_vmas()
  * drops the lock and schedules.
  */
-unsigned long unmap_vmas(struct mmu_gather *tlb,
+unsigned long unmap_vmas(struct mmu_gather **tlbp,
 		struct vm_area_struct *vma, unsigned long start_addr,
 		unsigned long end_addr, unsigned long *nr_accounted,
-		struct zap_details *details, bool activate)
+		struct zap_details *details)
 {
 	long zap_work = ZAP_BLOCK_SIZE;
+	unsigned long tlb_start = 0;	/* For tlb_finish_mmu */
+	int tlb_start_valid = 0;
 	unsigned long start = start_addr;
-	struct mutex *i_mmap_lock = details ? details->i_mmap_lock : NULL;
+	spinlock_t *i_mmap_lock = details? details->i_mmap_lock: NULL;
+	int fullmm = (*tlbp)->fullmm;
 	struct mm_struct *mm = vma->vm_mm;
 
 	mmu_notifier_invalidate_range_start(mm, start_addr, end_addr);
@@ -1232,6 +1152,11 @@ unsigned long unmap_vmas(struct mmu_gather *tlb,
 			untrack_pfn_vma(vma, 0, 0);
 
 		while (start != end) {
+			if (!tlb_start_valid) {
+				tlb_start = start;
+				tlb_start_valid = 1;
+			}
+
 			if (unlikely(is_vm_hugetlb_page(vma))) {
 				/*
 				 * It is undesirable to test vma->vm_file as it
@@ -1252,21 +1177,27 @@ unsigned long unmap_vmas(struct mmu_gather *tlb,
 
 				start = end;
 			} else
-				start = unmap_page_range(tlb, vma,
-						start, end, &zap_work, details, activate);
+				start = unmap_page_range(*tlbp, vma,
+						start, end, &zap_work, details);
 
 			if (zap_work > 0) {
 				BUG_ON(start != end);
 				break;
 			}
 
+			tlb_finish_mmu(*tlbp, tlb_start, start);
+
 			if (need_resched() ||
-				(i_mmap_lock && mutex_is_contended(i_mmap_lock))) {
-				if (i_mmap_lock)
+				(i_mmap_lock && spin_needbreak(i_mmap_lock))) {
+				if (i_mmap_lock) {
+					*tlbp = NULL;
 					goto out;
+				}
 				cond_resched();
 			}
 
+			*tlbp = tlb_gather_mmu(vma->vm_mm, fullmm);
+			tlb_start_valid = 0;
 			zap_work = ZAP_BLOCK_SIZE;
 		}
 	}
@@ -1281,21 +1212,21 @@ out:
  * @address: starting address of pages to zap
  * @size: number of bytes to zap
  * @details: details of nonlinear truncation or shared cache invalidation
- * @activate: whether pages included in the vma should be activated or not
  */
 unsigned long zap_page_range(struct vm_area_struct *vma, unsigned long address,
-		unsigned long size, struct zap_details *details, bool activate)
+		unsigned long size, struct zap_details *details)
 {
 	struct mm_struct *mm = vma->vm_mm;
-	struct mmu_gather tlb;
+	struct mmu_gather *tlb;
 	unsigned long end = address + size;
 	unsigned long nr_accounted = 0;
 
 	lru_add_drain();
-	tlb_gather_mmu(&tlb, mm, 0);
+	tlb = tlb_gather_mmu(mm, 0);
 	update_hiwater_rss(mm);
-	end = unmap_vmas(&tlb, vma, address, end, &nr_accounted, details, activate);
-	tlb_finish_mmu(&tlb, address, end);
+	end = unmap_vmas(&tlb, vma, address, end, &nr_accounted, details);
+	if (tlb)
+		tlb_finish_mmu(tlb, address, end);
 	return end;
 }
 
@@ -1317,7 +1248,7 @@ int zap_vma_ptes(struct vm_area_struct *vma, unsigned long address,
 	if (address < vma->vm_start || address + size > vma->vm_end ||
 	    		!(vma->vm_flags & VM_PFNMAP))
 		return -1;
-	zap_page_range(vma, address, size, NULL, false);
+	zap_page_range(vma, address, size, NULL);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(zap_vma_ptes);
@@ -2604,8 +2535,8 @@ again:
 	}
 
 	restart_addr = zap_page_range(vma, start_addr,
-				end_addr - start_addr, details, true);
-	need_break = need_resched() || mutex_is_contended(details->i_mmap_lock);
+					end_addr - start_addr, details);
+	need_break = need_resched() || spin_needbreak(details->i_mmap_lock);
 
 	if (restart_addr >= end_addr) {
 		/* We have now completed this vma: mark it so */
@@ -2619,9 +2550,9 @@ again:
 			goto again;
 	}
 
-	mutex_unlock(details->i_mmap_lock);
+	spin_unlock(details->i_mmap_lock);
 	cond_resched();
-	mutex_lock(details->i_mmap_lock);
+	spin_lock(details->i_mmap_lock);
 	return -EINTR;
 }
 
@@ -2718,7 +2649,7 @@ void unmap_mapping_range(struct address_space *mapping,
 	details.i_mmap_lock = &mapping->i_mmap_lock;
 
 	mutex_lock(&mapping->unmap_mutex);
-	mutex_lock(&mapping->i_mmap_lock);
+	spin_lock(&mapping->i_mmap_lock);
 
 	/* Protect against endless unmapping loops */
 	mapping->truncate_count++;
@@ -2733,7 +2664,7 @@ void unmap_mapping_range(struct address_space *mapping,
 		unmap_mapping_range_tree(&mapping->i_mmap, &details);
 	if (unlikely(!list_empty(&mapping->i_mmap_nonlinear)))
 		unmap_mapping_range_list(&mapping->i_mmap_nonlinear, &details);
-	mutex_unlock(&mapping->i_mmap_lock);
+	spin_unlock(&mapping->i_mmap_lock);
 	mutex_unlock(&mapping->unmap_mutex);
 }
 EXPORT_SYMBOL(unmap_mapping_range);
@@ -2901,7 +2832,7 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	mem_cgroup_commit_charge_swapin(page, ptr);
 
 	swap_free(entry);
-	if ((vma->vm_flags & VM_LOCKED) || PageMlocked(page))
+	if (vm_swap_full() || (vma->vm_flags & VM_LOCKED) || PageMlocked(page))
 		try_to_free_swap(page);
 	unlock_page(page);
 	if (swapcache) {
