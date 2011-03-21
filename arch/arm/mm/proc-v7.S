@@ -61,14 +61,7 @@ ENDPROC(cpu_v7_proc_fin)
  */
 	.align	5
 ENTRY(cpu_v7_reset)
-	mrc     p15, 0, r1, c1, c0, 0           @ ctrl register
-	bic     r1, r1, #0x0001                 @ ...............m
-        mcr     p15, 0, r1, c1, c0, 0           @ Turn off MMU
-        mcr     p15, 0, ip, c8, c7, 0           @ invalidate I & D,flush TLB
-        mcr     p15, 0, ip, c7, c5, 6           @ flush BTC
-        dsb
-        isb
-	mov     pc,r0
+	mov	pc, r0
 ENDPROC(cpu_v7_reset)
 
 /*
@@ -291,18 +284,18 @@ __v7_setup:
 	mcr	p15, 0, r4, c2, c0, 1		@ load TTB1
 #ifdef CONFIG_ARCH_MSM_SCORPION
 #ifdef CONFIG_ARCH_QSD8X50
-        mov     r0, #0x77
+	mov	r0, #0x77
 #else
-        mov     r0, #0x33
+	mov	r0, #0x33
 #endif
-        mcr     p15, 3, r0, c15, c0, 3          @ set L2CR1
-        mrc     p15, 0, r0, c1, c0, 1           @ read ACTLR
+	mcr	p15, 3, r0, c15, c0, 3		@ set L2CR1
+	mrc	p15, 0, r0, c1, c0, 1		@ read ACTLR
 #ifdef CONFIG_CPU_CACHE_ERR_REPORT
-        orr     r0, r0, #0x37                   @ turn on L1/L2 error reporting
+	orr	r0, r0, #0x37			@ turn on L1/L2 error reporting
 #else
-        bic     r0, r0, #0x37
+	bic	r0, r0, #0x37
 #endif
-        mcr     p15, 0, r0, c1, c0, 1           @ write ACTLR
+	mcr	p15, 0, r0, c1, c0, 1		@ write ACTLR
 #endif
 	/*
 	 * Memory region attributes with SCTLR.TRE=1

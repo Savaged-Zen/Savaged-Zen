@@ -1991,6 +1991,9 @@ int nfs_access_cache_shrinker(struct shrinker *shrink, int nr_to_scan, gfp_t gfp
 		else {
 remove_lru_entry:
 			list_del_init(&nfsi->access_cache_inode_lru);
+			smp_mb__before_clear_bit();
+			clear_bit(NFS_INO_ACL_LRU_SET, &nfsi->flags);
+			smp_mb__after_clear_bit();
 		}
 		spin_unlock(&inode->i_lock);
 	}
@@ -2018,10 +2021,12 @@ void nfs_access_zap_cache(struct inode *inode)
 {
 	LIST_HEAD(head);
 
-//	if (test_bit(NFS_INO_ACL_LRU_SET, &NFS_I(inode)->flags) == 0)
-//		return;
+	if (test_bit(NFS_INO_ACL_LRU_SET, &NFS_I(inode)->flags) == 0)
+		return;
 	/* Remove from global LRU init */
 	spin_lock(&nfs_access_lru_lock);
+	if (test_and_clear_bit(NFS_INO_ACL_LRU_SET, &NFS_I(inode)->flags))
+		list_del_init(&NFS_I(inode)->access_cache_inode_lru);
 
 	spin_lock(&inode->i_lock);
 	__nfs_access_zap_cache(NFS_I(inode), &head);
@@ -2134,12 +2139,13 @@ static void nfs_access_add_cache(struct inode *inode, struct nfs_access_entry *s
 	smp_mb__after_atomic_inc();
 
 	/* Add inode to global LRU list */
-/*	if (!test_bit(NFS_INO_ACL_LRU_SET, &NFS_I(inode)->flags)) {
+	if (!test_bit(NFS_INO_ACL_LRU_SET, &NFS_I(inode)->flags)) {
 		spin_lock(&nfs_access_lru_lock);
+		if (!test_and_set_bit(NFS_INO_ACL_LRU_SET, &NFS_I(inode)->flags))
 			list_add_tail(&NFS_I(inode)->access_cache_inode_lru,
 					&nfs_access_lru_list);
 		spin_unlock(&nfs_access_lru_lock);
-	} */
+	}
 }
 
 static int nfs_do_access(struct inode *inode, struct rpc_cred *cred, int mask)

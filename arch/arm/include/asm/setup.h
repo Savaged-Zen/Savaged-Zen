@@ -135,14 +135,14 @@ struct tag_microp_version {
 };
 
 /* Light sensor calibration value */
-#define ATAG_ALS	0x5441001b
+#define ATAG_ALS       0x5441001b
 
 struct tag_als_kadc {
 	__u32 kadc;
 };
 
 /* Proximity sensor calibration values */
-#define ATAG_PS		0x5441001c
+#define ATAG_PS                0x5441001c
 
 struct tag_ps_kparam {
 	__u32 kparam1;
@@ -177,11 +177,6 @@ struct tag {
 		struct tag_initrd	initrd;
 		struct tag_serialnr	serialnr;
 		struct tag_revision	revision;
-#ifdef CONFIG_MICROP_COMMON
-		struct tag_microp_version	microp_version;
-		struct tag_als_kadc als_kadc;
-		struct tag_ps_kparam	ps_kparam;
-#endif
 		struct tag_videolfb	videolfb;
 		struct tag_cmdline	cmdline;
 
