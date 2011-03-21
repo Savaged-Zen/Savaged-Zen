@@ -500,7 +500,7 @@ static int pmem_unmap_pfn_range(int id, struct vm_area_struct *vma,
 	BUG_ON(!PMEM_IS_PAGE_ALIGNED(len));
 
 	garbage_pages = len >> PAGE_SHIFT;
-	zap_page_range(vma, vma->vm_start + offset, len, NULL, false);
+	zap_page_range(vma, vma->vm_start + offset, len, NULL);
 	pmem_map_garbage(id, vma, data, offset, len);
 	return 0;
 }
@@ -529,7 +529,7 @@ static int pmem_remap_pfn_range(int id, struct vm_area_struct *vma,
 {
 	/* hold the mm semp for the vma you are modifying when you call this */
 	BUG_ON(!vma);
-	zap_page_range(vma, vma->vm_start + offset, len, NULL, false);
+	zap_page_range(vma, vma->vm_start + offset, len, NULL);
 	return pmem_map_pfn_range(id, vma, data, offset, len);
 }
 
