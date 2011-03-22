@@ -750,7 +750,7 @@ msmsdcc_start_data(struct msmsdcc_host *host, struct mmc_data *data,
 			host->cmd_c = c;
 		}
 		dsb();
-		msm_dmov_enqueue_cmd_ext(host->dma.channel, &host->dma.hdr);
+		msm_dmov_enqueue_cmd(host->dma.channel, &host->dma.hdr);
 		if (data->flags & MMC_DATA_WRITE)
 			host->prog_scan = true;
 	} else {
@@ -1525,9 +1525,6 @@ msmsdcc_probe(struct platform_device *pdev)
 		return -ENXIO;
 	}
 
-	tasklet_init(&host->dma_tlet, msmsdcc_dma_complete_tlet,
-			(unsigned long)host);
-
 	/*
 	 * Setup our host structure
 	 */
@@ -1566,6 +1563,9 @@ msmsdcc_probe(struct platform_device *pdev)
 					   plat->embedded_sdio->funcs,
 					   plat->embedded_sdio->num_funcs);
 #endif
+
+	tasklet_init(&host->dma_tlet, msmsdcc_dma_complete_tlet,
+			(unsigned long)host);
 
 	/*
 	 * Setup DMA
