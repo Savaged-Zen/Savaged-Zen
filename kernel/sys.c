@@ -1088,9 +1088,7 @@ out:
 	write_unlock_irq(&tasklist_lock);
 	if (err > 0) {
 		proc_sid_connector(group_leader);
-#ifndef CONFIG_SCHED_BFS
 		sched_autogroup_create_attach(group_leader);
-#endif
 	}
 	return err;
 }

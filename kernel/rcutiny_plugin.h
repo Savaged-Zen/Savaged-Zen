@@ -32,6 +32,7 @@
 #define RCU_TRACE(stmt)
 #endif /* #else #ifdef CONFIG_RCU_TRACE */
 
+#ifndef CONFIG_CLASSIC_RCU
 /* Global control variables for rcupdate callback mechanism. */
 struct rcu_ctrlblk {
 	struct rcu_head *rcucblist;	/* List of pending callbacks (CBs). */
@@ -50,6 +51,8 @@ static struct rcu_ctrlblk rcu_bh_ctrlblk = {
 	.donetail	= &rcu_bh_ctrlblk.rcucblist,
 	.curtail	= &rcu_bh_ctrlblk.rcucblist,
 };
+
+#endif /* CONFIG_CLASSIC_RCU */
 
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 int rcu_scheduler_active __read_mostly;
@@ -859,6 +862,7 @@ void exit_rcu(void)
 
 #ifdef CONFIG_RCU_TRACE
 
+#ifndef CONFIG_CLASSIC_RCU
 /*
  * Because preemptible RCU does not exist, it is not necessary to
  * dump out its statistics.
@@ -901,6 +905,7 @@ static void rcu_preempt_remove_callbacks(struct rcu_ctrlblk *rcp)
 static void rcu_preempt_process_callbacks(void)
 {
 }
+#endif /* CONFIG_CLASSIC_RCU */
 
 #endif /* #else #ifdef CONFIG_TINY_PREEMPT_RCU */
 

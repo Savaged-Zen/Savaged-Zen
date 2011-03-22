@@ -894,7 +894,7 @@ static void enqueue_sleeper(struct cfs_rq *cfs_rq, struct sched_entity *se)
 		se->statistics.sum_sleep_runtime += delta;
 
 		if (tsk) {
-			if (tsk->sched_in_iowait) {
+			if (tsk->in_iowait) {
 				se->statistics.iowait_sum += delta;
 				se->statistics.iowait_count++;
 				trace_sched_stat_iowait(tsk, delta);
@@ -1042,10 +1042,10 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 	se->on_rq = 0;
 	update_cfs_load(cfs_rq, 0);
 	account_entity_dequeue(cfs_rq, se);
-	update_cfs_shares(cfs_rq, 0);
 
 	min_vruntime = cfs_rq->min_vruntime;
 	update_min_vruntime(cfs_rq);
+	update_cfs_shares(cfs_rq, 0);
 
 	/*
 	 * Normalize the entity after updating the min_vruntime because the
