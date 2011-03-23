@@ -41,14 +41,20 @@ config ARCH_MSM8X60
 	bool "MSM8X60"
 	select MACH_MSM8X60_SURF if (!MACH_MSM8X60_RUMI3 && !MACH_MSM8X60_SIM \
 				  && !MACH_MSM8X60_FFA)
+	select ARCH_MSM_SCORPIONMP
 	select ARM_GIC
 	select CPU_V7
 	select MSM_V2_TLMM
 	select MSM_GPIOMUX
+	select IOMMU_API
+	select MSM_SCM if SMP
 	select VERIFY_PERMISSION_FAULT
 endchoice
 
 config MSM_SOC_REV_A
+	bool
+
+config  ARCH_MSM_SCORPIONMP
 	bool
 
 config  ARCH_MSM_ARM11
@@ -573,6 +579,12 @@ config MSM_GPIOMUX
 config MSM_V2_TLMM
 	bool
 
+config IOMMU_API
+	bool
+
+config MSM_SCM
+	bool
+
 config MSM_DAL
 	default n 
 	bool "MSM Driver Access Layer (DAL RPC)"
@@ -590,7 +602,7 @@ config MSM_ONCRPCROUTER
 	  the ARM9 and ARM11
 
 config MSM_RPCSERVERS
-	depends on MSM_ONCRPCROUTER
+	depends on MSM_ONCRPCROUTER && ARCH_MSM7X00A
 	default y
 	bool "Kernel side RPC server bundle"
 	help
@@ -641,7 +653,7 @@ config AXI_SCREEN_POLICY
         depends on ARCH_QSD8X50 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
   depends on HAS_EARLYSUSPEND
   bool "Use higher AXI bus while screen ON"
-  default n
+  default y
   help
     Simple AXI scaling based on screen ON/OFF and PWRC.
 
