@@ -4579,7 +4579,7 @@ void init_idle(struct task_struct *idle, int cpu)
 #else
 	task_thread_info(idle)->preempt_count = 0;
 #endif
-	ftrace_graph_init_task(idle);
+	ftrace_graph_init_idle_task(idle, cpu);
 }
 
 /*
