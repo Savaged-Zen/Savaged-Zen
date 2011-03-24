@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux/arm 2.6.38 Kernel Configuration
-# Thu Mar 24 13:14:41 2011
+# Thu Mar 24 13:25:50 2011
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -42,8 +42,8 @@ CONFIG_HAVE_KERNEL_LZMA=y
 CONFIG_HAVE_KERNEL_XZ=y
 CONFIG_HAVE_KERNEL_LZO=y
 # CONFIG_KERNEL_GZIP is not set
-# CONFIG_KERNEL_LZMA is not set
-CONFIG_KERNEL_XZ=y
+CONFIG_KERNEL_LZMA=y
+# CONFIG_KERNEL_XZ is not set
 # CONFIG_KERNEL_LZO is not set
 # CONFIG_SWAP is not set
 # CONFIG_SYSVIPC is not set
