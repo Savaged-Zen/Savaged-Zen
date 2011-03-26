@@ -68,6 +68,7 @@
 #include <linux/bootmem.h>
 #include <linux/ftrace.h>
 #include <linux/slab.h>
+#include <linux/zentune.h>
 
 #include <asm/tlb.h>
 #include <asm/unistd.h>
@@ -131,14 +132,30 @@
  * Value is in ms and set to a minimum of 6ms. Scales with number of cpus.
  * Tunable via /proc interface.
  */
-int rr_interval __read_mostly = 10;
+#if defined(CONFIG_ZEN_DEFAULT)
+int rr_interval __read_mostly = rr_interval_default;
+#elif defined(CONFIG_ZEN_SERVER)
+int rr_interval __read_mostly = rr_interval_server;
+#elif defined(CONFIG_ZEN_DESKTOP)
+int rr_interval __read_mostly = rr_interval_desktop;
+#elif defined(CONFIG_ZEN_CUSTOM)
+int rr_interval __read_mostly = rr_interval_custom;
+#endif
 
 /*
  * sched_iso_cpu - sysctl which determines the cpu percentage SCHED_ISO tasks
  * are allowed to run five seconds as real time tasks. This is the total over
  * all online cpus.
  */
-int sched_iso_cpu __read_mostly = 25;
+#if defined(CONFIG_ZEN_DEFAULT)
+int sched_iso_cpu __read_mostly = sched_iso_cpu_default;
+#elif defined(CONFIG_ZEN_SERVER)
+int sched_iso_cpu __read_mostly = sched_iso_cpu_server;
+#elif defined(CONFIG_ZEN_DESKTOP)
+int sched_iso_cpu __read_mostly = sched_iso_cpu_desktop;
+#elif defined(CONFIG_ZEN_CUSTOM)
+int sched_iso_cpu __read_mostly = sched_iso_cpu_custom;
+#endif
 
 /*
  * The relative length of deadline for each priority(nice) level.
