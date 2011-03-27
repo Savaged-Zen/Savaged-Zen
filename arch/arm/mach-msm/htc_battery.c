@@ -44,11 +44,7 @@
 #endif
 #ifdef CONFIG_BATTERY_DS2784
 #include <linux/ds2784_battery.h>
-#elif CONFIG_BATTERY_DS2746
-#include <linux/ds2746_battery.h>
 #endif
-
-#include <linux/smb329.h>
 
 static struct wake_lock vbus_wake_lock;
 
@@ -908,6 +904,7 @@ static int htc_set_smem_cable_type(u32 cable_type)
 	return 0;
 }
 #endif
+#ifndef CONFIG_HTC_BATTCHG_SMEM
 static ssize_t htc_battery_show_batt_attr(struct device *dev,
 					 struct device_attribute *attr,
 					 char *buf)
@@ -925,6 +922,7 @@ static ssize_t htc_battery_show_batt_attr(struct device *dev,
 	}
 	return 0;
 }
+#endif
 
 /* -------------------------------------------------------------------------- */
 static int htc_power_get_property(struct power_supply *psy,
@@ -1293,13 +1291,6 @@ static int update_batt_info(void)
 			ret = -1;
 		}
 		break;
-#elif CONFIG_BATTERY_DS2746
-	case GUAGE_DS2746:
-		if (ds2746_get_battery_info(&htc_batt_info.rep)) {
-			BATT_ERR("%s: ds2746 read failed!!!", __func__);
-			ret = -1;
-		}
-		break;
 #endif
 
 	default:
@@ -1609,7 +1600,7 @@ static struct msm_rpc_server battery_server = {
 	.rpc_call = handle_battery_call,
 };
 
-#if defined(CONFIG_BATTERY_DS2784) || defined(CONFIG_BATTERY_DS2746)
+#if defined(CONFIG_BATTERY_DS2784)
 static int ds2784_notifier_func(struct notifier_block *nfb,
 		unsigned long action, void *param)
 {
@@ -1671,9 +1662,6 @@ static int htc_battery_probe(struct platform_device *pdev)
 #ifdef CONFIG_BATTERY_DS2784
 	if (pdata->guage_driver == GUAGE_DS2784)
 		ds2784_register_notifier(&ds2784_notifier);
-#elif CONFIG_BATTERY_DS2746
-	if (pdata->guage_driver == GUAGE_DS2746)
-		ds2746_register_notifier(&ds2784_notifier);
 #endif
 
 	if (system_rev >= 1) {
