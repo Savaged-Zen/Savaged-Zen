@@ -39,8 +39,10 @@ extern void start_drawing_late_resume(struct early_suspend *h);
 static void msmfb_resume_handler(struct early_suspend *h);
 static void msmfb_resume(struct work_struct *work);
 
+#ifdef CONFIG_MACH_SUPERSONIC
 void hdmi_DoBlit(int offset);
 int hdmi_usePanelSync(void);
+#endif
 
 #define MSMFB_DEBUG 1
 #ifdef CONFIG_FB_MSM_LOGO
@@ -419,6 +421,7 @@ restart:
 		msmfb->yoffset);
 	spin_unlock_irqrestore(&msmfb->update_lock, irq_flags);
 
+#ifdef CONFIG_MACH_SUPERSONIC
     if (!hdmi_usePanelSync())
     {
         msmfb->vsync_request_time = ktime_get();
@@ -426,6 +429,7 @@ restart:
     }
     else
     {
+#endif
         /* if the panel is all the way on wait for vsync, otherwise sleep
          * for 16 ms (long enough for the dma to panel) and then begin dma */
         msmfb->vsync_request_time = ktime_get();
@@ -439,10 +443,12 @@ restart:
                           HRTIMER_MODE_REL);
             }
         }
+#ifdef CONFIG_MACH_SUPERSONIC
     }
 
     /* We did the DMA, now blit the data to the other display */
     hdmi_DoBlit(msmfb->xres * msmfb->yoffset * BYTES_PER_PIXEL(msmfb));
+#endif
 
     return;
 }
