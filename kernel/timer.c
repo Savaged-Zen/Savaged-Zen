@@ -1765,12 +1765,12 @@ static void do_nsleep(unsigned int nsecs, struct hrtimer_sleeper *sleeper,
 	 * of do_nanosleep().
 	 */
 	hrtimer_init(&sleeper->timer, CLOCK_MONOTONIC, mode);
-	sleeper->timer._expires = ktime_set(0, nsecs);
+	sleeper->timer._softexpires = ktime_set(0, nsecs);
 	hrtimer_init_sleeper(sleeper, current);
 
 	do {
 		set_current_state(state);
-		hrtimer_start(&sleeper->timer, sleeper->timer._expires, mode);
+		hrtimer_start(&sleeper->timer, sleeper->timer._softexpires, mode);
 		if (sleeper->task)
 			schedule();
 		hrtimer_cancel(&sleeper->timer);
@@ -1804,7 +1804,7 @@ unsigned long hr_msleep_interruptible(unsigned int msecs)
 
 	if (!sleeper.task)
 		return 0;
-	left = ktime_sub(sleeper.timer._expires,
+	left = ktime_sub(sleeper.timer._softexpires,
 			 sleeper.timer.base->get_time());
 	return max(((long) ktime_to_ns(left))/(long)NSEC_PER_MSEC, 1L);
 }
