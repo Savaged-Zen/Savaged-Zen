@@ -36,6 +36,10 @@
 #include "board-incrediblec.h"
 #elif CONFIG_MACH_SUPERSONIC
 #include "board-supersonic.h"
+#elif CONFIG_MACH_MAHIMAHI
+#include "board-mahimahi.h"
+#elif CONFIG_MACH_BRAVO
+#include "board-bravo.h"
 #endif
 #endif
 
@@ -649,8 +653,6 @@ ssize_t acpuclk_get_vdd_levels_str(char *buf)
 	return len;
 }
 
-#ifdef CONFIG_MACH_INCREDIBLEC
-
 void acpuclk_set_vdd(unsigned acpu_khz, int vdd)
 {
 	int i;
@@ -660,36 +662,31 @@ void acpuclk_set_vdd(unsigned acpu_khz, int vdd)
 	{
 		if (freq_table[i].frequency != CPUFREQ_ENTRY_INVALID)
 		{
+#ifdef CONFIG_MACH_INCREDIBLEC
 			if (acpu_khz == 0)
 				acpu_freq_tbl[i].vdd = min(max((acpu_freq_tbl[i].vdd + vdd), INCREDIBLEC_MIN_UV_MV), INCREDIBLEC_MAX_UV_MV);
 			else if (acpu_freq_tbl[i].acpu_khz == acpu_khz)
 				acpu_freq_tbl[i].vdd = min(max(vdd, INCREDIBLEC_MIN_UV_MV), INCREDIBLEC_MAX_UV_MV);
-		}
-	}
-	mutex_unlock(&drv_state.lock);
-}
-
 #elif CONFIG_MACH_SUPERSONIC
-
-void acpuclk_set_vdd(unsigned acpu_khz, int vdd)
-{
-	int i;
-	vdd = vdd / 25 * 25;	//! regulator only accepts multiples of 25 (mV)
-	mutex_lock(&drv_state.lock);
-	for (i = 0; acpu_freq_tbl[i].acpu_khz; i++)
-	{
-		if (freq_table[i].frequency != CPUFREQ_ENTRY_INVALID)
-		{
 			if (acpu_khz == 0)
 				acpu_freq_tbl[i].vdd = min(max((acpu_freq_tbl[i].vdd + vdd), SUPERSONIC_MIN_UV_MV), SUPERSONIC_MAX_UV_MV);
 			else if (acpu_freq_tbl[i].acpu_khz == acpu_khz)
 				acpu_freq_tbl[i].vdd = min(max(vdd, SUPERSONIC_MIN_UV_MV), SUPERSONIC_MAX_UV_MV);
+#elif CONFIG_MACH_MAHIMAHI
+			if (acpu_khz == 0)
+				acpu_freq_tbl[i].vdd = min(max((acpu_freq_tbl[i].vdd + vdd), MAHIMAHI_MIN_UV_MV), MAHIMAHI_MAX_UV_MV);
+			else if (acpu_freq_tbl[i].acpu_khz == acpu_khz)
+				acpu_freq_tbl[i].vdd = min(max(vdd, MAHIMAHI_MIN_UV_MV), MAHIMAHI_MAX_UV_MV);
+#elif CONFIG_MACH_BRAVO
+			if (acpu_khz == 0)
+				acpu_freq_tbl[i].vdd = min(max((acpu_freq_tbl[i].vdd + vdd), BRAVO_MIN_UV_MV), BRAVO_MAX_UV_MV);
+			else if (acpu_freq_tbl[i].acpu_khz == acpu_khz)
+				acpu_freq_tbl[i].vdd = min(max(vdd, BRAVO_MIN_UV_MV), BRAVO_MAX_UV_MV);
+#endif
 		}
 	}
 	mutex_unlock(&drv_state.lock);
 }
-
-#endif
 
 #endif
 

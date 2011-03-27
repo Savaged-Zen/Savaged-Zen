@@ -69,6 +69,10 @@
 #include "board-incrediblec.h"
 #elif CONFIG_MACH_SUPERSONIC
 #include "board-supersonic.h"
+#elif CONFIG_MACH_MAHIMAHI
+#include "board-mahimahi.h"
+#elif CONFIG_MACH_BRAVO
+#include "board-bravo.h"
 #endif
 #endif
 
@@ -177,6 +181,30 @@ void acpuclk_set_vdd_havs(unsigned acpu_khz, int min_vdd, int max_vdd    ) {
     } else if (acpu_vdd_tbl[i].acpu_khz == acpu_khz) {
       acpu_vdd_tbl[i].min_vdd = min(max(min_vdd, SUPERSONIC_MIN_UV_MV), SUPERSONIC_MAX_UV_MV);
       acpu_vdd_tbl[i].max_vdd = min(max(max_vdd, SUPERSONIC_MIN_UV_MV), SUPERSONIC_MAX_UV_MV);
+    }
+  }
+
+#elif CONFIG_MACH_MAHIMAHI
+
+  for (i = 0; acpu_vdd_tbl[i].acpu_khz; i++) {
+    if (acpu_khz == 0) {
+      acpu_vdd_tbl[i].min_vdd = min(max((acpu_vdd_tbl[i].min_vdd + min_vdd), MAHIMAHI_MIN_UV_MV), MAHIMAHI_MAX_UV_MV);
+      acpu_vdd_tbl[i].max_vdd = min(max((acpu_vdd_tbl[i].max_vdd + max_vdd), MAHIMAHI_MIN_UV_MV), MAHIMAHI_MAX_UV_MV);
+    } else if (acpu_vdd_tbl[i].acpu_khz == acpu_khz) {
+      acpu_vdd_tbl[i].min_vdd = min(max(min_vdd, MAHIMAHI_MIN_UV_MV), MAHIMAHI_MAX_UV_MV);
+      acpu_vdd_tbl[i].max_vdd = min(max(max_vdd, MAHIMAHI_MIN_UV_MV), MAHIMAHI_MAX_UV_MV);
+    }
+  }
+
+#elif CONFIG_MACH_BRAVO
+
+  for (i = 0; acpu_vdd_tbl[i].acpu_khz; i++) {
+    if (acpu_khz == 0) {
+      acpu_vdd_tbl[i].min_vdd = min(max((acpu_vdd_tbl[i].min_vdd + min_vdd), BRAVO_MIN_UV_MV), BRAVO_MAX_UV_MV);
+      acpu_vdd_tbl[i].max_vdd = min(max((acpu_vdd_tbl[i].max_vdd + max_vdd), BRAVO_MIN_UV_MV), BRAVO_MAX_UV_MV);
+    } else if (acpu_vdd_tbl[i].acpu_khz == acpu_khz) {
+      acpu_vdd_tbl[i].min_vdd = min(max(min_vdd, BRAVO_MIN_UV_MV), BRAVO_MAX_UV_MV);
+      acpu_vdd_tbl[i].max_vdd = min(max(max_vdd, BRAVO_MIN_UV_MV), BRAVO_MAX_UV_MV);
     }
   }
 
