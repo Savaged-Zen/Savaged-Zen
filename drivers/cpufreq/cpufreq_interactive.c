@@ -602,6 +602,7 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *new_policy,
 
 		pm_idle_old = pm_idle;
 		pm_idle = cpufreq_interactive_idle;
+		cpu_scales(cpu);
 		break;
 
 	case CPUFREQ_GOV_STOP:
@@ -624,6 +625,7 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *new_policy,
 				&interactive_attr_group);
 
 		pm_idle = pm_idle_old;
+		cpu_nonscaling(cpu);
 		break;
 
 	case CPUFREQ_GOV_LIMITS:
