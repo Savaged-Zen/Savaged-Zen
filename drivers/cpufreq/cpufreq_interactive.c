@@ -571,6 +571,7 @@ static struct attribute_group interactive_attr_group = {
 static int cpufreq_governor_interactive(struct cpufreq_policy *new_policy,
 		unsigned int event)
 {
+	unsigned int cpu = new_policy->cpu;
 	int rc;
 	struct cpufreq_interactive_cpuinfo *pcpu =
 		&per_cpu(cpuinfo, new_policy->cpu);
