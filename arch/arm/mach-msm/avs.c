@@ -67,11 +67,14 @@
 #ifdef CONFIG_CPU_FREQ_VDD_LEVELS
 #ifdef CONFIG_MACH_INCREDIBLEC
 #include "board-incrediblec.h"
-#elif CONFIG_MACH_SUPERSONIC
+#endif
+#ifdef CONFIG_MACH_SUPERSONIC
 #include "board-supersonic.h"
-#elif CONFIG_MACH_MAHIMAHI
+#endif
+#ifdef CONFIG_MACH_MAHIMAHI
 #include "board-mahimahi.h"
-#elif CONFIG_MACH_BRAVO
+#endif
+#ifdef CONFIG_MACH_BRAVO
 #include "board-bravo.h"
 #endif
 #endif
@@ -172,7 +175,8 @@ void acpuclk_set_vdd_havs(unsigned acpu_khz, int min_vdd, int max_vdd    ) {
     }
   }
 
-#elif CONFIG_MACH_SUPERSONIC
+#endif
+#ifdef CONFIG_MACH_SUPERSONIC
 
   for (i = 0; acpu_vdd_tbl[i].acpu_khz; i++) {
     if (acpu_khz == 0) {
@@ -184,7 +188,8 @@ void acpuclk_set_vdd_havs(unsigned acpu_khz, int min_vdd, int max_vdd    ) {
     }
   }
 
-#elif CONFIG_MACH_MAHIMAHI
+#endif
+#ifdef CONFIG_MACH_MAHIMAHI
 
   for (i = 0; acpu_vdd_tbl[i].acpu_khz; i++) {
     if (acpu_khz == 0) {
@@ -196,7 +201,8 @@ void acpuclk_set_vdd_havs(unsigned acpu_khz, int min_vdd, int max_vdd    ) {
     }
   }
 
-#elif CONFIG_MACH_BRAVO
+#endif
+#ifdef CONFIG_MACH_BRAVO
 
   for (i = 0; acpu_vdd_tbl[i].acpu_khz; i++) {
     if (acpu_khz == 0) {
