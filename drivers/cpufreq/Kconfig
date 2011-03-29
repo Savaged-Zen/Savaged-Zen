@@ -236,7 +236,7 @@ config CPU_FREQ_GOV_CONSERVATIVE
 config CPU_FREQ_VDD_LEVELS
 	bool "CPU Vdd levels sysfs interface"
 	depends on CPU_FREQ_STAT
-	depends on ARCH_QSD8X50 && MSM_AVS_HW
+	depends on ARCH_QSD8X50
 	default n
 	help
 	  CPU Vdd levels sysfs interface
