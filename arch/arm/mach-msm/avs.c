@@ -108,8 +108,8 @@ struct clkctl_acpu_speed {
 #endif // !ndef MAX
 
 struct clkctl_acpu_speed acpu_vdd_tbl[] = {
-	{  19200, VOLTAGE_MIN_START, 950 },
-	{ 128000, VOLTAGE_MIN_START, 950 },
+//	{  19200, VOLTAGE_MIN_START, 950 },
+//	{ 128000, VOLTAGE_MIN_START, 950 },
 	{ 245000, VOLTAGE_MIN_START, 950 },
 //  	{ 256000, VOLTAGE_MIN_START, 950 },
 	{ 384000, VOLTAGE_MIN_START, 975 },
