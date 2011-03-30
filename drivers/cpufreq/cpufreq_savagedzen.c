@@ -603,7 +603,6 @@ static int cpufreq_governor_savagedzen(struct cpufreq_policy *new_policy,
 
                 this_savagedzen->cur_policy = new_policy;
                 this_savagedzen->enable = 1;
-		cpu_scales(cpu);
 
                 // notice no break here!
 
@@ -626,7 +625,6 @@ static int cpufreq_governor_savagedzen(struct cpufreq_policy *new_policy,
                                 &savagedzen_attr_group);
 
                 pm_idle = pm_idle_old;
-		cpu_nonscaling(cpu);
                 break;
         }
 

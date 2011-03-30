@@ -1219,12 +1219,11 @@ struct task_struct {
 #ifdef CONFIG_SCHED_BFS
 	int time_slice;
 	u64 deadline;
-	struct list_head run_list, cand_list;
+	struct list_head run_list;
 	u64 last_ran;
 	u64 sched_time; /* sched_clock time spent running */
 
 	unsigned long rt_timeout;
-	int cpu_skip;
 #else /* CONFIG_SCHED_BFS */
 	const struct sched_class *sched_class;
 	struct sched_entity se;
@@ -1556,8 +1555,6 @@ struct task_struct {
 #ifdef CONFIG_SCHED_BFS
 extern int grunqueue_is_locked(void);
 extern void grq_unlock_wait(void);
-extern void cpu_scales(int cpu);
-extern void cpu_nonscaling(int cpu);
 #define tsk_seruntime(t)		((t)->sched_time)
 #define tsk_rttimeout(t)		((t)->rt_timeout)
 
@@ -1569,7 +1566,7 @@ static inline void tsk_cpus_current(struct task_struct *p)
 
 static inline void print_scheduler_version(void)
 {
-	printk(KERN_INFO"BFS CPU scheduler v0.370 by Con Kolivas.\n");
+	printk(KERN_INFO"BFS CPU scheduler v0.363 by Con Kolivas.\n");
 }
 
 static inline int iso_task(struct task_struct *p)
@@ -1580,13 +1577,6 @@ extern void remove_cpu(unsigned long cpu);
 extern int above_background_load(void);
 #else /* CFS */
 extern int runqueue_is_locked(int cpu);
-static inline void cpu_scales(int cpu)
-{
-}
-
-static inline void cpu_nonscaling(int cpu)
-{
-}
 #define tsk_seruntime(t)	((t)->se.sum_exec_runtime)
 #define tsk_rttimeout(t)	((t)->rt.timeout)
 

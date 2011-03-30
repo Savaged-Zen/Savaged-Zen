@@ -23,7 +23,6 @@
 #include <linux/fs.h>
 #include <linux/sysfs.h>
 #include <linux/mutex.h>
-#include <linux/sched.h>
 
 /**
  * A few values needed by the userspace governor
@@ -143,7 +142,6 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 				per_cpu(cpu_cur_freq, cpu));
 
 		mutex_unlock(&userspace_mutex);
-		cpu_scales(cpu);
 		break;
 	case CPUFREQ_GOV_STOP:
 		mutex_lock(&userspace_mutex);
@@ -160,7 +158,6 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 		per_cpu(cpu_set_freq, cpu) = 0;
 		dprintk("managing cpu %u stopped\n", cpu);
 		mutex_unlock(&userspace_mutex);
-		cpu_nonscaling(cpu);
 		break;
 	case CPUFREQ_GOV_LIMITS:
 		mutex_lock(&userspace_mutex);

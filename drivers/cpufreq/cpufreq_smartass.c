@@ -601,7 +601,6 @@ static int cpufreq_governor_smartass(struct cpufreq_policy *new_policy,
 
                 this_smartass->cur_policy = new_policy;
                 this_smartass->enable = 1;
-		cpu_scales(cpu);
 
                 // notice no break here!
 
@@ -624,7 +623,6 @@ static int cpufreq_governor_smartass(struct cpufreq_policy *new_policy,
                                 &smartass_attr_group);
 
                 pm_idle = pm_idle_old;
-		cpu_nonscaling(cpu);
                 break;
         }
 
