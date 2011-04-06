@@ -356,22 +356,19 @@ config TROUT_BATTCHG
 	default y
 	bool "Trout battery / charger driver"
 
-config HTC_BATTCHG_TRICKLE
-	depends on HTC_BATTCHG
-	default y
-	bool "Enable SBC Trickle Charge Fix"
-	help
-	  This enables the SBC (Superior Battery Charging) modificaton.
-	  Features:
-	   - Trickle Charging (AC & USB)
-	   - Battery Charging to 100%
-	   - Accurate voltage measurement on the charger
-	  Author: ms79723 
 
 config HTC_BATTCHG
 	depends on MSM_ONCRPCROUTER && POWER_SUPPLY
 	default n
 	bool "HTC battery / charger driver"
+
+config HTC_BATTCHG_SBC_DEFAULT
+	depends on HTC_BATTCHG
+	default y
+	bool "Use SBC trickle charging by default"
+	help
+	  This enables the SBC (Superior Battery Charging) by ms79723
+	  It can be enabled/disabled at runtime at /sys/kernel/batt_options/sbc
 
 config HTC_BATTCHG_SMEM
 	depends on HTC_BATTCHG
