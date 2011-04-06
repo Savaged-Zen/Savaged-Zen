@@ -137,7 +137,7 @@ obj-$(CONFIG_MACH_SUPERSONIC) += board-supersonic-tpa2018d1.o
 obj-$(CONFIG_MACH_SUPERSONIC) += board-supersonic-tpa6130.o
 obj-$(CONFIG_MACH_SUPERSONIC) += htc_wifi_nvs.o htc_bluetooth.o
 obj-$(CONFIG_MACH_SUPERSONIC) += htc_acoustic_qsd.o
-obj-$(CONFIG_HTC_BATTCHG) += htc_battery.o 
+obj-$(CONFIG_HTC_BATTCHG) += htc_battery.o
 obj-$(CONFIG_HTC_BATTCHG) += sz_batt_options.o
 sz_batt_options-objs := htc_battery_sysfs.o htc_battery_sysfs_main.o htc_battery_options.o htc_battery_options_sysfs.o
 

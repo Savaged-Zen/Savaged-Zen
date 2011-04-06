@@ -45,11 +45,6 @@ int batt_set_option(int option)
 {
 	sysctl_batt_sbc = available_options[option].batt_sbc;
 
-	if (sysctl_batt_sbc == 1)
-		printk(KERN_INFO "Battery Options: SBC Enabled.\n");
-	else
-		printk(KERN_INFO "Battery Options: SBC Disabled.\n");
-
 	return 0;
 }
 EXPORT_SYMBOL(batt_set_option);
