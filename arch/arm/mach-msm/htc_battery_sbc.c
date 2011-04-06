@@ -94,29 +94,7 @@ tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec); \
 
 const char *charger_tags[] = {"none", "USB", "AC"};
 
-struct htc_battery_info {
-	int device_id;
-	int present;
-	unsigned long update_time;
-
-	/* lock to protect the battery info */
-	struct mutex lock;
-
-	/* lock held while calling the arm9 to query the battery info */
-	struct mutex rpc_lock;
-	struct battery_info_reply rep;
-	int (*func_show_batt_attr)(struct device_attribute *attr, char *buf);
-	int gpio_mbat_in;
-	int gpio_usb_id;
-	int gpio_mchg_en_n;
-	int gpio_iset;
-	int guage_driver;
-	int m2a_cable_detect;
-	int charger;
-};
-
 static struct msm_rpc_endpoint *endpoint;
-
 static struct htc_battery_info htc_batt_info;
 
 /* Remove cache mechanism to prevent cable status not sync. */
