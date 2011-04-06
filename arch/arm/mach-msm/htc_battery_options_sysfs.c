@@ -14,13 +14,11 @@
 
 #include <mach/htc_battery_sysfs_option.h>
 #include <mach/htc_battery_sysfs.h>
-#include <mach/htc_battery.h>
 
 extern int system_option;
 extern struct option available_options[LAST];
 extern struct kobject *batt_kobj;
 
-static struct htc_battery_info charging_test;
 static struct kobject *sbc_kobj;
 
 static ssize_t cl_settings_show(struct kobject *kobj,
@@ -89,10 +87,7 @@ static ssize_t options_store(struct kobject *kobj, struct kobj_attribute *attr,
         for (i=0; i<(LAST); i++) {
 		if (strcmp(buf, available_options[i].name) == 0) {
 		        system_option = i;
-			if (charging_test.rep.charging_source == CHARGER_BATTERY)
-				batt_set_option(i);
-			else
-				printk(KERN_ERR "SZ: Will not switch drivers while plugged in!");
+			batt_set_option(i);
 			break;
 		}
 	}
