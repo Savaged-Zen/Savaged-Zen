@@ -35,27 +35,27 @@ static struct mutex bt_sco_lock;
 
 static struct q6_hw_info q6_audio_hw[Q6_HW_COUNT] = {
 	[Q6_HW_HANDSET] = {
-		.min_gain = -400,
-		.max_gain = 1199,
+		.min_gain = -1600,
+		.max_gain = 400,
 	},
 	[Q6_HW_HEADSET] = {
-		.min_gain = -1100,
+		.min_gain = -1600,
 		.max_gain = 400,
 	},
 	[Q6_HW_SPEAKER] = {
-		.min_gain = -1000,
-		.max_gain = 500,
+		.min_gain = -1100,
+		.max_gain = 400,
 	},
 	[Q6_HW_TTY] = {
-		.min_gain = 0,
-		.max_gain = 0,
+		.min_gain = -1600,
+		.max_gain = 400,
 	},
 	[Q6_HW_BT_SCO] = {
-		.min_gain = -1000,
+		.min_gain = -1600,
 		.max_gain = 400,
 	},
 	[Q6_HW_BT_A2DP] = {
-		.min_gain = -1100,
+		.min_gain = -1600,
 		.max_gain = 400,
 	},
 };
