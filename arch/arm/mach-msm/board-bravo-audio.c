@@ -127,16 +127,6 @@ void bravo_receiver_enable(int en)
 	}
 }
 
-static void config_gpio_table(uint32_t *table, int len)
-{
-	int n;
-	unsigned id;
-	for (n = 0; n < len; n++) {
-		id = table[n];
-		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &id, 0);
-	}
-}
-
 static uint32_t bt_sco_enable[] = {
 	PCOM_GPIO_CFG(BRAVO_BT_PCM_OUT, 1, GPIO_OUTPUT,
 			GPIO_NO_PULL, GPIO_2MA),
