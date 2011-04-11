@@ -566,7 +566,6 @@ unsigned long acpuclk_power_collapse(int from_idle)
 {
 	int ret = acpuclk_get_rate();
   enum setrate_reason reason = (from_idle) ? SETRATE_PC_IDLE : SETRATE_PC;
-	ret *= 1000;
 	if (ret > drv_state.power_collapse_khz)
 		acpuclk_set_rate(drv_state.power_collapse_khz, reason);
 	return ret;
@@ -574,16 +573,15 @@ unsigned long acpuclk_power_collapse(int from_idle)
 
 unsigned long acpuclk_get_wfi_rate(void)
 {
-	return drv_state.wait_for_irq_khz;
+	return drv_state.wait_for_irq_khz * 1000;
 }
 
 unsigned long acpuclk_wait_for_irq(void)
 {
 	int ret = acpuclk_get_rate();
-	ret *= 1000;
 	if (ret > drv_state.wait_for_irq_khz)
-		acpuclk_set_rate(drv_state.wait_for_irq_khz, 1);
-	return ret;
+		acpuclk_set_rate(drv_state.wait_for_irq_khz * 1000, SETRATE_SWFI);
+	return ret * 1000;
 }
 
 #ifdef CONFIG_MSM_CPU_AVS
@@ -622,7 +620,7 @@ void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *clkdata)
 
 	acpuclk_init();
 	acpuclk_init_cpufreq_table();
-  drv_state.clk_ebi1 = clk_get(NULL,"ebi1_clk");
+  	drv_state.clk_ebi1 = clk_get(NULL,"ebi1_clk");
 
 #ifdef CONFIG_MSM_CPU_AVS
 	if (!acpu_avs_init(drv_state.acpu_set_vdd,
