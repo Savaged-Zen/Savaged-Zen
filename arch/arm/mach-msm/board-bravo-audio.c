@@ -266,5 +266,5 @@ void __init bravo_audio_init(void)
 	q6audio_register_analog_ops(&ops);
 	acoustic_register_ops(&acoustic);
 	if (is_cdma_version(system_rev))
-		q6audio_set_acdb_file("default_PMIC.acdb");
+		q6audio_set_acdb_file("default_mos.acdb");
 }
