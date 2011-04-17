@@ -46,7 +46,6 @@
                          SDVO_TV_MASK)
 
 #define IS_TV(c)	(c->output_flag & SDVO_TV_MASK)
-#define IS_TMDS(c)	(c->output_flag & SDVO_TMDS_MASK)
 #define IS_LVDS(c)	(c->output_flag & SDVO_LVDS_MASK)
 #define IS_TV_OR_LVDS(c) (c->output_flag & (SDVO_TV_MASK | SDVO_LVDS_MASK))
 
@@ -1025,13 +1024,9 @@ static void intel_sdvo_mode_set(struct drm_encoder *encoder,
 	if (!intel_sdvo_set_target_input(intel_sdvo))
 		return;
 
-	if (intel_sdvo->has_hdmi_monitor) {
-		intel_sdvo_set_encode(intel_sdvo, SDVO_ENCODE_HDMI);
-		intel_sdvo_set_colorimetry(intel_sdvo,
-					   SDVO_COLORIMETRY_RGB256);
-		intel_sdvo_set_avi_infoframe(intel_sdvo);
-	} else
-		intel_sdvo_set_encode(intel_sdvo, SDVO_ENCODE_DVI);
+	if (intel_sdvo->has_hdmi_monitor &&
+	    !intel_sdvo_set_avi_infoframe(intel_sdvo))
+		return;
 
 	if (intel_sdvo->is_tv &&
 	    !intel_sdvo_set_tv_format(intel_sdvo))
@@ -1357,8 +1352,7 @@ intel_sdvo_hdmi_sink_detect(struct drm_connector *connector)
 				intel_sdvo->has_hdmi_monitor = drm_detect_hdmi_monitor(edid);
 				intel_sdvo->has_hdmi_audio = drm_detect_monitor_audio(edid);
 			}
-		} else
-			status = connector_status_disconnected;
+		}
 		connector->display_info.raw_edid = NULL;
 		kfree(edid);
 	}
@@ -1401,30 +1395,12 @@ intel_sdvo_detect(struct drm_connector *connector, bool force)
 
 	intel_sdvo->attached_output = response;
 
-	intel_sdvo->has_hdmi_monitor = false;
-	intel_sdvo->has_hdmi_audio = false;
-
 	if ((intel_sdvo_connector->output_flag & response) == 0)
 		ret = connector_status_disconnected;
-	else if (IS_TMDS(intel_sdvo_connector))
+	else if (response & SDVO_TMDS_MASK)
 		ret = intel_sdvo_hdmi_sink_detect(connector);
-	else {
-		struct edid *edid;
-
-		/* if we have an edid check it matches the connection */
-		edid = intel_sdvo_get_edid(connector);
-		if (edid == NULL)
-			edid = intel_sdvo_get_analog_edid(connector);
-		if (edid != NULL) {
-			if (edid->input & DRM_EDID_INPUT_DIGITAL)
-				ret = connector_status_disconnected;
-			else
-				ret = connector_status_connected;
-			connector->display_info.raw_edid = NULL;
-			kfree(edid);
-		} else
-			ret = connector_status_connected;
-	}
+	else
+		ret = connector_status_connected;
 
 	/* May update encoder flag for like clock for SDVO TV, etc.*/
 	if (ret == connector_status_connected) {
@@ -1460,15 +1436,10 @@ static void intel_sdvo_get_ddc_modes(struct drm_connector *connector)
 		edid = intel_sdvo_get_analog_edid(connector);
 
 	if (edid != NULL) {
-		struct intel_sdvo_connector *intel_sdvo_connector = to_intel_sdvo_connector(connector);
-		bool monitor_is_digital = !!(edid->input & DRM_EDID_INPUT_DIGITAL);
-		bool connector_is_digital = !!IS_TMDS(intel_sdvo_connector);
-
-		if (connector_is_digital == monitor_is_digital) {
+		if (edid->input & DRM_EDID_INPUT_DIGITAL) {
 			drm_mode_connector_update_edid_property(connector, edid);
 			drm_add_edid_modes(connector, edid);
 		}
-
 		connector->display_info.raw_edid = NULL;
 		kfree(edid);
 	}
@@ -1948,7 +1919,20 @@ intel_sdvo_select_i2c_bus(struct drm_i915_private *dev_priv,
 static bool
 intel_sdvo_is_hdmi_connector(struct intel_sdvo *intel_sdvo, int device)
 {
-	return intel_sdvo_check_supp_encode(intel_sdvo);
+	int is_hdmi;
+
+	if (!intel_sdvo_check_supp_encode(intel_sdvo))
+		return false;
+
+	if (!intel_sdvo_set_target_output(intel_sdvo,
+					  device == 0 ? SDVO_OUTPUT_TMDS0 : SDVO_OUTPUT_TMDS1))
+		return false;
+
+	is_hdmi = 0;
+	if (!intel_sdvo_get_value(intel_sdvo, SDVO_CMD_GET_ENCODE, &is_hdmi, 1))
+		return false;
+
+	return !!is_hdmi;
 }
 
 static u8
@@ -2050,7 +2034,12 @@ intel_sdvo_dvi_init(struct intel_sdvo *intel_sdvo, int device)
 	connector->connector_type = DRM_MODE_CONNECTOR_DVID;
 
 	if (intel_sdvo_is_hdmi_connector(intel_sdvo, device)) {
+		/* enable hdmi encoding mode if supported */
+		intel_sdvo_set_encode(intel_sdvo, SDVO_ENCODE_HDMI);
+		intel_sdvo_set_colorimetry(intel_sdvo,
+					   SDVO_COLORIMETRY_RGB256);
 		connector->connector_type = DRM_MODE_CONNECTOR_HDMIA;
+
 		intel_sdvo->is_hdmi = true;
 	}
 	intel_sdvo->base.clone_mask = ((1 << INTEL_SDVO_NON_TV_CLONE_BIT) |

@@ -1243,15 +1243,9 @@ static int i915_load_modeset_init(struct drm_device *dev,
 	if (ret)
 		DRM_INFO("failed to find VBIOS tables\n");
 
-	/* If we have > 1 VGA cards, then we need to arbitrate access
-	 * to the common VGA resources.
-	 *
-	 * If we are a secondary display controller (!PCI_DISPLAY_CLASS_VGA),
-	 * then we do not take part in VGA arbitration and the
-	 * vga_client_register() fails with -ENODEV.
-	 */
+	/* if we have > 1 VGA cards, then disable the radeon VGA resources */
 	ret = vga_client_register(dev->pdev, dev, NULL, i915_vga_set_decode);
-	if (ret && ret != -ENODEV)
+	if (ret)
 		goto cleanup_ringbuffer;
 
 	intel_register_dsm_handler();
@@ -1942,17 +1936,6 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 	/* overlay on gen2 is broken and can't address above 1G */
 	if (IS_GEN2(dev))
 		dma_set_coherent_mask(&dev->pdev->dev, DMA_BIT_MASK(30));
-
-	/* 965GM sometimes incorrectly writes to hardware status page (HWS)
-	 * using 32bit addressing, overwriting memory if HWS is located
-	 * above 4GB.
-	 *
-	 * The documentation also mentions an issue with undefined
-	 * behaviour if any general state is accessed within a page above 4GB,
-	 * which also needs to be handled carefully.
-	 */
-	if (IS_BROADWATER(dev) || IS_CRESTLINE(dev))
-		dma_set_coherent_mask(&dev->pdev->dev, DMA_BIT_MASK(32));
 
 	dev_priv->regs = ioremap(base, size);
 	if (!dev_priv->regs) {

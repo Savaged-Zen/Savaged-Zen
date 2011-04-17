@@ -1863,14 +1863,12 @@ xfs_qm_dqreclaim_one(void)
 	xfs_dquot_t	*dqpout;
 	xfs_dquot_t	*dqp;
 	int		restarts;
-	int		startagain;
 
 	restarts = 0;
 	dqpout = NULL;
 
 	/* lockorder: hashchainlock, freelistlock, mplistlock, dqlock, dqflock */
-again:
-	startagain = 0;
+startagain:
 	mutex_lock(&xfs_Gqm->qm_dqfrlist_lock);
 
 	list_for_each_entry(dqp, &xfs_Gqm->qm_dqfrlist, q_freelist) {
@@ -1887,10 +1885,13 @@ again:
 			ASSERT(! (dqp->dq_flags & XFS_DQ_INACTIVE));
 
 			trace_xfs_dqreclaim_want(dqp);
+
+			xfs_dqunlock(dqp);
+			mutex_unlock(&xfs_Gqm->qm_dqfrlist_lock);
+			if (++restarts >= XFS_QM_RECLAIM_MAX_RESTARTS)
+				return NULL;
 			XQM_STATS_INC(xqmstats.xs_qm_dqwants);
-			restarts++;
-			startagain = 1;
-			goto dqunlock;
+			goto startagain;
 		}
 
 		/*
@@ -1905,20 +1906,23 @@ again:
 			ASSERT(list_empty(&dqp->q_mplist));
 			list_del_init(&dqp->q_freelist);
 			xfs_Gqm->qm_dqfrlist_cnt--;
+			xfs_dqunlock(dqp);
 			dqpout = dqp;
 			XQM_STATS_INC(xqmstats.xs_qm_dqinact_reclaims);
-			goto dqunlock;
+			break;
 		}
 
 		ASSERT(dqp->q_hash);
 		ASSERT(!list_empty(&dqp->q_mplist));
 
 		/*
-		 * Try to grab the flush lock. If this dquot is in the process
-		 * of getting flushed to disk, we don't want to reclaim it.
+		 * Try to grab the flush lock. If this dquot is in the process of
+		 * getting flushed to disk, we don't want to reclaim it.
 		 */
-		if (!xfs_dqflock_nowait(dqp))
-			goto dqunlock;
+		if (!xfs_dqflock_nowait(dqp)) {
+			xfs_dqunlock(dqp);
+			continue;
+		}
 
 		/*
 		 * We have the flush lock so we know that this is not in the
@@ -1940,7 +1944,8 @@ again:
 				xfs_fs_cmn_err(CE_WARN, mp,
 			"xfs_qm_dqreclaim: dquot %p flush failed", dqp);
 			}
-			goto dqunlock;
+			xfs_dqunlock(dqp); /* dqflush unlocks dqflock */
+			continue;
 		}
 
 		/*
@@ -1962,8 +1967,13 @@ again:
 		 */
 		if (!mutex_trylock(&mp->m_quotainfo->qi_dqlist_lock)) {
 			restarts++;
-			startagain = 1;
-			goto qhunlock;
+			mutex_unlock(&dqp->q_hash->qh_lock);
+			xfs_dqfunlock(dqp);
+			xfs_dqunlock(dqp);
+			mutex_unlock(&xfs_Gqm->qm_dqfrlist_lock);
+			if (restarts++ >= XFS_QM_RECLAIM_MAX_RESTARTS)
+				return NULL;
+			goto startagain;
 		}
 
 		ASSERT(dqp->q_nrefs == 0);
@@ -1976,20 +1986,14 @@ again:
 		xfs_Gqm->qm_dqfrlist_cnt--;
 		dqpout = dqp;
 		mutex_unlock(&mp->m_quotainfo->qi_dqlist_lock);
-qhunlock:
 		mutex_unlock(&dqp->q_hash->qh_lock);
 dqfunlock:
 		xfs_dqfunlock(dqp);
-dqunlock:
 		xfs_dqunlock(dqp);
 		if (dqpout)
 			break;
 		if (restarts >= XFS_QM_RECLAIM_MAX_RESTARTS)
-			break;
-		if (startagain) {
-			mutex_unlock(&xfs_Gqm->qm_dqfrlist_lock);
-			goto again;
-		}
+			return NULL;
 	}
 	mutex_unlock(&xfs_Gqm->qm_dqfrlist_lock);
 	return dqpout;

@@ -79,9 +79,7 @@ enum {
 	MAX_IDLE_WORKERS_RATIO	= 4,		/* 1/4 of busy can be idle */
 	IDLE_WORKER_TIMEOUT	= 300 * HZ,	/* keep idle ones for 5 mins */
 
-	MAYDAY_INITIAL_TIMEOUT  = HZ / 100 >= 2 ? HZ / 100 : 2,
-						/* call for help after 10ms
-						   (min two ticks) */
+	MAYDAY_INITIAL_TIMEOUT	= HZ / 100,	/* call for help after 10ms */
 	MAYDAY_INTERVAL		= HZ / 10,	/* and then every 100ms */
 	CREATE_COOLDOWN		= HZ,		/* time to breath after fail */
 	TRUSTEE_COOLDOWN	= HZ / 10,	/* for trustee draining */
@@ -1808,7 +1806,7 @@ __acquires(&gcwq->lock)
 	spin_unlock_irq(&gcwq->lock);
 
 	work_clear_pending(work);
-	lock_map_acquire_read(&cwq->wq->lockdep_map);
+	lock_map_acquire(&cwq->wq->lockdep_map);
 	lock_map_acquire(&lockdep_map);
 	trace_workqueue_execute_start(work);
 	f(work);
@@ -2011,15 +2009,6 @@ repeat:
 				move_linked_works(work, scheduled, &n);
 
 		process_scheduled_works(rescuer);
-
-		/*
-		 * Leave this gcwq.  If keep_working() is %true, notify a
-		 * regular worker; otherwise, we end up with 0 concurrency
-		 * and stalling the execution.
-		 */
-		if (keep_working(gcwq))
-			wake_up_worker(gcwq);
-
 		spin_unlock_irq(&gcwq->lock);
 	}
 
@@ -2361,18 +2350,8 @@ static bool start_flush_work(struct work_struct *work, struct wq_barrier *barr,
 	insert_wq_barrier(cwq, barr, work, worker);
 	spin_unlock_irq(&gcwq->lock);
 
-	/*
-	 * If @max_active is 1 or rescuer is in use, flushing another work
-	 * item on the same workqueue may lead to deadlock.  Make sure the
-	 * flusher is not running on the same workqueue by verifying write
-	 * access.
-	 */
-	if (cwq->wq->saved_max_active == 1 || cwq->wq->flags & WQ_RESCUER)
-		lock_map_acquire(&cwq->wq->lockdep_map);
-	else
-		lock_map_acquire_read(&cwq->wq->lockdep_map);
+	lock_map_acquire(&cwq->wq->lockdep_map);
 	lock_map_release(&cwq->wq->lockdep_map);
-
 	return true;
 already_gone:
 	spin_unlock_irq(&gcwq->lock);

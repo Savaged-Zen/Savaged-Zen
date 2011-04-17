@@ -148,8 +148,7 @@ struct mddev_s
 						       * are happening, so run/
 						       * takeover/stop are not safe
 						       */
-	int				ready; /* See when safe to pass
-						* IO requests down */
+
 	struct gendisk			*gendisk;
 
 	struct kobject			kobj;
@@ -270,8 +269,6 @@ struct mddev_s
 	atomic_t			active;		/* general refcount */
 	atomic_t			openers;	/* number of active opens */
 
-	int				changed;	/* True if we might need to
-							 * reread partition info */
 	int				degraded;	/* whether md should consider
 							 * adding a spare
 							 */

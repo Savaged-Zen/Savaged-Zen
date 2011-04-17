@@ -129,7 +129,8 @@ void __cpuinit irq_ctx_init(int cpu)
 	irqctx = page_address(alloc_pages_node(cpu_to_node(cpu),
 					       THREAD_FLAGS,
 					       THREAD_ORDER));
-	memset(&irqctx->tinfo, 0, sizeof(struct thread_info));
+	irqctx->tinfo.task		= NULL;
+	irqctx->tinfo.exec_domain	= NULL;
 	irqctx->tinfo.cpu		= cpu;
 	irqctx->tinfo.preempt_count	= HARDIRQ_OFFSET;
 	irqctx->tinfo.addr_limit	= MAKE_MM_SEG(0);
@@ -139,8 +140,10 @@ void __cpuinit irq_ctx_init(int cpu)
 	irqctx = page_address(alloc_pages_node(cpu_to_node(cpu),
 					       THREAD_FLAGS,
 					       THREAD_ORDER));
-	memset(&irqctx->tinfo, 0, sizeof(struct thread_info));
+	irqctx->tinfo.task		= NULL;
+	irqctx->tinfo.exec_domain	= NULL;
 	irqctx->tinfo.cpu		= cpu;
+	irqctx->tinfo.preempt_count	= 0;
 	irqctx->tinfo.addr_limit	= MAKE_MM_SEG(0);
 
 	per_cpu(softirq_ctx, cpu) = irqctx;

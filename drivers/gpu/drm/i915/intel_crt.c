@@ -30,7 +30,6 @@
 #include "drm.h"
 #include "drm_crtc.h"
 #include "drm_crtc_helper.h"
-#include "drm_edid.h"
 #include "intel_drv.h"
 #include "i915_drm.h"
 #include "i915_drv.h"
@@ -288,9 +287,8 @@ static bool intel_crt_ddc_probe(struct drm_i915_private *dev_priv, int ddc_bus)
 	return i2c_transfer(&dev_priv->gmbus[ddc_bus].adapter, msgs, 1) == 1;
 }
 
-static bool intel_crt_detect_ddc(struct drm_connector *connector)
+static bool intel_crt_detect_ddc(struct intel_crt *crt)
 {
-	struct intel_crt *crt = intel_attached_crt(connector);
 	struct drm_i915_private *dev_priv = crt->base.base.dev->dev_private;
 
 	/* CRT should always be at 0, but check anyway */
@@ -303,26 +301,8 @@ static bool intel_crt_detect_ddc(struct drm_connector *connector)
 	}
 
 	if (intel_ddc_probe(&crt->base, dev_priv->crt_ddc_pin)) {
-		struct edid *edid;
-		bool is_digital = false;
-
-		edid = drm_get_edid(connector,
-			&dev_priv->gmbus[dev_priv->crt_ddc_pin].adapter);
-		/*
-		 * This may be a DVI-I connector with a shared DDC
-		 * link between analog and digital outputs, so we
-		 * have to check the EDID input spec of the attached device.
-		 */
-		if (edid != NULL) {
-			is_digital = edid->input & DRM_EDID_INPUT_DIGITAL;
-			connector->display_info.raw_edid = NULL;
-			kfree(edid);
-		}
-
-		if (!is_digital) {
-			DRM_DEBUG_KMS("CRT detected via DDC:0x50 [EDID]\n");
-			return true;
-		}
+		DRM_DEBUG_KMS("CRT detected via DDC:0x50 [EDID]\n");
+		return true;
 	}
 
 	return false;
@@ -478,7 +458,7 @@ intel_crt_detect(struct drm_connector *connector, bool force)
 		}
 	}
 
-	if (intel_crt_detect_ddc(connector))
+	if (intel_crt_detect_ddc(crt))
 		return connector_status_connected;
 
 	if (!force)
@@ -492,7 +472,7 @@ intel_crt_detect(struct drm_connector *connector, bool force)
 		crtc = intel_get_load_detect_pipe(&crt->base, connector,
 						  NULL, &dpms_mode);
 		if (crtc) {
-			if (intel_crt_detect_ddc(connector))
+			if (intel_crt_detect_ddc(crt))
 				status = connector_status_connected;
 			else
 				status = intel_crt_load_detect(crtc, crt);

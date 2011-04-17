@@ -1209,7 +1209,6 @@ struct gendisk *alloc_disk_node(int minors, int node_id)
 			return NULL;
 		}
 		disk->part_tbl->part[0] = &disk->part0;
-		kref_init(&disk->part0.ref);
 
 		disk->minors = minors;
 		rand_initialize_disk(disk);
@@ -1302,7 +1301,7 @@ int invalidate_partition(struct gendisk *disk, int partno)
 	struct block_device *bdev = bdget_disk(disk, partno);
 	if (bdev) {
 		fsync_bdev(bdev);
-		res = __invalidate_device(bdev, true);
+		res = __invalidate_device(bdev);
 		bdput(bdev);
 	}
 	return res;

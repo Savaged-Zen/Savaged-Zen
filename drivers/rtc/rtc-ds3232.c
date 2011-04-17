@@ -1,7 +1,7 @@
 /*
  * RTC client/driver for the Maxim/Dallas DS3232 Real-Time Clock over I2C
  *
- * Copyright (C) 2009-2011 Freescale Semiconductor.
+ * Copyright (C) 2009-2010 Freescale Semiconductor.
  * Author: Jack Lan <jack.lan@freescale.com>
  *
  * This program is free software; you can redistribute  it and/or modify it
@@ -141,11 +141,9 @@ static int ds3232_read_time(struct device *dev, struct rtc_time *time)
 		time->tm_hour = bcd2bin(hour);
 	}
 
-	/* Day of the week in linux range is 0~6 while 1~7 in RTC chip */
-	time->tm_wday = bcd2bin(week) - 1;
+	time->tm_wday = bcd2bin(week);
 	time->tm_mday = bcd2bin(day);
-	/* linux tm_mon range:0~11, while month range is 1~12 in RTC chip */
-	time->tm_mon = bcd2bin(month & 0x7F) - 1;
+	time->tm_mon = bcd2bin(month & 0x7F);
 	if (century)
 		add_century = 100;
 
@@ -164,11 +162,9 @@ static int ds3232_set_time(struct device *dev, struct rtc_time *time)
 	buf[0] = bin2bcd(time->tm_sec);
 	buf[1] = bin2bcd(time->tm_min);
 	buf[2] = bin2bcd(time->tm_hour);
-	/* Day of the week in linux range is 0~6 while 1~7 in RTC chip */
-	buf[3] = bin2bcd(time->tm_wday + 1);
+	buf[3] = bin2bcd(time->tm_wday); /* Day of the week */
 	buf[4] = bin2bcd(time->tm_mday); /* Date */
-	/* linux tm_mon range:0~11, while month range is 1~12 in RTC chip */
-	buf[5] = bin2bcd(time->tm_mon + 1);
+	buf[5] = bin2bcd(time->tm_mon);
 	if (time->tm_year >= 100) {
 		buf[5] |= 0x80;
 		buf[6] = bin2bcd(time->tm_year - 100);

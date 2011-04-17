@@ -796,9 +796,8 @@ static inline void security_free_mnt_opts(struct security_mnt_opts *opts)
  * @unix_stream_connect:
  *	Check permissions before establishing a Unix domain stream connection
  *	between @sock and @other.
- *	@sock contains the sock structure.
- *	@other contains the peer sock structure.
- *	@newsk contains the new sock structure.
+ *	@sock contains the socket structure.
+ *	@other contains the peer socket structure.
  *	Return 0 if permission is granted.
  * @unix_may_send:
  *	Check permissions before connecting or sending datagrams from @sock to
@@ -1569,7 +1568,8 @@ struct security_operations {
 	int (*inode_getsecctx)(struct inode *inode, void **ctx, u32 *ctxlen);
 
 #ifdef CONFIG_SECURITY_NETWORK
-	int (*unix_stream_connect) (struct sock *sock, struct sock *other, struct sock *newsk);
+	int (*unix_stream_connect) (struct socket *sock,
+				    struct socket *other, struct sock *newsk);
 	int (*unix_may_send) (struct socket *sock, struct socket *other);
 
 	int (*socket_create) (int family, int type, int protocol, int kern);
@@ -1664,7 +1664,7 @@ int security_capset(struct cred *new, const struct cred *old,
 		    const kernel_cap_t *effective,
 		    const kernel_cap_t *inheritable,
 		    const kernel_cap_t *permitted);
-int security_capable(const struct cred *cred, int cap);
+int security_capable(int cap);
 int security_real_capable(struct task_struct *tsk, int cap);
 int security_real_capable_noaudit(struct task_struct *tsk, int cap);
 int security_sysctl(struct ctl_table *table, int op);
@@ -1857,9 +1857,9 @@ static inline int security_capset(struct cred *new,
 	return cap_capset(new, old, effective, inheritable, permitted);
 }
 
-static inline int security_capable(const struct cred *cred, int cap)
+static inline int security_capable(int cap)
 {
-	return cap_capable(current, cred, cap, SECURITY_CAP_AUDIT);
+	return cap_capable(current, current_cred(), cap, SECURITY_CAP_AUDIT);
 }
 
 static inline int security_real_capable(struct task_struct *tsk, int cap)
@@ -2525,7 +2525,8 @@ static inline int security_inode_getsecctx(struct inode *inode, void **ctx, u32 
 
 #ifdef CONFIG_SECURITY_NETWORK
 
-int security_unix_stream_connect(struct sock *sock, struct sock *other, struct sock *newsk);
+int security_unix_stream_connect(struct socket *sock, struct socket *other,
+				 struct sock *newsk);
 int security_unix_may_send(struct socket *sock,  struct socket *other);
 int security_socket_create(int family, int type, int protocol, int kern);
 int security_socket_post_create(struct socket *sock, int family,
@@ -2566,8 +2567,8 @@ void security_tun_dev_post_create(struct sock *sk);
 int security_tun_dev_attach(struct sock *sk);
 
 #else	/* CONFIG_SECURITY_NETWORK */
-static inline int security_unix_stream_connect(struct sock *sock,
-					       struct sock *other,
+static inline int security_unix_stream_connect(struct socket *sock,
+					       struct socket *other,
 					       struct sock *newsk)
 {
 	return 0;

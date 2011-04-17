@@ -144,36 +144,16 @@ static void hif_usb_tx_cb(struct urb *urb)
 	case -ENODEV:
 	case -ESHUTDOWN:
 		/*
-		 * The URB has been killed, free the SKBs.
+		 * The URB has been killed, free the SKBs
+		 * and return.
 		 */
 		ath9k_skb_queue_purge(hif_dev, &tx_buf->skb_queue);
-
-		/*
-		 * If the URBs are being flushed, no need to add this
-		 * URB to the free list.
-		 */
-		spin_lock(&hif_dev->tx.tx_lock);
-		if (hif_dev->tx.flags & HIF_USB_TX_FLUSH) {
-			spin_unlock(&hif_dev->tx.tx_lock);
-			return;
-		}
-		spin_unlock(&hif_dev->tx.tx_lock);
-
-		/*
-		 * In the stop() case, this URB has to be added to
-		 * the free list.
-		 */
-		goto add_free;
+		return;
 	default:
 		break;
 	}
 
-	/*
-	 * Check if TX has been stopped, this is needed because
-	 * this CB could have been invoked just after the TX lock
-	 * was released in hif_stop() and kill_urb() hasn't been
-	 * called yet.
-	 */
+	/* Check if TX has been stopped */
 	spin_lock(&hif_dev->tx.tx_lock);
 	if (hif_dev->tx.flags & HIF_USB_TX_STOP) {
 		spin_unlock(&hif_dev->tx.tx_lock);
@@ -210,9 +190,8 @@ static int __hif_usb_tx(struct hif_device_usb *hif_dev)
 	struct tx_buf *tx_buf = NULL;
 	struct sk_buff *nskb = NULL;
 	int ret = 0, i;
-	u16 tx_skb_cnt = 0;
+	u16 *hdr, tx_skb_cnt = 0;
 	u8 *buf;
-	__le16 *hdr;
 
 	if (hif_dev->tx.tx_skb_cnt == 0)
 		return 0;
@@ -237,9 +216,9 @@ static int __hif_usb_tx(struct hif_device_usb *hif_dev)
 
 		buf = tx_buf->buf;
 		buf += tx_buf->offset;
-		hdr = (__le16 *)buf;
-		*hdr++ = cpu_to_le16(nskb->len);
-		*hdr++ = cpu_to_le16(ATH_USB_TX_STREAM_MODE_TAG);
+		hdr = (u16 *)buf;
+		*hdr++ = nskb->len;
+		*hdr++ = ATH_USB_TX_STREAM_MODE_TAG;
 		buf += 4;
 		memcpy(buf, nskb->data, nskb->len);
 		tx_buf->len = nskb->len + 4;
@@ -326,7 +305,6 @@ static void hif_usb_start(void *hif_handle, u8 pipe_id)
 static void hif_usb_stop(void *hif_handle, u8 pipe_id)
 {
 	struct hif_device_usb *hif_dev = (struct hif_device_usb *)hif_handle;
-	struct tx_buf *tx_buf = NULL, *tx_buf_tmp = NULL;
 	unsigned long flags;
 
 	spin_lock_irqsave(&hif_dev->tx.tx_lock, flags);
@@ -334,12 +312,6 @@ static void hif_usb_stop(void *hif_handle, u8 pipe_id)
 	hif_dev->tx.tx_skb_cnt = 0;
 	hif_dev->tx.flags |= HIF_USB_TX_STOP;
 	spin_unlock_irqrestore(&hif_dev->tx.tx_lock, flags);
-
-	/* The pending URBs have to be canceled. */
-	list_for_each_entry_safe(tx_buf, tx_buf_tmp,
-				 &hif_dev->tx.tx_pending, list) {
-		usb_kill_urb(tx_buf->urb);
-	}
 }
 
 static int hif_usb_send(void *hif_handle, u8 pipe_id, struct sk_buff *skb,
@@ -606,7 +578,6 @@ free:
 static void ath9k_hif_usb_dealloc_tx_urbs(struct hif_device_usb *hif_dev)
 {
 	struct tx_buf *tx_buf = NULL, *tx_buf_tmp = NULL;
-	unsigned long flags;
 
 	list_for_each_entry_safe(tx_buf, tx_buf_tmp,
 				 &hif_dev->tx.tx_buf, list) {
@@ -616,10 +587,6 @@ static void ath9k_hif_usb_dealloc_tx_urbs(struct hif_device_usb *hif_dev)
 		kfree(tx_buf->buf);
 		kfree(tx_buf);
 	}
-
-	spin_lock_irqsave(&hif_dev->tx.tx_lock, flags);
-	hif_dev->tx.flags |= HIF_USB_TX_FLUSH;
-	spin_unlock_irqrestore(&hif_dev->tx.tx_lock, flags);
 
 	list_for_each_entry_safe(tx_buf, tx_buf_tmp,
 				 &hif_dev->tx.tx_pending, list) {

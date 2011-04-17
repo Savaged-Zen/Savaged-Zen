@@ -24,7 +24,6 @@
 #include <linux/init.h>
 #include <linux/dma-mapping.h>
 #include <linux/pm_runtime.h>
-#include <linux/pci-aspm.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -758,8 +757,7 @@ static void __rtl8169_check_link_status(struct net_device *dev,
 		if (pm)
 			pm_request_resume(&tp->pci_dev->dev);
 		netif_carrier_on(dev);
-		if (net_ratelimit())
-			netif_info(tp, ifup, dev, "link up\n");
+		netif_info(tp, ifup, dev, "link up\n");
 	} else {
 		netif_carrier_off(dev);
 		netif_info(tp, ifdown, dev, "link down\n");
@@ -3049,11 +3047,6 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	mii->reg_num_mask = 0x1f;
 	mii->supports_gmii = !!(cfg->features & RTL_FEATURE_GMII);
 
-	/* disable ASPM completely as that cause random device stop working
-	 * problems as well as full system hangs for some PCIe devices users */
-	pci_disable_link_state(pdev, PCIE_LINK_STATE_L0S | PCIE_LINK_STATE_L1 |
-				     PCIE_LINK_STATE_CLKPM);
-
 	/* enable device (incl. PCI PM wakeup and hotplug setup) */
 	rc = pci_enable_device(pdev);
 	if (rc < 0) {
@@ -3235,8 +3228,6 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	if (pci_dev_run_wake(pdev))
 		pm_runtime_put_noidle(&pdev->dev);
-
-	netif_carrier_off(dev);
 
 out:
 	return rc;
@@ -3728,8 +3719,7 @@ static void rtl_hw_start_8168(struct net_device *dev)
 	RTL_W16(IntrMitigate, 0x5151);
 
 	/* Work around for RxFIFO overflow. */
-	if (tp->mac_version == RTL_GIGA_MAC_VER_11 ||
-	    tp->mac_version == RTL_GIGA_MAC_VER_22) {
+	if (tp->mac_version == RTL_GIGA_MAC_VER_11) {
 		tp->intr_event |= RxFIFOOver | PCSTimeout;
 		tp->intr_event &= ~RxOverflow;
 	}
@@ -4606,32 +4596,12 @@ static irqreturn_t rtl8169_interrupt(int irq, void *dev_instance)
 			break;
 		}
 
-		if (unlikely(status & RxFIFOOver)) {
-			switch (tp->mac_version) {
-			/* Work around for rx fifo overflow */
-			case RTL_GIGA_MAC_VER_11:
-			case RTL_GIGA_MAC_VER_22:
-			case RTL_GIGA_MAC_VER_26:
-				netif_stop_queue(dev);
-				rtl8169_tx_timeout(dev);
-				goto done;
-			/* Testers needed. */
-			case RTL_GIGA_MAC_VER_17:
-			case RTL_GIGA_MAC_VER_19:
-			case RTL_GIGA_MAC_VER_20:
-			case RTL_GIGA_MAC_VER_21:
-			case RTL_GIGA_MAC_VER_23:
-			case RTL_GIGA_MAC_VER_24:
-			case RTL_GIGA_MAC_VER_27:
-			/* Experimental science. Pktgen proof. */
-			case RTL_GIGA_MAC_VER_12:
-			case RTL_GIGA_MAC_VER_25:
-				if (status == RxFIFOOver)
-					goto done;
-				break;
-			default:
-				break;
-			}
+		/* Work around for rx fifo overflow */
+		if (unlikely(status & RxFIFOOver) &&
+		(tp->mac_version == RTL_GIGA_MAC_VER_11)) {
+			netif_stop_queue(dev);
+			rtl8169_tx_timeout(dev);
+			break;
 		}
 
 		if (unlikely(status & SYSErr)) {
@@ -4667,7 +4637,7 @@ static irqreturn_t rtl8169_interrupt(int irq, void *dev_instance)
 			(status & RxFIFOOver) ? (status | RxOverflow) : status);
 		status = RTL_R16(IntrStatus);
 	}
-done:
+
 	return IRQ_RETVAL(handled);
 }
 

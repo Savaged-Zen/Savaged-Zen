@@ -387,10 +387,6 @@ static void discard_port_data(struct port *port)
 	unsigned int len;
 	int ret;
 
-	if (!port->portdev) {
-		/* Device has been unplugged.  vqs are already gone. */
-		return;
-	}
 	vq = port->in_vq;
 	if (port->inbuf)
 		buf = port->inbuf;
@@ -473,10 +469,6 @@ static void reclaim_consumed_buffers(struct port *port)
 	void *buf;
 	unsigned int len;
 
-	if (!port->portdev) {
-		/* Device has been unplugged.  vqs are already gone. */
-		return;
-	}
 	while ((buf = virtqueue_get_buf(port->out_vq, &len))) {
 		kfree(buf);
 		port->outvq_full = false;
@@ -1470,17 +1462,6 @@ static void control_work_handler(struct work_struct *work)
 	spin_unlock(&portdev->cvq_lock);
 }
 
-static void out_intr(struct virtqueue *vq)
-{
-	struct port *port;
-
-	port = find_port_by_vq(vq->vdev->priv, vq);
-	if (!port)
-		return;
-
-	wake_up_interruptible(&port->waitqueue);
-}
-
 static void in_intr(struct virtqueue *vq)
 {
 	struct port *port;
@@ -1585,7 +1566,7 @@ static int init_vqs(struct ports_device *portdev)
 	 */
 	j = 0;
 	io_callbacks[j] = in_intr;
-	io_callbacks[j + 1] = out_intr;
+	io_callbacks[j + 1] = NULL;
 	io_names[j] = "input";
 	io_names[j + 1] = "output";
 	j += 2;
@@ -1599,7 +1580,7 @@ static int init_vqs(struct ports_device *portdev)
 		for (i = 1; i < nr_ports; i++) {
 			j += 2;
 			io_callbacks[j] = in_intr;
-			io_callbacks[j + 1] = out_intr;
+			io_callbacks[j + 1] = NULL;
 			io_names[j] = "input";
 			io_names[j + 1] = "output";
 		}

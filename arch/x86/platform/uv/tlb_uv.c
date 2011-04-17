@@ -1341,7 +1341,7 @@ uv_activation_descriptor_init(int node, int pnode)
 
 	/*
 	 * each bau_desc is 64 bytes; there are 8 (UV_ITEMS_PER_DESCRIPTOR)
-	 * per cpu; and one per cpu on the uvhub (UV_ADP_SIZE)
+	 * per cpu; and up to 32 (UV_ADP_SIZE) cpu's per uvhub
 	 */
 	bau_desc = kmalloc_node(sizeof(struct bau_desc) * UV_ADP_SIZE
 				* UV_ITEMS_PER_DESCRIPTOR, GFP_KERNEL, node);
@@ -1490,7 +1490,7 @@ calculate_destination_timeout(void)
 /*
  * initialize the bau_control structure for each cpu
  */
-static int __init uv_init_per_cpu(int nuvhubs)
+static void __init uv_init_per_cpu(int nuvhubs)
 {
 	int i;
 	int cpu;
@@ -1507,7 +1507,7 @@ static int __init uv_init_per_cpu(int nuvhubs)
 	struct bau_control *smaster = NULL;
 	struct socket_desc {
 		short num_cpus;
-		short cpu_number[MAX_CPUS_PER_SOCKET];
+		short cpu_number[16];
 	};
 	struct uvhub_desc {
 		unsigned short socket_mask;
@@ -1540,10 +1540,6 @@ static int __init uv_init_per_cpu(int nuvhubs)
 		sdp = &bdp->socket[socket];
 		sdp->cpu_number[sdp->num_cpus] = cpu;
 		sdp->num_cpus++;
-		if (sdp->num_cpus > MAX_CPUS_PER_SOCKET) {
-			printk(KERN_EMERG "%d cpus per socket invalid\n", sdp->num_cpus);
-			return 1;
-		}
 	}
 	for (uvhub = 0; uvhub < nuvhubs; uvhub++) {
 		if (!(*(uvhub_mask + (uvhub/8)) & (1 << (uvhub%8))))
@@ -1574,12 +1570,6 @@ static int __init uv_init_per_cpu(int nuvhubs)
 				bcp->uvhub_master = hmaster;
 				bcp->uvhub_cpu = uv_cpu_hub_info(cpu)->
 						blade_processor_id;
-				if (bcp->uvhub_cpu >= MAX_CPUS_PER_UVHUB) {
-					printk(KERN_EMERG
-						"%d cpus per uvhub invalid\n",
-						bcp->uvhub_cpu);
-					return 1;
-				}
 			}
 nextsocket:
 			socket++;
@@ -1605,7 +1595,6 @@ nextsocket:
 		bcp->congested_reps = congested_reps;
 		bcp->congested_period = congested_period;
 	}
-	return 0;
 }
 
 /*
@@ -1636,10 +1625,7 @@ static int __init uv_bau_init(void)
 	spin_lock_init(&disable_lock);
 	congested_cycles = microsec_2_cycles(congested_response_us);
 
-	if (uv_init_per_cpu(nuvhubs)) {
-		nobau = 1;
-		return 0;
-	}
+	uv_init_per_cpu(nuvhubs);
 
 	uv_partition_base_pnode = 0x7fffffff;
 	for (uvhub = 0; uvhub < nuvhubs; uvhub++)

@@ -90,10 +90,6 @@ static int mosart_input_mapping(struct hid_device *hdev, struct hid_input *hi,
 	case 0xff000000:
 		/* ignore HID features */
 		return -1;
-
-	case HID_UP_BUTTON:
-		/* ignore buttons */
-		return -1;
 	}
 
 	return 0;
@@ -244,7 +240,6 @@ static void mosart_remove(struct hid_device *hdev)
 static const struct hid_device_id mosart_devices[] = {
 	{ HID_USB_DEVICE(USB_VENDOR_ID_ASUS, USB_DEVICE_ID_ASUS_T91MT) },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_ASUS, USB_DEVICE_ID_ASUSTEK_MULTITOUCH_YFO) },
-	{ HID_USB_DEVICE(USB_VENDOR_ID_TURBOX, USB_DEVICE_ID_TURBOX_TOUCHSCREEN_MOSART) },
 	{ }
 };
 MODULE_DEVICE_TABLE(hid, mosart_devices);

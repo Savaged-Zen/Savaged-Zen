@@ -1396,9 +1396,8 @@ static inline void mwait_play_dead(void)
 	unsigned int highest_subcstate = 0;
 	int i;
 	void *mwait_ptr;
-	struct cpuinfo_x86 *c = &current_cpu_data;
 
-	if (!(cpu_has(c, X86_FEATURE_MWAIT) && mwait_usable(c)))
+	if (!cpu_has(&current_cpu_data, X86_FEATURE_MWAIT))
 		return;
 	if (!cpu_has(&current_cpu_data, X86_FEATURE_CLFLSH))
 		return;

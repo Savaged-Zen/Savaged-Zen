@@ -295,8 +295,7 @@ int ath_set_channel(struct ath_softc *sc, struct ieee80211_hw *hw,
 	ath9k_hw_set_interrupts(ah, ah->imask);
 
 	if (!(sc->sc_flags & (SC_OP_OFFCHANNEL))) {
-		if (sc->sc_flags & SC_OP_BEACONS)
-			ath_beacon_config(sc, NULL);
+		ath_beacon_config(sc, NULL);
 		ieee80211_queue_delayed_work(sc->hw, &sc->tx_complete_work, 0);
 		ath_start_ani(common);
 	}
@@ -1245,6 +1244,8 @@ static int ath9k_start(struct ieee80211_hw *hw)
 			ath9k_btcoex_timer_resume(sc);
 	}
 
+	pm_qos_update_request(&sc->pm_qos_req, 55);
+
 mutex_unlock:
 	mutex_unlock(&sc->mutex);
 
@@ -1417,11 +1418,12 @@ static void ath9k_stop(struct ieee80211_hw *hw)
 	ath9k_hw_configpcipowersave(ah, 1, 1);
 	ath9k_ps_restore(sc);
 
-	sc->ps_idle = true;
-	ath9k_set_wiphy_idle(aphy, true);
-	ath_radio_disable(sc, hw);
+	/* Finally, put the chip in FULL SLEEP mode */
+	ath9k_setpower(sc, ATH9K_PM_FULL_SLEEP);
 
 	sc->sc_flags |= SC_OP_INVALID;
+
+	pm_qos_update_request(&sc->pm_qos_req, PM_QOS_DEFAULT_VALUE);
 
 	mutex_unlock(&sc->mutex);
 

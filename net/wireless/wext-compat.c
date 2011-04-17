@@ -802,11 +802,11 @@ int cfg80211_wext_siwfreq(struct net_device *dev,
 			return freq;
 		if (freq == 0)
 			return -EINVAL;
-		mutex_lock(&rdev->devlist_mtx);
 		wdev_lock(wdev);
+		mutex_lock(&rdev->devlist_mtx);
 		err = cfg80211_set_freq(rdev, wdev, freq, NL80211_CHAN_NO_HT);
-		wdev_unlock(wdev);
 		mutex_unlock(&rdev->devlist_mtx);
+		wdev_unlock(wdev);
 		return err;
 	default:
 		return -EOPNOTSUPP;
