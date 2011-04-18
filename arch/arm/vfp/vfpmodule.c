@@ -10,9 +10,12 @@
  */
 #include <linux/module.h>
 #include <linux/types.h>
+#include <linux/cpu.h>
 #include <linux/kernel.h>
+#include <linux/notifier.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
+#include <linux/smp.h>
 #include <linux/init.h>
 
 #include <asm/cputype.h>
@@ -374,54 +377,6 @@ static void vfp_enable(void *unused)
 	set_copro_access(access | CPACC_FULL(10) | CPACC_FULL(11));
 }
 
-int vfp_flush_context(void)
-{
-  unsigned long flags;
-  struct thread_info *ti;
-  u32 fpexc;
-  u32 cpu;
-  int saved = 0;
-
-  local_irq_save(flags);
-
-  ti = current_thread_info();
-  fpexc = fmrx(FPEXC);
-  cpu = ti->cpu;
-
-#ifdef CONFIG_SMP
-  /* On SMP, if VFP is enabled, save the old state */
-  if ((fpexc & FPEXC_EN) && last_VFP_context[cpu]) {
-    last_VFP_context[cpu]->hard.cpu = cpu;
-#else
-  /* If there is a VFP context we must save it. */
-  if (last_VFP_context[cpu]) {
-    /* Enable VFP so we can save the old state. */
-    fmxr(FPEXC, fpexc | FPEXC_EN);
-    isb();
-#endif
-    vfp_save_state(last_VFP_context[cpu], fpexc);
-
-    /* disable, just in case */
-    fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
-    saved = 1;
-  }
-  last_VFP_context[cpu] = NULL;
-
-  local_irq_restore(flags);
-
-  return saved;
-}
-
-void vfp_reinit(void)
-{
-  /* ensure we have access to the vfp */
-  vfp_enable(NULL);
-
-  /* and disable it to ensure the next usage restores the state */
-  fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
-}
-
-
 #ifdef CONFIG_PM
 #include <linux/sysdev.h>
 
@@ -532,7 +487,24 @@ void vfp_flush_hwstate(struct thread_info *thread)
 	put_cpu();
 }
 
-#include <linux/smp.h>
+/*
+ * VFP hardware can lose all context when a CPU goes offline.
+ * Safely clear our held state when a CPU has been killed, and
+ * re-enable access to VFP when the CPU comes back online.
+ *
+ * Both CPU_DYING and CPU_STARTING are called on the CPU which
+ * is being offlined/onlined.
+ */
+static int vfp_hotplug(struct notifier_block *b, unsigned long action,
+	void *hcpu)
+{
+	if (action == CPU_DYING || action == CPU_DYING_FROZEN) {
+		unsigned int cpu = (long)hcpu;
+		last_VFP_context[cpu] = NULL;
+	} else if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
+		vfp_enable(NULL);
+	return NOTIFY_OK;
+}
 
 /*
  * VFP support code initialisation.
@@ -562,6 +534,8 @@ static int __init vfp_init(void)
 	else if (vfpsid & FPSID_NODOUBLE) {
 		printk("no double precision support\n");
 	} else {
+		hotcpu_notifier(vfp_hotplug, 0);
+
 		smp_call_function(vfp_enable, NULL, 1);
 
 		VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;  /* Extract the architecture version */

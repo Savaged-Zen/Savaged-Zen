@@ -39,7 +39,7 @@
 #include <net/sock.h>
 
 #include <asm/system.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <asm/unaligned.h>
 
 #include <net/bluetooth/bluetooth.h>
@@ -66,7 +66,8 @@ void hci_acl_connect(struct hci_conn *conn)
 	bacpy(&cp.bdaddr, &conn->dst);
 	cp.pscan_rep_mode = 0x02;
 
-	if ((ie = hci_inquiry_cache_lookup(hdev, &conn->dst))) {
+	ie = hci_inquiry_cache_lookup(hdev, &conn->dst);
+	if (ie) {
 		if (inquiry_entry_age(ie) <= INQUIRY_ENTRY_AGE_MAX) {
 			cp.pscan_rep_mode = ie->data.pscan_rep_mode;
 			cp.pscan_mode     = ie->data.pscan_mode;
@@ -217,8 +218,7 @@ static void hci_conn_idle(unsigned long arg)
 	hci_conn_enter_sniff_mode(conn);
 }
 
-struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type,
-					__u16 pkt_type, bdaddr_t *dst)
+struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type, bdaddr_t *dst)
 {
 	struct hci_conn *conn;
 
@@ -243,22 +243,14 @@ struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type,
 		conn->pkt_type = hdev->pkt_type & ACL_PTYPE_MASK;
 		break;
 	case SCO_LINK:
-		if (!pkt_type)
-			pkt_type = SCO_ESCO_MASK;
+		if (lmp_esco_capable(hdev))
+			conn->pkt_type = (hdev->esco_type & SCO_ESCO_MASK) |
+					(hdev->esco_type & EDR_ESCO_MASK);
+		else
+			conn->pkt_type = hdev->pkt_type & SCO_PTYPE_MASK;
+		break;
 	case ESCO_LINK:
-		if (!pkt_type)
-			pkt_type = ALL_ESCO_MASK;
-		if (lmp_esco_capable(hdev)) {
-			/* HCI Setup Synchronous Connection Command uses
-			   reverse logic on the EDR_ESCO_MASK bits */
-			conn->pkt_type = (pkt_type ^ EDR_ESCO_MASK) &
-					hdev->esco_type;
-		} else {
-			/* Legacy HCI Add Sco Connection Command uses a
-			   shifted bitmask */
-			conn->pkt_type = (pkt_type << 5) & hdev->pkt_type &
-					SCO_PTYPE_MASK;
-		}
+		conn->pkt_type = hdev->esco_type & ~EDR_ESCO_MASK;
 		break;
 	}
 
@@ -379,29 +371,29 @@ struct hci_conn *hci_connect(struct hci_dev *hdev, int type,
 
 	BT_DBG("%s dst %s", hdev->name, batostr(dst));
 
-	if (!(acl = hci_conn_hash_lookup_ba(hdev, ACL_LINK, dst))) {
-		if (!(acl = hci_conn_add(hdev, ACL_LINK, 0, dst)))
+	acl = hci_conn_hash_lookup_ba(hdev, ACL_LINK, dst);
+	if (!acl) {
+		acl = hci_conn_add(hdev, ACL_LINK, dst);
+		if (!acl)
 			return NULL;
 	}
 
 	hci_conn_hold(acl);
 
 	if (acl->state == BT_OPEN || acl->state == BT_CLOSED) {
-		acl->sec_level = sec_level;
+		acl->sec_level = BT_SECURITY_LOW;
+		acl->pending_sec_level = sec_level;
 		acl->auth_type = auth_type;
 		hci_acl_connect(acl);
-	} else {
-		if (acl->sec_level < sec_level)
-			acl->sec_level = sec_level;
-		if (acl->auth_type < auth_type)
-			acl->auth_type = auth_type;
 	}
 
 	if (type == ACL_LINK)
 		return acl;
 
-	if (!(sco = hci_conn_hash_lookup_ba(hdev, type, dst))) {
-		if (!(sco = hci_conn_add(hdev, type, pkt_type, dst))) {
+	sco = hci_conn_hash_lookup_ba(hdev, type, dst);
+	if (!sco) {
+		sco = hci_conn_add(hdev, type, dst);
+		if (!sco) {
 			hci_conn_put(acl);
 			return NULL;
 		}
@@ -448,10 +440,16 @@ static int hci_conn_auth(struct hci_conn *conn, __u8 sec_level, __u8 auth_type)
 {
 	BT_DBG("conn %p", conn);
 
+	if (conn->pending_sec_level > sec_level)
+		sec_level = conn->pending_sec_level;
+
 	if (sec_level > conn->sec_level)
-		conn->sec_level = sec_level;
+		conn->pending_sec_level = sec_level;
 	else if (conn->link_mode & HCI_LM_AUTH)
 		return 1;
+
+	/* Make sure we preserve an existing MITM requirement*/
+	auth_type |= (conn->auth_type & 0x01);
 
 	conn->auth_type = auth_type;
 
@@ -661,10 +659,12 @@ int hci_get_conn_list(void __user *arg)
 
 	size = sizeof(req) + req.conn_num * sizeof(*ci);
 
-	if (!(cl = kmalloc(size, GFP_KERNEL)))
+	cl = kmalloc(size, GFP_KERNEL);
+	if (!cl)
 		return -ENOMEM;
 
-	if (!(hdev = hci_dev_get(req.dev_id))) {
+	hdev = hci_dev_get(req.dev_id);
+	if (!hdev) {
 		kfree(cl);
 		return -ENODEV;
 	}

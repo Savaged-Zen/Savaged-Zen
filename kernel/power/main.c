@@ -316,46 +316,6 @@ power_attr(wake_lock);
 power_attr(wake_unlock);
 #endif
 
-#ifdef CONFIG_HTC_ONMODE_CHARGING
-static ssize_t state_onchg_show(struct kobject *kobj, struct kobj_attribute *attr,
-           char *buf)
-{
-  char *s = buf;
-  if (get_onchg_state())
-    s += sprintf(s, "chgoff ");
-  else
-    s += sprintf(s, "chgon ");
-
-  if (s != buf)
-    /* convert the last space to a newline */
-    *(s-1) = '\n';
-
-  return (s - buf);
-}
-
-static ssize_t
-state_onchg_store(struct kobject *kobj, struct kobj_attribute *attr,
-         const char *buf, size_t n)
-{
-  char *p;
-  int len;
-
-  p = memchr(buf, '\n', n);
-  len = p ? p - buf : n;
-
-  if (len == 5 || len == 6 || len == 7) {
-    if (!strncmp(buf, "chgon", len))
-      request_onchg_state(1);
-    else if (!strncmp(buf, "chgoff", len))
-      request_onchg_state(0);
-  }
-
-  return 0;
-}
-
-power_attr(state_onchg);
-#endif
-
 static struct attribute * g[] = {
 	&state_attr.attr,
 #ifdef CONFIG_PM_TRACE
@@ -372,9 +332,6 @@ static struct attribute * g[] = {
 	&wake_lock_attr.attr,
 	&wake_unlock_attr.attr,
 #endif
-#ifdef CONFIG_HTC_ONMODE_CHARGING
-  &state_onchg_attr.attr,
-#endif
 #endif
 	NULL,
 };
@@ -389,7 +346,7 @@ EXPORT_SYMBOL_GPL(pm_wq);
 
 static int __init pm_start_workqueue(void)
 {
-	pm_wq = alloc_workqueue("pm", WQ_FREEZEABLE, 0);
+	pm_wq = alloc_workqueue("pm", WQ_FREEZABLE, 0);
 
 	return pm_wq ? 0 : -ENOMEM;
 }

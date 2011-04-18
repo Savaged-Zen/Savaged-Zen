@@ -29,9 +29,6 @@
 #include <mach/msm_iomap.h>
 #include <mach/system.h>
 #include <asm/io.h>
-#ifdef CONFIG_VFP
-#include <asm/vfp.h>
-#endif
 
 #include "smd_private.h"
 #include "acpuclock.h"
@@ -133,7 +130,6 @@ void msm_timer_exit_idle(int low_power);
 int msm_irq_idle_sleep_allowed(void);
 int msm_irq_pending(void);
 int clks_print_running(void);
-extern int board_mfg_mode(void);
 
 #ifdef CONFIG_AXI_SCREEN_POLICY
 static int axi_rate;
@@ -213,38 +209,24 @@ msm_pm_wait_state(uint32_t wait_all_set, uint32_t wait_all_clear,
 	return -ETIMEDOUT;
 }
 
-/*
- * For speeding up boot time:
- * During booting up, disable entering arch_idle() by disable_hlt()
- * Enable it after booting up BOOT_LOCK_TIMEOUT sec.
- */
-#define BOOT_LOCK_TIMEOUT_NORMAL      (60 * HZ)
-#define BOOT_LOCK_TIMEOUT_SHORT      (10 * HZ)
-static void do_expire_boot_lock(struct work_struct *work)
-{
-  enable_hlt();
-  pr_info("Release 'boot-time' no_halt_lock\n");
-}
-static DECLARE_DELAYED_WORK(work_expire_boot_lock, do_expire_boot_lock);
-
 static void
 msm_pm_enter_prep_hw(void)
 {
 #if defined(CONFIG_ARCH_MSM7X30)
-  writel(1, A11S_PWRDOWN);
-  writel(4, A11S_SECOP);
-#elif defined(CONFIG_ARCH_MSM7X27)
-  writel(0x1f, A11S_CLK_SLEEP_EN);
-  writel(1, A11S_PWRDOWN);
-#elif defined(CONFIG_ARCH_QSD8X50)
-  writel(0x1f, A11S_CLK_SLEEP_EN);
-  writel(1, A11S_PWRDOWN);
-  writel(0, A11S_STANDBY_CTL);
-#else /* 7X00/7X25 */
-  writel(0x1f, A11S_CLK_SLEEP_EN);
-  writel(1, A11S_PWRDOWN);
-  writel(0, A11S_STANDBY_CTL);
-  writel(0, A11RAMBACKBIAS);
+	writel(1, A11S_PWRDOWN);
+	writel(4, A11S_SECOP);
+#else
+#if defined(CONFIG_ARCH_QSD8X50)
+	writel(0x1b, A11S_CLK_SLEEP_EN);
+#else
+	writel(0x1f, A11S_CLK_SLEEP_EN);
+#endif
+	writel(1, A11S_PWRDOWN);
+	writel(0, A11S_STANDBY_CTL);
+
+#if defined(CONFIG_ARCH_MSM_ARM11)
+	writel(0, A11RAMBACKBIAS);
+#endif
 #endif
 }
 
@@ -429,23 +411,10 @@ static int msm_sleep(int sleep_mode, uint32_t sleep_delay, int from_idle)
 			printk(KERN_INFO "msm_sleep(): vector %x %x -> "
 			       "%x %x\n", saved_vector[0], saved_vector[1],
 			       msm_pm_reset_vector[0], msm_pm_reset_vector[1]);
-#ifdef CONFIG_VFP
-    if (from_idle)
-      vfp_flush_context();
-#endif
-
-    if (!from_idle) printk(KERN_INFO "[R] suspend end\n");
-    /* reset idle sleep mode when suspend. */
-    if (!from_idle) msm_pm_idle_sleep_mode = CONFIG_MSM7X00A_IDLE_SLEEP_MODE;
 		collapsed = msm_pm_collapse();
-    if (!from_idle) printk(KERN_INFO "[R] resume start\n");
 		msm_pm_reset_vector[0] = saved_vector[0];
 		msm_pm_reset_vector[1] = saved_vector[1];
 		if (collapsed) {
-#ifdef CONFIG_VFP
-      if (from_idle)
-        vfp_reinit();
-#endif
 			cpu_init();
 			__asm__("cpsie   a");
 			msm_fiq_exit_sleep();
@@ -665,19 +634,19 @@ void msm_pm_flush_console(void)
 
 	printk("\n");
 	printk(KERN_EMERG "Restarting %s\n", linux_banner);
-	if (!try_acquire_console_sem()) {
-		release_console_sem();
+	if (console_trylock()) {
+		console_unlock();
 		return;
 	}
 
 	mdelay(50);
 
 	local_irq_disable();
-	if (try_acquire_console_sem())
+	if (!console_trylock())
 		printk(KERN_EMERG "msm_restart: Console was locked! Busting\n");
 	else
 		printk(KERN_EMERG "msm_restart: Console was locked!\n");
-	release_console_sem();
+	console_unlock();
 }
 
 static void msm_pm_restart(char str)
@@ -832,29 +801,6 @@ static void __init msm_pm_axi_init(void)
 }
 #endif
 
-static void __init boot_lock_nohalt(void)
-{
-  int nohalt_timeout;
-
-  /* normal/factory2/recovery */
-  switch (board_mfg_mode()) {
-  case 0: /* normal */
-  case 1: /* factory2 */
-  case 2: /* recovery */
-    nohalt_timeout = BOOT_LOCK_TIMEOUT_NORMAL;
-    break;
-  case 3: /* charge */
-  case 4: /* power_test */
-  case 5: /* offmode_charge */
-  default:
-    nohalt_timeout = BOOT_LOCK_TIMEOUT_SHORT;
-    break;
-  }
-  disable_hlt();
-  schedule_delayed_work(&work_expire_boot_lock, nohalt_timeout);
-  pr_info("Acquire 'boot-time' no_halt_lock %ds\n", nohalt_timeout / HZ);
-}
-
 static int __init msm_pm_init(void)
 {
 	pm_power_off = msm_pm_power_off;
@@ -877,8 +823,6 @@ static int __init msm_pm_init(void)
 	create_proc_read_entry("msm_pm_stats", S_IRUGO,
 				NULL, msm_pm_read_proc, NULL);
 #endif
-
-  boot_lock_nohalt();
 	return 0;
 }
 
