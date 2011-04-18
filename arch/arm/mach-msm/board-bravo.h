@@ -20,6 +20,9 @@
 
 #include <mach/board.h>
 
+#define BRAVO_MIN_UV_MV (800)
+#define BRAVO_MAX_UV_MV (1350)
+
 #define MSM_SMI_BASE		0x02B00000
 #define MSM_SMI_SIZE		0x01500000
 
