@@ -706,8 +706,8 @@ static struct regulator_init_data tps65023_data[5] = {
 	{
 		.constraints = {
 			.name = "dcdc1", /* VREG_MSMC2_1V29 */
-			.min_uV = 925000,
-			.max_uV = 1350000,
+			.min_uV = INCREDIBLEC_MIN_UV_MV * 1000,
+			.max_uV = INCREDIBLEC_MAX_UV_MV * 1000,
 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
 		},
 		.consumer_supplies = tps65023_dcdc1_supplies,
@@ -1213,12 +1213,12 @@ static struct msm_acpu_clock_platform_data incrediblec_clock_data = {
 	.acpu_switch_time_us	= 20,
 	.max_speed_delta_khz	= 256000,
 	.vdd_switch_time_us	= 62,
-	.power_collapse_khz	= 245000,
-	.wait_for_irq_khz	= 245000,
+	.power_collapse_khz	= 128000,
+	.wait_for_irq_khz	= 128000,
 };
 
 static unsigned incrediblec_perf_acpu_table[] = {
-	245000000,
+	128000000,
 	576000000,
 	998400000,
 };

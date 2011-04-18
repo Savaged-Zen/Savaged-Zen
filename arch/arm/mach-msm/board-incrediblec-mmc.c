@@ -83,8 +83,17 @@ static struct {
 	int mask;
 	int level;
 } mmc_vdd_table[] = {
+	{ MMC_VDD_165_195,	1800 },
+	{ MMC_VDD_20_21,	2050 },
+	{ MMC_VDD_21_22,	2150 },
+	{ MMC_VDD_22_23,	2250 },
+	{ MMC_VDD_23_24,	2350 },
+	{ MMC_VDD_24_25,	2450 },
+	{ MMC_VDD_25_26,	2550 },
+	{ MMC_VDD_26_27,	2650 },
+	{ MMC_VDD_27_28,	2750 },
 	{ MMC_VDD_28_29,	2850 },
-	{ MMC_VDD_29_30,	2900 },
+	{ MMC_VDD_29_30,	2950 },
 };
 
 static uint32_t incrediblec_sdslot_switchvdd(struct device *dev, unsigned int vdd)
@@ -142,7 +151,12 @@ static unsigned int incrediblec_sdslot_status(struct device *dev)
 	return !gpio_get_value(INCREDIBLEC_GPIO_SDMC_CD_N);
 }
 
-#define INCREDIBLEC_MMC_VDD	(MMC_VDD_28_29 | MMC_VDD_29_30)
+#define INCREDIBLEC_MMC_VDD	(MMC_VDD_165_195 | MMC_VDD_20_21 | \
+				 MMC_VDD_21_22  | MMC_VDD_22_23 | \
+				 MMC_VDD_23_24 | MMC_VDD_24_25 | \
+				 MMC_VDD_25_26 | MMC_VDD_26_27 | \
+				 MMC_VDD_27_28 | MMC_VDD_28_29 | \
+				 MMC_VDD_29_30)
 
 static unsigned int incrediblec_sdslot_type = MMC_TYPE_SD;
 
@@ -218,7 +232,7 @@ static unsigned int incrediblec_wifi_status(struct device *dev)
 }
 
 static struct msm_mmc_platform_data incrediblec_wifi_data = {
-	.ocr_mask		= MMC_VDD_28_29,
+	.ocr_mask		= MMC_VDD_20_21,
 	.built_in		= 1,
 	.status			= incrediblec_wifi_status,
 	.register_status_notify	= incrediblec_wifi_status_register,
