@@ -677,7 +677,7 @@ void acpuclk_set_vdd(unsigned acpu_khz, int vdd)
 				acpu_freq_tbl[i].vdd = min(max((acpu_freq_tbl[i].vdd + vdd), MAHIMAHI_MIN_UV_MV), MAHIMAHI_MAX_UV_MV);
 			else if (acpu_freq_tbl[i].acpu_khz == acpu_khz)
 				acpu_freq_tbl[i].vdd = min(max(vdd, MAHIMAHI_MIN_UV_MV), MAHIMAHI_MAX_UV_MV);
-#elif defined(CONFIG_MACH_BRAVO || defined(CONFIG_MACH_BRAVOC)
+#elif defined(CONFIG_MACH_BRAVO) || defined(CONFIG_MACH_BRAVOC)
 			if (acpu_khz == 0)
 				acpu_freq_tbl[i].vdd = min(max((acpu_freq_tbl[i].vdd + vdd), BRAVO_MIN_UV_MV), BRAVO_MAX_UV_MV);
 			else if (acpu_freq_tbl[i].acpu_khz == acpu_khz)
