@@ -107,6 +107,9 @@ struct clkctl_acpu_speed {
 	int	 max_vdd;
 };
 
+#ifndef MAX
+# define MAX(A,B) (A>B?A:B)
+#endif // !ndef MAX
 
 struct clkctl_acpu_speed acpu_vdd_tbl[] = {
 	{  19200, VOLTAGE_MIN_START, 975 },
