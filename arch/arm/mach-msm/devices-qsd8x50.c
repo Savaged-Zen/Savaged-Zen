@@ -867,54 +867,6 @@ struct platform_device msm_device_spi = {
 #define MINMAX (CLKFLAG_USE_MIN_TO_SET | CLKFLAG_USE_MAX_TO_SET)
 #define USE_MIN (CLKFLAG_USE_MIN_TO_SET | CLKFLAG_SHARED)
 
-static struct resource resources_otg[] = {
-	{
-		.start	= MSM_HSUSB_PHYS,
-		.end	= MSM_HSUSB_PHYS + MSM_HSUSB_SIZE,
-		.flags	= IORESOURCE_MEM,
-	},
-	{
-		.start	= INT_USB_HS,
-		.end	= INT_USB_HS,
-		.flags	= IORESOURCE_IRQ,
-	},
-};
-
-struct platform_device msm_device_otg = {
-	.name		= "msm_otg",
-	.id		= -1,
-	.num_resources	= ARRAY_SIZE(resources_otg),
-	.resource	= resources_otg,
-	.dev		= {
-		.coherent_dma_mask	= 0xffffffff,
-	},
-};
-
-static u64 dma_mask = 0xffffffffULL;
-static struct resource resources_hsusb_host[] = {
-	{
-		.start	= MSM_HSUSB_PHYS,
-		.end	= MSM_HSUSB_PHYS + MSM_HSUSB_SIZE,
-		.flags	= IORESOURCE_MEM,
-	},
-	{
-		.start	= INT_USB_HS,
-		.end	= INT_USB_HS,
-		.flags	= IORESOURCE_IRQ,
-	},
-};
-
-struct platform_device msm_device_hsusb_host = {
-	.name		= "msm_hsusb_host",
-	.id		= -1,
-	.num_resources	= ARRAY_SIZE(resources_hsusb_host),
-	.resource	= resources_hsusb_host,
-	.dev		= {
-		.dma_mask               = &dma_mask,
-		.coherent_dma_mask      = 0xffffffffULL,
-	},
-};
-
 struct clk msm_clocks_8x50[] = {
 	CLK_PCOM("adm_clk",	ADM_CLK,	NULL, 0),
 	CLK_PCOM("ebi1_clk",	EBI1_CLK,	NULL, CLK_MIN | CLKFLAG_SHARED),

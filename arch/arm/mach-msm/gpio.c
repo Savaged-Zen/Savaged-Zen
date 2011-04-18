@@ -235,21 +235,21 @@ struct msm_gpio_chip msm_gpio_chips[] = {
 #endif
 };
 
-static void msm_gpio_irq_ack(struct irq_data *d)
+static void msm_gpio_irq_ack(unsigned int irq)
 {
 	unsigned long irq_flags;
-	struct msm_gpio_chip *msm_chip = irq_data_get_irq_chip_data(d);
+	struct msm_gpio_chip *msm_chip = get_irq_chip_data(irq);
 	spin_lock_irqsave(&msm_chip->lock, irq_flags);
 	msm_gpio_clear_detect_status(msm_chip,
-				     d->irq - gpio_to_irq(msm_chip->chip.base));
+				     irq - gpio_to_irq(msm_chip->chip.base));
 	spin_unlock_irqrestore(&msm_chip->lock, irq_flags);
 }
 
-static void msm_gpio_irq_mask(struct irq_data *d)
+static void msm_gpio_irq_mask(unsigned int irq)
 {
 	unsigned long irq_flags;
-	struct msm_gpio_chip *msm_chip = irq_data_get_irq_chip_data(d);
-	unsigned offset = d->irq - gpio_to_irq(msm_chip->chip.base);
+	struct msm_gpio_chip *msm_chip = get_irq_chip_data(irq);
+	unsigned offset = irq - gpio_to_irq(msm_chip->chip.base);
 
 	spin_lock_irqsave(&msm_chip->lock, irq_flags);
 	/* level triggered interrupts are also latched */
@@ -260,11 +260,11 @@ static void msm_gpio_irq_mask(struct irq_data *d)
 	spin_unlock_irqrestore(&msm_chip->lock, irq_flags);
 }
 
-static void msm_gpio_irq_unmask(struct irq_data *d)
+static void msm_gpio_irq_unmask(unsigned int irq)
 {
 	unsigned long irq_flags;
-	struct msm_gpio_chip *msm_chip = irq_data_get_irq_chip_data(d);
-	unsigned offset = d->irq - gpio_to_irq(msm_chip->chip.base);
+	struct msm_gpio_chip *msm_chip = get_irq_chip_data(irq);
+	unsigned offset = irq - gpio_to_irq(msm_chip->chip.base);
 
 	spin_lock_irqsave(&msm_chip->lock, irq_flags);
 	/* level triggered interrupts are also latched */
@@ -275,11 +275,11 @@ static void msm_gpio_irq_unmask(struct irq_data *d)
 	spin_unlock_irqrestore(&msm_chip->lock, irq_flags);
 }
 
-static int msm_gpio_irq_set_wake(struct irq_data *d, unsigned int on)
+static int msm_gpio_irq_set_wake(unsigned int irq, unsigned int on)
 {
 	unsigned long irq_flags;
-	struct msm_gpio_chip *msm_chip = irq_data_get_irq_chip_data(d);
-	unsigned offset = d->irq - gpio_to_irq(msm_chip->chip.base);
+	struct msm_gpio_chip *msm_chip = get_irq_chip_data(irq);
+	unsigned offset = irq - gpio_to_irq(msm_chip->chip.base);
 
 	spin_lock_irqsave(&msm_chip->lock, irq_flags);
 
@@ -292,21 +292,21 @@ static int msm_gpio_irq_set_wake(struct irq_data *d, unsigned int on)
 	return 0;
 }
 
-static int msm_gpio_irq_set_type(struct irq_data *d, unsigned int flow_type)
+static int msm_gpio_irq_set_type(unsigned int irq, unsigned int flow_type)
 {
 	unsigned long irq_flags;
-	struct msm_gpio_chip *msm_chip = irq_data_get_irq_chip_data(d);
-	unsigned offset = d->irq - gpio_to_irq(msm_chip->chip.base);
+	struct msm_gpio_chip *msm_chip = get_irq_chip_data(irq);
+	unsigned offset = irq - gpio_to_irq(msm_chip->chip.base);
 	unsigned val, mask = BIT(offset);
 
 	spin_lock_irqsave(&msm_chip->lock, irq_flags);
 	val = readl(msm_chip->regs.int_edge);
 	if (flow_type & IRQ_TYPE_EDGE_BOTH) {
 		writel(val | mask, msm_chip->regs.int_edge);
-		irq_desc[d->irq].handle_irq = handle_edge_irq;
+		irq_desc[irq].handle_irq = handle_edge_irq;
 	} else {
 		writel(val & ~mask, msm_chip->regs.int_edge);
-		irq_desc[d->irq].handle_irq = handle_level_irq;
+		irq_desc[irq].handle_irq = handle_level_irq;
 	}
 	if ((flow_type & IRQ_TYPE_EDGE_BOTH) == IRQ_TYPE_EDGE_BOTH) {
 		msm_chip->both_edge_detect |= mask;
@@ -343,16 +343,16 @@ static void msm_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 					   msm_chip->chip.base + j);
 		}
 	}
-	desc->irq_data.chip->irq_ack(&desc->irq_data);
+	desc->chip->ack(irq);
 }
 
 static struct irq_chip msm_gpio_irq_chip = {
-	.name          = "msmgpio",
-	.irq_ack       = msm_gpio_irq_ack,
-	.irq_mask      = msm_gpio_irq_mask,
-	.irq_unmask    = msm_gpio_irq_unmask,
-	.irq_set_wake  = msm_gpio_irq_set_wake,
-	.irq_set_type  = msm_gpio_irq_set_type,
+	.name      = "msmgpio",
+	.ack       = msm_gpio_irq_ack,
+	.mask      = msm_gpio_irq_mask,
+	.unmask    = msm_gpio_irq_unmask,
+	.set_wake  = msm_gpio_irq_set_wake,
+	.set_type  = msm_gpio_irq_set_type,
 };
 
 #define NUM_GPIO_SMEM_BANKS 6

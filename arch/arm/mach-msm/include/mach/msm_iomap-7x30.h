@@ -176,7 +176,4 @@
 #define MSM_SPI_PHYS          0xA8000000
 #define MSM_SPI_SIZE          SZ_4K
 
-#define MSM_HSUSB_PHYS        0xA3600000
-#define MSM_HSUSB_SIZE        SZ_1K
-
 #endif

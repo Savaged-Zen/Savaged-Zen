@@ -31,9 +31,9 @@
 
 #include <asm/hardware/gic.h>
 
-static inline void smp_cross_call(const struct cpumask *mask, int ipi)
+static inline void smp_cross_call(const struct cpumask *mask)
 {
-	gic_raise_softirq(mask, ipi);
+	gic_raise_softirq(mask, 1);
 }
 
 #endif

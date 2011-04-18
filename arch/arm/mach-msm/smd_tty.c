@@ -42,6 +42,14 @@ static struct smd_tty_info smd_tty[MAX_SMD_TTYS];
 
 static const struct smd_tty_channel_desc smd_default_tty_channels[] = {
 	{ .id = 0, .name = "SMD_DS" },
+#ifdef CONFIG_MACH_SUPERSONIC
+	{ .id = 1, .name = "SMD_DIAG" },
+	{ .id = 9, .name = "SMD_DATA9" },
+	{ .id = 19, .name = "SMD_DATA3" }, // OMA_DM AT-channel
+#endif
+#ifdef CONFIG_BUILD_CIQ
+	{ .id = 26, .name = "SMD_DATA20" }, // CIQ master/slaver bridge
+#endif
 	{ .id = 27, .name = "SMD_GPSNMEA" },
 };
 

@@ -54,6 +54,9 @@ int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr) { return -EIO; }
 #define DMOV_SD2(off, ch) (MSM_DMOV_BASE + 0x0800 + (off) + ((ch) << 2))
 #define DMOV_SD3(off, ch) (MSM_DMOV_BASE + 0x0C00 + (off) + ((ch) << 2))
 
+/* only security domain 3 is available to the ARM11
+ * SD0 -> mARM trusted, SD1 -> mARM nontrusted, SD2 -> aDSP, SD3 -> aARM
+ */
 #if defined(CONFIG_ARCH_MSM7X30)
 #define DMOV_SD_AARM DMOV_SD2
 #else
@@ -89,13 +92,22 @@ int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr) { return -EIO; }
 #define DMOV_STATUS_CMD_PTR_RDY      (1 << 0)
 
 #define DMOV_ISR              DMOV_SD_AARM(0x380, 0)
-  
+
 #define DMOV_CONFIG(ch)       DMOV_SD_AARM(0x300, ch)
 #define DMOV_CONFIG_FORCE_TOP_PTR_RSLT (1 << 2)
 #define DMOV_CONFIG_FORCE_FLUSH_RSLT   (1 << 1)
 #define DMOV_CONFIG_IRQ_EN             (1 << 0)
 
 /* channel assignments */
+
+#define DMOV_GP_CHAN	      4
+
+#define DMOV_CE_IN_CHAN       5
+#define DMOV_CE_IN_CRCI       1
+
+#define DMOV_CE_OUT_CHAN      6
+#define DMOV_CE_OUT_CRCI      2
+
 
 #define DMOV_NAND_CHAN        7
 #define DMOV_NAND_CRCI_CMD    5
