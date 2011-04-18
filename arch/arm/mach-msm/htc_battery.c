@@ -457,7 +457,7 @@ static int htc_set_smem_cable_type(u32 cable_type) { return -1; }
 #if 1 //JH //this is for packet filter (notify port list while USB in/out)
 int update_port_list_charging_state(int enable);
 #endif 
-static int htc_cable_status_update(int status)
+int htc_cable_status_update(int status)
 {
 	int rc = 0;
 //	unsigned last_source;
@@ -485,12 +485,16 @@ static int htc_cable_status_update(int status)
 	}
 
 	/* TODO: replace charging_source to vbus_present */
-	htc_batt_info.rep.charging_source = status;
+	if (!sbc_status(SBC_STATE))
+		htc_batt_info.rep.charging_source = status;
 	/* ARM9 should know the status it notifies,
 	 * keep this code for old projects. */
 	/* htc_set_smem_cable_type(status); */
 
 	update_wake_lock(status);
+
+	if (sbc_status(SBC_STATE))
+		htc_batt_info.rep.charging_source = status;
 	/*ARM9 report CHARGER_AC while plug in htc_adaptor which is identify by usbid*/
 	/*don't need to notify usb driver*/
 	if ((htc_batt_info.guage_driver == GUAGE_MODEM) && (status == CHARGER_AC)) {
@@ -1017,22 +1021,16 @@ static int htc_battery_get_charging_status(void)
 		if ((htc_charge_full) && (htc_batt_info.rep.full_level == 100)) {
 			htc_batt_info.rep.level = 100;
 		}
+		if (sbc_status(SBC_STATE))
+			smem_batt_info->charging_enabled = htc_batt_info.rep.charging_enabled;
 		level = htc_batt_info.rep.level;
 
-		if (!sbc_status(SBC_STATE)) {
+		if (!sbc_status(SBC_STATE))
 			if (level == 100){
 				htc_charge_full = 1;}
-		} else {
-			smem_batt_info->charging_enabled = htc_batt_info.rep.charging_enabled;
+		else
 			if ((level == 100) && (htc_batt_info.rep.batt_vol >= 4193))
 				htc_charge_full = 1;
-
-			if ((level == 100) && (htc_batt_info.rep.batt_vol <= 4193)) {
-				htc_batt_info.rep.charging_enabled = 1;
-				battery_charging_ctrl(1);
-				power_supply_changed(&htc_power_supplies[CHARGER_AC]);
-			}
-		}
 		if (htc_charge_full && !sbc_status(SBC_STATE))
 			ret = POWER_SUPPLY_STATUS_FULL;
 		else if (htc_batt_info.rep.charging_enabled != 0 && !sbc_status(SBC_STATE))
@@ -1609,7 +1607,7 @@ static int handle_battery_call(struct msm_rpc_server *server,
 		args->enable = be32_to_cpu(args->enable);
 		if ((htc_batt_info.charger == LINEAR_CHARGER) && (htc_batt_info.rep.level == 100) &&
 			(htc_batt_info.rep.batt_vol >= 4228) && sbc_status(SBC_STATE)) {
-			if ((args->enable == 2) || (args->enable == 1) || (args->enable == 0) || (args->enable == 00))
+			if ((args->enable == 2) || (args->enable == 1) || (args->enable == 0) || (args->enable == 100))
 				args->enable = 0;
 		} else if (sbc_status(SBC_STATE))
 			args->enable = 2;
