@@ -32,16 +32,13 @@
 #include "proc_comm.h"
 
 #ifdef CONFIG_CPU_FREQ_VDD_LEVELS
-#ifdef CONFIG_MACH_INCREDIBLEC
+#if defined(CONFIG_MACH_INCREDIBLEC)
 #include "board-incrediblec.h"
-#endif
-#ifdef CONFIG_MACH_SUPERSONIC
+#elif defined(CONFIG_MACH_SUPERSONIC)
 #include "board-supersonic.h"
-#endif
-#ifdef CONFIG_MACH_MAHIMAHI
+#elif defined(CONFIG_MACH_MAHIMAHI)
 #include "board-mahimahi.h"
-#endif
-#ifdef CONFIG_MACH_BRAVO
+#elif defined(CONFIG_MACH_BRAVO) || defined(CONFIG_MACH_BRAVOC)
 #include "board-bravo.h"
 #endif
 #endif
@@ -665,25 +662,22 @@ void acpuclk_set_vdd(unsigned acpu_khz, int vdd)
 	{
 		if (freq_table[i].frequency != CPUFREQ_ENTRY_INVALID)
 		{
-#ifdef CONFIG_MACH_INCREDIBLEC
+#if defined(CONFIG_MACH_INCREDIBLEC)
 			if (acpu_khz == 0)
 				acpu_freq_tbl[i].vdd = min(max((acpu_freq_tbl[i].vdd + vdd), INCREDIBLEC_MIN_UV_MV), INCREDIBLEC_MAX_UV_MV);
 			else if (acpu_freq_tbl[i].acpu_khz == acpu_khz)
 				acpu_freq_tbl[i].vdd = min(max(vdd, INCREDIBLEC_MIN_UV_MV), INCREDIBLEC_MAX_UV_MV);
-#endif
-#ifdef CONFIG_MACH_SUPERSONIC
+#elif defined(CONFIG_MACH_SUPERSONIC)
 			if (acpu_khz == 0)
 				acpu_freq_tbl[i].vdd = min(max((acpu_freq_tbl[i].vdd + vdd), SUPERSONIC_MIN_UV_MV), SUPERSONIC_MAX_UV_MV);
 			else if (acpu_freq_tbl[i].acpu_khz == acpu_khz)
 				acpu_freq_tbl[i].vdd = min(max(vdd, SUPERSONIC_MIN_UV_MV), SUPERSONIC_MAX_UV_MV);
-#endif
-#ifdef CONFIG_MACH_MAHIMAHI
+#elif defined(CONFIG_MACH_MAHIMAHI)
 			if (acpu_khz == 0)
 				acpu_freq_tbl[i].vdd = min(max((acpu_freq_tbl[i].vdd + vdd), MAHIMAHI_MIN_UV_MV), MAHIMAHI_MAX_UV_MV);
 			else if (acpu_freq_tbl[i].acpu_khz == acpu_khz)
 				acpu_freq_tbl[i].vdd = min(max(vdd, MAHIMAHI_MIN_UV_MV), MAHIMAHI_MAX_UV_MV);
-#endif
-#ifdef CONFIG_MACH_BRAVO
+#elif defined(CONFIG_MACH_BRAVO || defined(CONFIG_MACH_BRAVOC)
 			if (acpu_khz == 0)
 				acpu_freq_tbl[i].vdd = min(max((acpu_freq_tbl[i].vdd + vdd), BRAVO_MIN_UV_MV), BRAVO_MAX_UV_MV);
 			else if (acpu_freq_tbl[i].acpu_khz == acpu_khz)
