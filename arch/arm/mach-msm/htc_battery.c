@@ -1025,12 +1025,13 @@ static int htc_battery_get_charging_status(void)
 			smem_batt_info->charging_enabled = htc_batt_info.rep.charging_enabled;
 		level = htc_batt_info.rep.level;
 
-		if (!sbc_status(SBC_STATE))
+		if (!sbc_status(SBC_STATE)) {
 			if (level == 100){
 				htc_charge_full = 1;}
-		else
+		} else {
 			if ((level == 100) && (htc_batt_info.rep.batt_vol >= 4193))
 				htc_charge_full = 1;
+		}
 		if (htc_charge_full && !sbc_status(SBC_STATE))
 			ret = POWER_SUPPLY_STATUS_FULL;
 		else if (htc_batt_info.rep.charging_enabled != 0 && !sbc_status(SBC_STATE))
