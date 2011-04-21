@@ -318,6 +318,7 @@ static void inode_wait_for_writeback(struct inode *inode)
 int inode_writeback_begin(struct inode *inode, int wait)
 {
 	assert_spin_locked(&inode_lock);
+
 	if (!atomic_read(&inode->i_count))
 		WARN_ON(!(inode->i_state & (I_WILL_FREE|I_FREEING)));
 	else
@@ -426,7 +427,13 @@ writeback_single_inode(struct inode *inode, struct writeback_control *wbc)
 
 	spin_unlock(&inode_lock);
 
+	if (per_file_limit)
+		wbc->nr_to_write = per_file_limit;
+
 	ret = do_writepages(mapping, wbc);
+
+	if (per_file_limit)
+		wbc->nr_to_write += nr_to_write - per_file_limit;
 
 	/*
 	 * Make sure to wait on the data before writing out the metadata.
@@ -483,7 +490,9 @@ writeback_single_inode(struct inode *inode, struct writeback_control *wbc)
 			redirty_tail(inode);
 		}
 	}
-
+out:
+	trace_writeback_single_inode(inode, wbc,
+				     nr_to_write - wbc->nr_to_write);
 	return ret;
 }
 
@@ -632,15 +641,6 @@ static void __writeback_inodes_sb(struct super_block *sb,
 	spin_unlock(&inode_lock);
 }
 
-/*
- * The maximum number of pages to writeout in a single bdi flush/kupdate
- * operation.  We do this so we don't hold I_SYNC against an inode for
- * enormous amounts of time, which would block a userspace task which has
- * been forced to throttle against that inode.  Also, the code reevaluates
- * the dirty each time it has written this many pages.
- */
-#define MAX_WRITEBACK_PAGES     1024
-
 static inline bool over_bground_thresh(void)
 {
 	unsigned long background_thresh, dirty_thresh;
@@ -649,6 +649,39 @@ static inline bool over_bground_thresh(void)
 
 	return (global_page_state(NR_FILE_DIRTY) +
 		global_page_state(NR_UNSTABLE_NFS) > background_thresh);
+}
+
+/*
+ * Give each inode a nr_to_write that can complete within 1 second.
+ */
+static unsigned long writeback_chunk_size(struct backing_dev_info *bdi,
+					  int sync_mode)
+{
+	unsigned long pages;
+
+	/*
+	 * WB_SYNC_ALL mode does livelock avoidance by syncing dirty
+	 * inodes/pages in one big loop. Setting wbc.nr_to_write=LONG_MAX
+	 * here avoids calling into writeback_inodes_wb() more than once.
+	 *
+	 * The intended call sequence for WB_SYNC_ALL writeback is:
+	 *
+	 *      wb_writeback()
+	 *          __writeback_inodes_sb()     <== called only once
+	 *              write_cache_pages()     <== called once for each inode
+	 *                  (quickly) tag currently dirty pages
+	 *                  (maybe slowly) sync all tagged pages
+	 */
+	if (sync_mode == WB_SYNC_ALL)
+		return LONG_MAX;
+
+	pages = min(bdi->avg_bandwidth,
+		    bdi->dirty_threshold / DIRTY_SCOPE);
+
+	if (pages <= MIN_WRITEBACK_PAGES)
+		return MIN_WRITEBACK_PAGES;
+
+	return rounddown_pow_of_two(pages);
 }
 
 /*
@@ -691,6 +724,7 @@ static long wb_writeback(struct bdi_writeback *wb,
 	}
 
 	wbc.wb_start = jiffies; /* livelock avoidance */
+	bdi_update_write_bandwidth(wb->bdi, wbc.wb_start);
 	for (;;) {
 		/*
 		 * Stop writeback when nr_pages has been consumed
@@ -706,7 +740,9 @@ static long wb_writeback(struct bdi_writeback *wb,
 			break;
 
 		wbc.more_io = 0;
+		write_chunk = writeback_chunk_size(wb->bdi, wbc.sync_mode);
 		wbc.nr_to_write = MAX_WRITEBACK_PAGES;
+		wbc.per_file_limit = write_chunk;
 		wbc.pages_skipped = 0;
 
 		trace_wbc_writeback_start(&wbc, wb->bdi);
@@ -715,6 +751,8 @@ static long wb_writeback(struct bdi_writeback *wb,
 		else
 			writeback_inodes_wb(wb, &wbc);
 		trace_wbc_writeback_written(&wbc, wb->bdi);
+
+		bdi_update_write_bandwidth(wb->bdi, wbc.wb_start);
 
 		work->nr_pages -= MAX_WRITEBACK_PAGES - wbc.nr_to_write;
 		wrote += MAX_WRITEBACK_PAGES - wbc.nr_to_write;

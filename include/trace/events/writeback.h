@@ -10,6 +10,19 @@
 
 struct wb_writeback_work;
 
+#define show_inode_state(state)					\
+	__print_flags(state, "|",				\
+		{I_DIRTY_SYNC,		"I_DIRTY_SYNC"},	\
+		{I_DIRTY_DATASYNC,	"I_DIRTY_DATASYNC"},	\
+		{I_DIRTY_PAGES,		"I_DIRTY_PAGES"},	\
+		{I_NEW,			"I_NEW"},		\
+		{I_WILL_FREE,		"I_WILL_FREE"},		\
+		{I_FREEING,		"I_FREEING"},		\
+		{I_CLEAR,		"I_CLEAR"},		\
+		{I_SYNC,		"I_SYNC"},		\
+		{I_REFERENCED,		"I_REFERENCED"}		\
+		)
+
 DECLARE_EVENT_CLASS(writeback_work_class,
 	TP_PROTO(struct backing_dev_info *bdi, struct wb_writeback_work *work),
 	TP_ARGS(bdi, work),
@@ -146,10 +159,236 @@ DEFINE_EVENT(wbc_class, name, \
 DEFINE_WBC_EVENT(wbc_writeback_start);
 DEFINE_WBC_EVENT(wbc_writeback_written);
 DEFINE_WBC_EVENT(wbc_writeback_wait);
-DEFINE_WBC_EVENT(wbc_balance_dirty_start);
-DEFINE_WBC_EVENT(wbc_balance_dirty_written);
-DEFINE_WBC_EVENT(wbc_balance_dirty_wait);
 DEFINE_WBC_EVENT(wbc_writepage);
+
+TRACE_EVENT(writeback_single_inode,
+
+	TP_PROTO(struct inode *inode,
+		 struct writeback_control *wbc,
+		 unsigned long wrote
+	),
+
+	TP_ARGS(inode, wbc, wrote),
+
+	TP_STRUCT__entry(
+		__array(char, name, 32)
+		__field(unsigned long, ino)
+		__field(unsigned long, state)
+		__field(unsigned long, age)
+		__field(unsigned long, wrote)
+		__field(long, nr_to_write)
+		__field(unsigned long, writeback_index)
+	),
+
+	TP_fast_assign(
+		strncpy(__entry->name,
+			dev_name(inode->i_mapping->backing_dev_info->dev), 32);
+		__entry->ino		= inode->i_ino;
+		__entry->state		= inode->i_state;
+		__entry->age		= (jiffies - inode->dirtied_when) *
+								1000 / HZ;
+		__entry->wrote		= wrote;
+		__entry->nr_to_write	= wbc->nr_to_write;
+		__entry->writeback_index = inode->i_mapping->writeback_index;
+	),
+
+	TP_printk("bdi %s: ino=%lu state=%s age=%lu "
+		  "wrote=%lu to_write=%ld index=%lu",
+		  __entry->name,
+		  __entry->ino,
+		  show_inode_state(__entry->state),
+		  __entry->age,
+		  __entry->wrote,
+		  __entry->nr_to_write,
+		  __entry->writeback_index
+	)
+);
+
+#define KBps(x)			((x) << (PAGE_SHIFT - 10))
+#define Bps(x)			((x) >> (BASE_BW_SHIFT - PAGE_SHIFT))
+
+TRACE_EVENT(dirty_throttle_bandwidth,
+
+	TP_PROTO(struct backing_dev_info *bdi,
+		 unsigned long dirty_bw,
+		 unsigned long long pos_bw,
+		 unsigned long long ref_bw),
+
+	TP_ARGS(bdi, dirty_bw, pos_bw, ref_bw),
+
+	TP_STRUCT__entry(
+		__array(char,			bdi, 32)
+		__field(unsigned long,		write_bw)
+		__field(unsigned long,		avg_bw)
+		__field(unsigned long,		dirty_bw)
+		__field(unsigned long long,	base_bw)
+		__field(unsigned long long,	pos_bw)
+		__field(unsigned long long,	ref_bw)
+		__field(unsigned long long,	avg_ref_bw)
+	),
+
+	TP_fast_assign(
+		strlcpy(__entry->bdi, dev_name(bdi->dev), 32);
+		__entry->write_bw	= KBps(bdi->write_bandwidth);
+		__entry->avg_bw		= KBps(bdi->avg_bandwidth);
+		__entry->dirty_bw	= KBps(dirty_bw);
+		__entry->base_bw	= Bps(bdi->throttle_bandwidth);
+		__entry->pos_bw		= Bps(pos_bw);
+		__entry->ref_bw		= Bps(ref_bw);
+		__entry->avg_ref_bw	= Bps(bdi->reference_bandwidth);
+	),
+
+
+	TP_printk("bdi %s: "
+		  "write_bw=%lu avg_bw=%lu dirty_bw=%lu "
+		  "base_bw=%llu pos_bw=%llu ref_bw=%llu aref_bw=%llu",
+		  __entry->bdi,
+		  __entry->write_bw,	/* bdi write bandwidth */
+		  __entry->avg_bw,	/* bdi avg write bandwidth */
+		  __entry->dirty_bw,	/* bdi dirty bandwidth */
+		  __entry->base_bw,	/* base throttle bandwidth */
+		  __entry->pos_bw,	/* position control bandwidth */
+		  __entry->ref_bw,	/* reference throttle bandwidth */
+		  __entry->avg_ref_bw	/* smoothed reference bandwidth */
+	)
+);
+
+TRACE_EVENT(balance_dirty_pages,
+
+	TP_PROTO(struct backing_dev_info *bdi,
+		 unsigned long thresh,
+		 unsigned long dirty,
+		 unsigned long bdi_dirty,
+		 unsigned long task_bw,
+		 unsigned long dirtied,
+		 unsigned long period,
+		 long pause,
+		 unsigned long start_time),
+
+	TP_ARGS(bdi, thresh, dirty, bdi_dirty,
+		task_bw, dirtied, period, pause, start_time),
+
+	TP_STRUCT__entry(
+		__array(	 char,	bdi, 32)
+		__field(unsigned long,	bdi_weight)
+		__field(unsigned long,	task_weight)
+		__field(unsigned long,	limit)
+		__field(unsigned long,	goal)
+		__field(unsigned long,	dirty)
+		__field(unsigned long,	bdi_goal)
+		__field(unsigned long,	bdi_dirty)
+		__field(unsigned long,	avg_dirty)
+		__field(unsigned long,	base_bw)
+		__field(unsigned long,	task_bw)
+		__field(unsigned long,	dirtied)
+		__field(unsigned long,	period)
+		__field(	 long,	think)
+		__field(	 long,	pause)
+		__field(unsigned long,	paused)
+	),
+
+	TP_fast_assign(
+		long numerator;
+		long denominator;
+
+		strlcpy(__entry->bdi, dev_name(bdi->dev), 32);
+
+		bdi_writeout_fraction(bdi, &numerator, &denominator);
+		__entry->bdi_weight	= 1000 * numerator / denominator;
+		task_dirties_fraction(current, &numerator, &denominator);
+		__entry->task_weight	= 1000 * numerator / denominator;
+
+		__entry->limit = default_backing_dev_info.dirty_threshold;
+		__entry->goal		= thresh - thresh / DIRTY_SCOPE;
+		__entry->dirty		= dirty;
+		__entry->bdi_goal	= bdi->dirty_threshold -
+					  bdi->dirty_threshold / DIRTY_SCOPE;
+		__entry->bdi_dirty	= bdi_dirty;
+		__entry->avg_dirty	= bdi->avg_dirty;
+		__entry->base_bw	= KBps(bdi->throttle_bandwidth) >>
+								BASE_BW_SHIFT;
+		__entry->task_bw	= KBps(task_bw);
+		__entry->dirtied	= dirtied;
+		__entry->think		= current->paused_when == 0 ? 0 :
+			 (long)(jiffies - current->paused_when) * 1000 / HZ;
+		__entry->period		= period * 1000 / HZ;
+		__entry->pause		= pause * 1000 / HZ;
+		__entry->paused		= (jiffies - start_time) * 1000 / HZ;
+	),
+
+
+	TP_printk("bdi %s: bdi_weight=%lu task_weight=%lu "
+		  "limit=%lu goal=%lu dirty=%lu "
+		  "bdi_goal=%lu bdi_dirty=%lu avg_dirty=%lu "
+		  "base_bw=%lu task_bw=%lu "
+		  "dirtied=%lu "
+		  "period=%lu think=%ld pause=%ld paused=%lu",
+		  __entry->bdi,
+		  __entry->bdi_weight,
+		  __entry->task_weight,
+		  __entry->limit,
+		  __entry->goal,
+		  __entry->dirty,
+		  __entry->bdi_goal,
+		  __entry->bdi_dirty,
+		  __entry->avg_dirty,
+		  __entry->base_bw,	/* base throttle bandwidth */
+		  __entry->task_bw,	/* task throttle bandwidth */
+		  __entry->dirtied,
+		  __entry->period,	/* ms */
+		  __entry->think,	/* ms */
+		  __entry->pause,	/* ms */
+		  __entry->paused	/* ms */
+		  )
+);
+
+TRACE_EVENT(global_dirty_state,
+
+	TP_PROTO(unsigned long background_thresh,
+		 unsigned long dirty_thresh
+	),
+
+	TP_ARGS(background_thresh,
+		dirty_thresh
+	),
+
+	TP_STRUCT__entry(
+		__field(unsigned long,	nr_dirty)
+		__field(unsigned long,	nr_writeback)
+		__field(unsigned long,	nr_unstable)
+		__field(unsigned long,	background_thresh)
+		__field(unsigned long,	dirty_thresh)
+		__field(unsigned long,	poll_thresh)
+		__field(unsigned long,	nr_dirtied)
+		__field(unsigned long,	nr_written)
+	),
+
+	TP_fast_assign(
+		__entry->nr_dirty	= global_page_state(NR_FILE_DIRTY);
+		__entry->nr_writeback	= global_page_state(NR_WRITEBACK);
+		__entry->nr_unstable	= global_page_state(NR_UNSTABLE_NFS);
+		__entry->nr_dirtied	= global_page_state(NR_DIRTIED);
+		__entry->nr_written	= global_page_state(NR_WRITTEN);
+		__entry->background_thresh	= background_thresh;
+		__entry->dirty_thresh		= dirty_thresh;
+		__entry->poll_thresh		= current->nr_dirtied_pause;
+	),
+
+	TP_printk("dirty=%lu writeback=%lu unstable=%lu "
+		  "bg_thresh=%lu thresh=%lu gap=%ld poll=%ld "
+		  "dirtied=%lu written=%lu",
+		  __entry->nr_dirty,
+		  __entry->nr_writeback,
+		  __entry->nr_unstable,
+		  __entry->background_thresh,
+		  __entry->dirty_thresh,
+		  __entry->dirty_thresh - __entry->nr_dirty -
+		  __entry->nr_writeback - __entry->nr_unstable,
+		  __entry->poll_thresh,
+		  __entry->nr_dirtied,
+		  __entry->nr_written
+	)
+);
 
 DECLARE_EVENT_CLASS(writeback_congest_waited_template,
 
