@@ -12,6 +12,47 @@ struct backing_dev_info;
 extern spinlock_t inode_lock;
 
 /*
+ * 4MB minimal write chunk size
+ */
+#define MIN_WRITEBACK_PAGES	(4096UL >> (PAGE_CACHE_SHIFT - 10))
+
+/*
+ * The 1/4 region under the global dirty thresh is for smooth dirty throttling:
+ *
+ *		(thresh - 2*thresh/DIRTY_SCOPE, thresh)
+ *
+ * The 1/32 region under the global dirty limit will be more rigidly throttled:
+ *
+ *		(limit - limit/DIRTY_MARGIN, limit)
+ *
+ * The 1/32 region above the global dirty limit will be put to maximum pauses:
+ *
+ *		(limit, limit + limit/DIRTY_MARGIN)
+ *
+ * Further beyond, the dirtier task will enter a loop waiting (possibly long
+ * time) for the dirty pages to drop below (limit + limit/DIRTY_MARGIN).
+ *
+ * The last case may happen lightly when memory is very tight or at sudden
+ * workload rampup. Or under DoS situations such as a fork bomb where every new
+ * task dirties some more pages, or creating 10,000 tasks each writing to a USB
+ * key slowly in 4KB/s.
+ *
+ * The global dirty threshold is normally equal to global dirty limit, except
+ * when the system suddenly allocates a lot of anonymous memory and knocks down
+ * the global dirty threshold quickly, in which case the global dirty limit
+ * will follow down slowly to prevent livelocking all dirtier tasks.
+ */
+#define DIRTY_SCOPE		8
+#define DIRTY_MARGIN		(DIRTY_SCOPE * 4)
+
+/*
+ * The base throttle bandwidth will be 1000 times smaller than write bandwidth
+ * when there are 100 concurrent heavy dirtiers. This shift can work with up to
+ * 40 bits dirty size and 2^16 concurrent dirtiers.
+ */
+#define BASE_BW_SHIFT		24
+
+/*
  * fs/fs-writeback.c
  */
 enum writeback_sync_modes {
@@ -33,6 +74,7 @@ struct writeback_control {
 					   extra jobs and livelock */
 	long nr_to_write;		/* Write this many pages, and decrement
 					   this for each page written */
+	long per_file_limit;		/* Write this many pages for one file */
 	long pages_skipped;		/* Pages which were not written */
 
 	/*
@@ -127,6 +169,22 @@ int dirty_writeback_centisecs_handler(struct ctl_table *, int,
 void global_dirty_limits(unsigned long *pbackground, unsigned long *pdirty);
 unsigned long bdi_dirty_limit(struct backing_dev_info *bdi,
 			       unsigned long dirty);
+
+void bdi_writeout_fraction(struct backing_dev_info *bdi,
+			   long *numerator, long *denominator);
+void task_dirties_fraction(struct task_struct *tsk,
+			   long *numerator, long *denominator);
+
+void bdi_update_bandwidth(struct backing_dev_info *bdi,
+			  unsigned long thresh,
+			  unsigned long dirty,
+			  unsigned long bdi_dirty,
+			  unsigned long start_time);
+static inline void bdi_update_write_bandwidth(struct backing_dev_info *bdi,
+					      unsigned long start_time)
+{
+	bdi_update_bandwidth(bdi, 0, 0, 0, start_time);
+}
 
 void page_writeback_init(void);
 void balance_dirty_pages_ratelimited_nr(struct address_space *mapping,

@@ -40,6 +40,8 @@ typedef int (congested_fn)(void *, int);
 enum bdi_stat_item {
 	BDI_RECLAIMABLE,
 	BDI_WRITEBACK,
+	BDI_DIRTIED,
+	BDI_WRITTEN,
 	NR_BDI_STAT_ITEMS
 };
 
@@ -73,8 +75,25 @@ struct backing_dev_info {
 
 	struct percpu_counter bdi_stat[NR_BDI_STAT_ITEMS];
 
+	unsigned long bw_time_stamp;
+	unsigned long dirtied_stamp;
+	unsigned long written_stamp;
+	unsigned long write_bandwidth;
+	unsigned long avg_bandwidth;
+	unsigned long long throttle_bandwidth;
+	unsigned long long reference_bandwidth;
+	unsigned long long old_ref_bandwidth;
+	unsigned long avg_dirty;
+	unsigned long old_dirty;
+	unsigned long dirty_threshold;
+	unsigned long old_dirty_threshold;
+
 	struct prop_local_percpu completions;
-	int dirty_exceeded;
+
+	/* last time exceeded (limit - limit/DIRTY_MARGIN) */
+	unsigned long dirty_exceed_time;
+	/* last time dropped below (background_thresh + dirty_thresh) / 2 */
+	unsigned long dirty_free_run;
 
 	unsigned int min_ratio;
 	unsigned int max_ratio, max_prop_frac;
