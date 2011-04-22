@@ -30,8 +30,14 @@ config IRQ_WORK
 
 menu "General setup"
 
+choice
+	prompt "CPU Scheduler"
+	default SCHED_BFS
+	---help---
+	  Select the CPU Scheduler to be used.
+
 config SCHED_BFS
-	bool "BFS cpu scheduler"
+	bool "Brain Fuck Scheduler (BFS)"
 	---help---
 	  The Brain Fuck CPU Scheduler for excellent interactivity and
 	  responsiveness on the desktop and solid scalability on normal
@@ -41,8 +47,122 @@ config SCHED_BFS
           TEST so these options are disabled.
 
           Say Y here.
-	default y
 
+config SCHED_CFS
+	bool "Completely Fair Scheduler (CFS)"
+	---help---
+	This is the default cpu scheduler found in the upstream kernel.
+endchoice
+
+config SCHED_BFS_AUTOISO
+	bool "Automatically use SCHED_ISO policy for X"
+	depends on SCHED_BFS
+	default n
+	---help---
+	  Selecting this option will automatically use the SCHED_ISO scheduling
+	  policy for X, resulting in an interactivity boost. This *may* cause 
+	  things like skipping sound on audio applications that are not run
+	  as SCHED_ISO.
+
+	  Tasks (including X) can be run as sched_iso manually using schedtool.
+
+
+choice
+	prompt "Zen-Tune Profile"
+	default ZEN_DESKTOP
+	---help---
+	  Select the tunable profile to be used.
+
+config ZEN_SERVER
+	bool "Server"
+	---help---
+	  This option sets tunables for a server environment.
+	    DIRTY_RATIO: 80
+	    BACKGROUND_DIRTY_RATIO: 1
+	   *BFS ONLY*
+            ISO_CPU: 70
+	    RR_INTERVAL: 6
+	  *CFS ONLY*
+	   SCHED LATENCY: 6 ms
+	   SCHED LATENCY GRANULARITY: 0.75 ms
+		
+config ZEN_DEFAULT
+	bool "Default"
+	---help---
+	  This option sets tunables to default.
+	    DIRTY_RATIO: 20
+	    BACKGROUND_DIRTY_RATIO: 10
+	   *BFS ONLY*
+	    ISO_CPU: 70
+	    RR_INTERVAL: 6
+	  *CFS ONLY*
+	   SCHED LATENCY: 6 ms
+	   SCHED LATENCY GRANULARITY: 0.75 ms
+
+config ZEN_DESKTOP
+	bool "Desktop"
+	---help---
+	  This option sets tunables for a desktop environment.
+	   DIRTY_RATIO: 50
+	   BACKGROUND_DIRTY_RATIO: 20
+	  *BFS ONLY*
+	   ISO_CPU: 50
+	   RR_INTERVAL: 3
+	  *CFS ONLY*
+	   SCHED LATENCY: 3 ms
+	   SCHED LATENCY GRANULARITY: 0.3 ms
+
+config ZEN_CUSTOM
+	bool "Custom"
+	select ZEN_CUSTOM_CHOICES
+	---help---
+	  This option allows custom values to be chosen.
+endchoice
+
+menuconfig ZEN_CUSTOM_CHOICES
+	bool "Zen-Tune Custom Values"
+	depends on ZEN_CUSTOM
+
+if ZEN_CUSTOM_CHOICES
+config RR_INTERVAL_CUSTOM
+	int "BFS rr_interval (in ms)"
+	depends on SCHED_BFS
+	range 1 5000
+	default 6
+	---help---
+	  This is the default rr_interval value that bfs will use. Set to 6ms 
+	  by default because that is approximately the amount of time the human
+	  eye can register changes. Acceptable values are 1-5000. In addition,
+	  this value scales with the number of CPUs and is also adjustable via
+	  the /proc interface.
+
+config ISO_CPU_CUSTOM
+	int "BFS sched_iso_cpu (%)"
+	depends on SCHED_BFS
+	range 0 100
+	default 70
+	---help---
+	  This sets the percentage cpu that the unprivileged SCHED_ISO tasks can
+	  run effectively at realtime priority, averaged over a rolling five
+	  seconds over the -whole- system, meaning all cpus.
+
+config DIRTY_RATIO_CUSTOM
+	int "vm_dirty_ratio (%)"
+	range 0 100
+	default 20
+	---help---
+	  Contains, as a percentage of total system memory, the number of pages at which
+	  a process which is generating disk writes will itself start writing out dirty
+	  data.
+
+config DIRTY_BACKGROUND_RATIO_CUSTOM
+	int "dirty_background_ratio (%)"
+	range 0 100
+	default 10
+	---help---
+	  Contains, as a percentage of total system memory, the number of pages at which
+	  the pdflush background writeback daemon will start writing out dirty data.
+endif # ZEN_CUSTOM_CHOICES
 config EXPERIMENTAL
 	bool "Prompt for development and/or incomplete code/drivers"
 	---help---

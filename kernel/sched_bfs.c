@@ -68,6 +68,7 @@
 #include <linux/bootmem.h>
 #include <linux/ftrace.h>
 #include <linux/slab.h>
+#include <linux/zentune.h>
 
 #include <asm/tlb.h>
 #include <asm/unistd.h>
@@ -131,14 +132,30 @@
  * Value is in ms and set to a minimum of 6ms. Scales with number of cpus.
  * Tunable via /proc interface.
  */
-int rr_interval __read_mostly = 10;
+#if defined(CONFIG_ZEN_DEFAULT)
+int rr_interval __read_mostly = rr_interval_default;
+#elif defined(CONFIG_ZEN_SERVER)
+int rr_interval __read_mostly = rr_interval_server;
+#elif defined(CONFIG_ZEN_DESKTOP)
+int rr_interval __read_mostly = rr_interval_desktop;
+#elif defined(CONFIG_ZEN_CUSTOM)
+int rr_interval __read_mostly = rr_interval_custom;
+#endif
 
 /*
  * sched_iso_cpu - sysctl which determines the cpu percentage SCHED_ISO tasks
  * are allowed to run five seconds as real time tasks. This is the total over
  * all online cpus.
  */
-int sched_iso_cpu __read_mostly = 25;
+#if defined(CONFIG_ZEN_DEFAULT)
+int sched_iso_cpu __read_mostly = sched_iso_cpu_default;
+#elif defined(CONFIG_ZEN_SERVER)
+int sched_iso_cpu __read_mostly = sched_iso_cpu_server;
+#elif defined(CONFIG_ZEN_DESKTOP)
+int sched_iso_cpu __read_mostly = sched_iso_cpu_desktop;
+#elif defined(CONFIG_ZEN_CUSTOM)
+int sched_iso_cpu __read_mostly = sched_iso_cpu_custom;
+#endif
 
 /*
  * The relative length of deadline for each priority(nice) level.
@@ -149,7 +166,7 @@ static int prio_ratios[PRIO_RANGE] __read_mostly;
  * The quota handed out to tasks of all priority levels when refilling their
  * time_slice.
  */
-static inline unsigned long timeslice(void)
+static inline int timeslice(void)
 {
 	return MS_TO_US(rr_interval);
 }
@@ -1413,8 +1430,8 @@ static void try_preempt(struct task_struct *p, struct rq *this_rq)
 		if (rq_prio < highest_prio)
 			continue;
 
-		if (rq_prio > highest_prio || (rq_prio == highest_prio &&
-		    deadline_after(rq->rq_deadline, latest_deadline))) {
+		if (rq_prio > highest_prio ||
+		    deadline_after(rq->rq_deadline, latest_deadline)) {
 			latest_deadline = rq->rq_deadline;
 			highest_prio = rq_prio;
 			highest_prio_rq = rq;
@@ -2928,7 +2945,7 @@ static inline void set_rq_task(struct rq *rq, struct task_struct *p)
 {
 	rq->rq_time_slice = p->time_slice;
 	rq->rq_deadline = p->deadline;
-	rq->rq_last_ran = p->last_ran;
+	rq->rq_last_ran = p->last_ran = rq->clock;
 	rq->rq_policy = p->policy;
 	rq->rq_prio = p->prio;
 	if (p != rq->idle)
