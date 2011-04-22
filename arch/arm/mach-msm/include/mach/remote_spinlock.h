@@ -42,19 +42,19 @@ typedef struct {
 } remote_spinlock_t;
 
 #if defined(CONFIG_MSM_REMOTE_SPINLOCK)
-int _remote_spin_lock_init(remote_spinlock_t *lock, const char *name);
+int _remote_spin_lock_init(remote_spinlock_t *lock, int name);
 void _remote_spin_lock(remote_spinlock_t *lock);
 void _remote_spin_unlock(remote_spinlock_t *lock);
 #else
 static inline int _remote_spin_lock_init(remote_spinlock_t *lock,
-					 const char *name) { return 0; }
+					 int name) { return 0; }
 static inline void _remote_spin_lock(remote_spinlock_t *lock) { }
 static inline void _remote_spin_unlock(remote_spinlock_t *lock) { }
 #endif
 
 /* Note: only the below functions constitute the supported interface */
 static inline int remote_spin_lock_init(remote_spinlock_t *lock,
-					const char *name)
+					int name)
 {
 	spin_lock_init(&lock->local);
 	return _remote_spin_lock_init(lock, name);

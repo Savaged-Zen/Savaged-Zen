@@ -54,6 +54,7 @@ ENTRY(msm_pm_collapse)
 #endif
 
 #ifdef CONFIG_VFP
+	.fpu	neon
 	VFPFSTMIA r0, r1              /* Save VFP working registers */
 	fmrx    r1, fpexc
 	fmrx    r2, fpscr

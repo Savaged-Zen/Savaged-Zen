@@ -37,24 +37,9 @@
 #include <trace/events/writeback.h>
 
 /*
- * After a CPU has dirtied this many pages, balance_dirty_pages_ratelimited
- * will look to see if it needs to force writeback or throttling.
+ * Don't sleep more than 200ms at a time in balance_dirty_pages().
  */
-static long ratelimit_pages = 32;
-
-/*
- * When balance_dirty_pages decides that the caller needs to perform some
- * non-background writeback, this is how many pages it will attempt to write.
- * It should be somewhat larger than dirtied pages to ensure that reasonably
- * large amounts of I/O are submitted.
- */
-static inline long sync_writeback_pages(unsigned long dirtied)
-{
-	if (dirtied < ratelimit_pages)
-		dirtied = ratelimit_pages;
-
-	return dirtied + dirtied / 2;
-}
+#define MAX_PAUSE	max(HZ/5, 1)
 
 /* The following parameters are exported via /proc/sys/vm */
 
@@ -145,7 +130,7 @@ static int calc_period_shift(void)
 	else
 		dirty_total = (vm_dirty_ratio * determine_dirtyable_memory()) /
 				100;
-	return 2 + ilog2(dirty_total - 1);
+	return ilog2(dirty_total - 1);
 }
 
 /*
@@ -219,6 +204,7 @@ int dirty_bytes_handler(struct ctl_table *table, int write,
  */
 static inline void __bdi_writeout_inc(struct backing_dev_info *bdi)
 {
+	__inc_bdi_stat(bdi, BDI_WRITTEN);
 	__prop_inc_percpu_max(&vm_completions, &bdi->completions,
 			      bdi->max_prop_frac);
 }
@@ -241,53 +227,18 @@ void task_dirty_inc(struct task_struct *tsk)
 /*
  * Obtain an accurate fraction of the BDI's portion.
  */
-static void bdi_writeout_fraction(struct backing_dev_info *bdi,
+void bdi_writeout_fraction(struct backing_dev_info *bdi,
 		long *numerator, long *denominator)
 {
-	if (bdi_cap_writeback_dirty(bdi)) {
-		prop_fraction_percpu(&vm_completions, &bdi->completions,
+	prop_fraction_percpu(&vm_completions, &bdi->completions,
 				numerator, denominator);
-	} else {
-		*numerator = 0;
-		*denominator = 1;
-	}
 }
 
-static inline void task_dirties_fraction(struct task_struct *tsk,
+void task_dirties_fraction(struct task_struct *tsk,
 		long *numerator, long *denominator)
 {
 	prop_fraction_single(&vm_dirties, &tsk->dirties,
 				numerator, denominator);
-}
-
-/*
- * task_dirty_limit - scale down dirty throttling threshold for one task
- *
- * task specific dirty limit:
- *
- *   dirty -= (dirty/8) * p_{t}
- *
- * To protect light/slow dirtying tasks from heavier/fast ones, we start
- * throttling individual tasks before reaching the bdi dirty limit.
- * Relatively low thresholds will be allocated to heavy dirtiers. So when
- * dirty pages grow large, heavy dirtiers will be throttled first, which will
- * effectively curb the growth of dirty pages. Light dirtiers with high enough
- * dirty threshold may never get throttled.
- */
-static unsigned long task_dirty_limit(struct task_struct *tsk,
-				       unsigned long bdi_dirty)
-{
-	long numerator, denominator;
-	unsigned long dirty = bdi_dirty;
-	u64 inv = dirty >> 3;
-
-	task_dirties_fraction(tsk, &numerator, &denominator);
-	inv *= numerator;
-	do_div(inv, denominator);
-
-	dirty -= inv;
-
-	return max(dirty, bdi_dirty/2);
 }
 
 /*
@@ -403,8 +354,6 @@ unsigned long determine_dirtyable_memory(void)
  * Calculate the dirty thresholds based on sysctl parameters
  * - vm.dirty_background_ratio  or  vm.dirty_background_bytes
  * - vm.dirty_ratio             or  vm.dirty_bytes
- * The dirty limits will be lifted by 1/4 for PF_LESS_THROTTLE (ie. nfsd) and
- * real-time tasks.
  */
 void global_dirty_limits(unsigned long *pbackground, unsigned long *pdirty)
 {
@@ -426,21 +375,32 @@ void global_dirty_limits(unsigned long *pbackground, unsigned long *pdirty)
 	else
 		background = (dirty_background_ratio * available_memory) / 100;
 
-	if (background >= dirty)
-		background = dirty / 2;
+	/*
+	 * Ensure at least 1/4 gap between background and dirty thresholds, so
+	 * that when dirty throttling starts at (background + dirty)/2, it's
+	 * below or at the entrance of the soft dirty throttle scope.
+	 */
+	if (background > dirty - dirty / (DIRTY_SCOPE / 2))
+		background = dirty - dirty / (DIRTY_SCOPE / 2);
+
 	tsk = current;
-	if (tsk->flags & PF_LESS_THROTTLE || rt_task(tsk)) {
-		background += background / 4;
-		dirty += dirty / 4;
-	}
 	*pbackground = background;
 	*pdirty = dirty;
+	trace_global_dirty_state(background, dirty);
 }
+EXPORT_SYMBOL_GPL(global_dirty_limits);
 
-/*
+/**
  * bdi_dirty_limit - @bdi's share of dirty throttling threshold
+ * @bdi: the backing_dev_info to query
+ * @dirty: global dirty limit in pages
  *
- * Allocate high/low dirty limits to fast/slow devices, in order to prevent
+ * Returns @bdi's dirty limit in pages. The term "dirty" in the context of
+ * dirty balancing includes all PG_dirty, PG_writeback and NFS unstable pages.
+ * And the "limit" in the name is not seriously taken as hard limit in
+ * balance_dirty_pages().
+ *
+ * It allocates high/low dirty limits to fast/slow devices, in order to prevent
  * - starving fast devices
  * - piling up dirty pages (that will take long time to sync) on slow devices
  *
@@ -469,6 +429,746 @@ unsigned long bdi_dirty_limit(struct backing_dev_info *bdi, unsigned long dirty)
 }
 
 /*
+ * If we can dirty N more pages globally, honour N/8 to the bdi that runs low,
+ * so as to help it ramp up.
+ *
+ * It helps the chicken and egg problem: when bdi A (eg. /pub) is heavy dirtied
+ * and bdi B (eg. /) is light dirtied hence has 0 dirty limit, tasks writing to
+ * B always get heavily throttled and bdi B's dirty limit might never be able
+ * to grow up from 0.
+ */
+static unsigned long dirty_rampup_size(unsigned long dirty,
+				       unsigned long thresh)
+{
+	if (thresh > dirty + MIN_WRITEBACK_PAGES)
+		return min(MIN_WRITEBACK_PAGES * 2, (thresh - dirty) / 8);
+
+	return MIN_WRITEBACK_PAGES / 8;
+}
+
+/*
+ * After a task dirtied this many pages, balance_dirty_pages_ratelimited_nr()
+ * will look to see if it needs to start dirty throttling.
+ *
+ * If ratelimit_pages is too low then big NUMA machines will call the expensive
+ * global_page_state() too often. So scale it near-sqrt to the safety margin
+ * (the number of pages we may dirty without exceeding the dirty limits).
+ */
+static unsigned long ratelimit_pages(unsigned long dirty,
+				     unsigned long thresh)
+{
+	if (thresh > dirty)
+		return 1UL << (ilog2(thresh - dirty) >> 1);
+
+	return 1;
+}
+
+/*
+ * last time exceeded (limit - limit/DIRTY_MARGIN)
+ */
+static bool dirty_exceeded_recently(struct backing_dev_info *bdi,
+				    unsigned long time_window)
+{
+	return jiffies - bdi->dirty_exceed_time <= time_window;
+}
+
+/*
+ * last time dropped below (thresh - 2*thresh/DIRTY_SCOPE + thresh/DIRTY_MARGIN)
+ */
+static bool dirty_free_run_recently(struct backing_dev_info *bdi,
+				    unsigned long time_window)
+{
+	return jiffies - bdi->dirty_free_run <= time_window;
+}
+
+/*
+ * Position based bandwidth control.
+ *
+ * (1) hard dirty limiting areas
+ *
+ * The block area is required to stop large number of slow dirtiers, because
+ * the max pause area is only able to throttle a task at 1page/200ms=20KB/s.
+ *
+ * The max pause area is sufficient for normal workloads, and has the virtue
+ * of bounded latency for light dirtiers.
+ *
+ * The brake area is typically enough to hold off the dirtiers as long as the
+ * dirtyable memory is not so tight.
+ *
+ * The block area and max pause area are enforced inside the loop of
+ * balance_dirty_pages(). Others can be found in dirty_throttle_bandwidth().
+ *
+ *         block area,  loop until drop below the area  -------------------|<===
+ *     max pause area,  sleep(max_pause) and return     -----------|<=====>|
+ *         brake area,  bw scaled from 1 down to 0      ---|<=====>|
+ * --------------------------------------------------------o-------o-------o----
+ *                                                         ^       ^       ^
+ *                          limit - limit/DIRTY_MARGIN  ---'       |       |
+ *                          limit                       -----------'       |
+ *                          limit + limit/DIRTY_MARGIN  -------------------'
+ *
+ * (2) global control areas
+ *
+ * The rampup area is for ramping up the base bandwidth whereas the above brake
+ * area is for scaling down the base bandwidth.
+ *
+ * The global thresh is typically equal to the above global limit. The
+ * difference is, @thresh is real-time computed from global_dirty_limits() and
+ * @limit is tracking @thresh at 100ms intervals in update_dirty_limit(). The
+ * point is to track @thresh slowly if it dropped below the number of dirty
+ * pages, so as to avoid unnecessarily entering the three areas in (1).
+ *
+ *rampup area                 setpoint/goal
+ *|<=======>|                      v
+ * |-------------------------------*-------------------------------|------------
+ * ^                               ^                               ^
+ * thresh - 2*thresh/DIRTY_SCOPE   thresh - thresh/DIRTY_SCOPE     thresh
+ *
+ * (3) bdi control areas
+ *
+ * The bdi reserve area tries to keep a reasonable number of dirty pages for
+ * preventing block queue underrun.
+ *
+ * reserve area, scale up bw as dirty pages drop low  bdi_setpoint
+ * |<=============================================>|       v
+ * |-------------------------------------------------------*-------|----------
+ * 0                    bdi_thresh - bdi_thresh/DIRTY_SCOPE^       ^bdi_thresh
+ *
+ * (4) global/bdi control lines
+ *
+ * dirty_throttle_bandwidth() applies 2 main and 3 regional control lines for
+ * scaling up/down the base bandwidth based on the position of dirty pages.
+ *
+ * The two main control lines for the global/bdi control scopes do not end at
+ * thresh/bdi_thresh.  They are centered at setpoint/bdi_setpoint and cover the
+ * whole [0, limit].  If the control line drops below 0 before reaching @limit,
+ * an auxiliary line will be setup to connect them. The below figure illustrates
+ * the main bdi control line with an auxiliary line extending it to @limit.
+ *
+ * This allows smoothly throttling down bdi_dirty back to normal if it starts
+ * high in situations like
+ * - start writing to a slow SD card and a fast disk at the same time. The SD
+ *   card's bdi_dirty may rush to 5 times higher than bdi_setpoint.
+ * - the global/bdi dirty thresh/goal may be knocked down suddenly either on
+ *   user request or on increased memory consumption.
+ *
+ *   o
+ *     o
+ *       o                                      [o] main control line
+ *         o                                    [*] auxiliary control line
+ *           o
+ *             o
+ *               o
+ *                 o
+ *                   o
+ *                     o
+ *                       o--------------------- balance point, bw scale = 1
+ *                       | o
+ *                       |   o
+ *                       |     o
+ *                       |       o
+ *                       |         o
+ *                       |           o
+ *                       |             o------- connect point, bw scale = 1/2
+ *                       |               .*
+ *                       |                 .   *
+ *                       |                   .      *
+ *                       |                     .         *
+ *                       |                       .           *
+ *                       |                         .              *
+ *                       |                           .                 *
+ *  [--------------------*-----------------------------.--------------------*]
+ *  0                 bdi_setpoint                  bdi_origin           limit
+ *
+ * The bdi control line: if (bdi_origin < limit), an auxiliary control line (*)
+ * will be setup to extend the main control line (o) to @limit.
+ */
+static unsigned long dirty_throttle_bandwidth(struct backing_dev_info *bdi,
+					      unsigned long thresh,
+					      unsigned long dirty,
+					      unsigned long bdi_dirty,
+					      struct task_struct *tsk)
+{
+	unsigned long limit = default_backing_dev_info.dirty_threshold;
+	unsigned long bdi_thresh = bdi->dirty_threshold;
+	unsigned long origin;
+	unsigned long goal;
+	unsigned long long span;
+	unsigned long long bw;
+
+	if (unlikely(dirty >= limit))
+		return 0;
+
+	/*
+	 * global setpoint
+	 */
+	origin = 2 * thresh;
+	goal = thresh - thresh / DIRTY_SCOPE;
+
+	if (unlikely(origin < limit && dirty > (goal + origin) / 2)) {
+		origin = limit;
+		goal = (goal + origin) / 2;
+		bw >>= 1;
+	}
+	bw = origin - dirty;
+	bw <<= BASE_BW_SHIFT;
+	do_div(bw, origin - goal + 1);
+
+	/*
+	 * brake area to prevent global dirty exceeding
+	 */
+	if (dirty > limit - limit / DIRTY_MARGIN) {
+		bw *= limit - dirty;
+		do_div(bw, limit / DIRTY_MARGIN + 1);
+	}
+
+	/*
+	 * rampup area, immediately above the unthrottled free-run region.
+	 * It's setup mainly to get an estimation of ref_bw for reliably
+	 * ramping up the base bandwidth.
+	 */
+	dirty = default_backing_dev_info.avg_dirty;
+	origin = thresh - thresh / (DIRTY_SCOPE/2) + thresh / DIRTY_MARGIN;
+	if (dirty < origin) {
+		span = (origin - dirty) * bw;
+		do_div(span, thresh / (8 * DIRTY_MARGIN) + 1);
+		bw += span;
+	}
+
+	/*
+	 * bdi setpoint
+	 */
+	if (unlikely(bdi_thresh > thresh))
+		bdi_thresh = thresh;
+	goal = bdi_thresh - bdi_thresh / DIRTY_SCOPE;
+	/*
+	 * In JBOD case, bdi_thresh could fluctuate proportional to its own
+	 * size. Otherwise the bdi write bandwidth is good for limiting the
+	 * floating area, to compensate for the global control line being too
+	 * flat in large memory systems.
+	 */
+	span = (u64) bdi_thresh * (thresh - bdi_thresh) +
+		(2 * bdi->avg_bandwidth) * bdi_thresh;
+	do_div(span, thresh + 1);
+	origin = goal + 2 * span;
+
+	dirty = bdi->avg_dirty;
+	if (unlikely(dirty > goal + span)) {
+		if (dirty > limit)
+			return 0;
+		if (origin < limit) {
+			origin = limit;
+			goal += span;
+			bw >>= 1;
+		}
+	}
+	bw *= origin - dirty;
+	do_div(bw, origin - goal + 1);
+
+	/*
+	 * bdi reserve area, safeguard against bdi dirty underflow and disk idle
+	 */
+	origin = bdi_thresh - bdi_thresh / (DIRTY_SCOPE / 2);
+	if (bdi_dirty < origin) {
+		bw = bw * origin;
+		do_div(bw, bdi_dirty | 1);
+	}
+
+	/*
+	 * honour light dirtiers higher bandwidth:
+	 *
+	 *	bw *= sqrt(1 / task_dirty_weight);
+	 */
+	if (tsk) {
+		unsigned long numerator, denominator;
+		const unsigned long priority_base = 1024;
+		unsigned long priority = priority_base;
+
+		/*
+		 * Double the bandwidth for PF_LESS_THROTTLE (ie. nfsd) and
+		 * real-time tasks.
+		 */
+		if (tsk->flags & PF_LESS_THROTTLE || rt_task(tsk))
+			priority *= 2;
+
+		task_dirties_fraction(tsk, &numerator, &denominator);
+
+		denominator <<= 10;
+		denominator = denominator * priority / priority_base;
+		bw *= int_sqrt(denominator / (numerator + 1)) *
+					    priority / priority_base;
+		bw >>= 5 + BASE_BW_SHIFT / 2;
+		bw = (unsigned long)bw * bdi->throttle_bandwidth;
+		bw >>= 2 * BASE_BW_SHIFT - BASE_BW_SHIFT / 2;
+
+		/*
+		 * The avg_bandwidth bound is necessary because
+		 * bdi_update_throttle_bandwidth() blindly sets base bandwidth
+		 * to avg_bandwidth for more stable estimation, when it
+		 * believes the current task is the only dirtier.
+		 */
+		if (priority > priority_base)
+			return min((unsigned long)bw, bdi->avg_bandwidth);
+	}
+
+	return bw;
+}
+
+static void bdi_update_dirty_smooth(struct backing_dev_info *bdi,
+				    unsigned long dirty)
+{
+	unsigned long avg = bdi->avg_dirty;
+	unsigned long old = bdi->old_dirty;
+
+	if (unlikely(!avg)) {
+		avg = dirty;
+		goto update;
+	}
+
+	/*
+	 * dirty pages are departing upwards, follow up
+	 */
+	if (avg < old && old <= dirty) {
+		avg += (old - avg) >> 3;
+		goto update;
+	}
+
+	/*
+	 * dirty pages are departing downwards, follow down
+	 */
+	if (avg > old && old >= dirty) {
+		avg -= (avg - old) >> 3;
+		goto update;
+	}
+
+	/*
+	 * This can filter out one half unnecessary updates when bdi_dirty is
+	 * fluctuating around the balance point, and is most effective on XFS,
+	 * whose pattern is
+	 *                                                             .
+	 *	[.] dirty	[-] avg                       .       .
+	 *                                                   .       .
+	 *              .         .         .         .     .       .
+	 *      ---------------------------------------    .       .
+	 *            .         .         .         .     .       .
+	 *           .         .         .         .     .       .
+	 *          .         .         .         .     .       .
+	 *         .         .         .         .     .       .
+	 *        .         .         .         .
+	 *       .         .         .         .      (flucuated)
+	 *      .         .         .         .
+	 *     .         .         .         .
+	 *
+	 * @avg will remain flat at the cost of being biased towards high. In
+	 * practice the error tend to be much smaller: thanks to more coarse
+	 * grained fluctuations, @avg becomes the real average number for the
+	 * last two rising lines of @dirty.
+	 */
+	goto out;
+
+update:
+	bdi->avg_dirty = avg;
+out:
+	bdi->old_dirty = dirty;
+}
+
+static void __bdi_update_write_bandwidth(struct backing_dev_info *bdi,
+					 unsigned long elapsed,
+					 unsigned long written)
+{
+	const unsigned long period = roundup_pow_of_two(3 * HZ);
+	unsigned long avg = bdi->avg_bandwidth;
+	unsigned long old = bdi->write_bandwidth;
+	unsigned long cur;
+	u64 bw;
+
+	bw = written - bdi->written_stamp;
+	bw *= HZ;
+	if (unlikely(elapsed > period / 2)) {
+		do_div(bw, elapsed);
+		elapsed = period / 2;
+		bw *= elapsed;
+	}
+	bw += (u64)bdi->write_bandwidth * (period - elapsed);
+	cur = bw >> ilog2(period);
+	bdi->write_bandwidth = cur;
+
+	/*
+	 * one more level of smoothing
+	 */
+	if (avg > old && old > cur)
+		avg -= (avg - old) >> 5;
+
+	if (avg < old && old < cur)
+		avg += (old - avg) >> 5;
+
+	bdi->avg_bandwidth = avg;
+}
+
+static void update_dirty_limit(unsigned long thresh,
+			       unsigned long dirty)
+{
+	unsigned long limit = default_backing_dev_info.dirty_threshold;
+	unsigned long min = dirty + limit / DIRTY_MARGIN;
+
+	if (limit < thresh) {
+		limit = thresh;
+		goto out;
+	}
+
+	/* take care not to follow into the brake area */
+	if (limit > thresh + thresh / (DIRTY_MARGIN * 8) &&
+	    limit > min) {
+		limit -= (limit - max(thresh, min)) >> 3;
+		goto out;
+	}
+
+	return;
+out:
+	default_backing_dev_info.dirty_threshold = limit;
+}
+
+static void bdi_update_dirty_threshold(struct backing_dev_info *bdi,
+				       unsigned long thresh,
+				       unsigned long dirty)
+{
+	unsigned long old = bdi->old_dirty_threshold;
+	unsigned long avg = bdi->dirty_threshold;
+	unsigned long min;
+
+	min = dirty_rampup_size(dirty, thresh);
+	thresh = bdi_dirty_limit(bdi, thresh);
+
+	if (avg > old && old >= thresh)
+		avg -= (avg - old) >> 4;
+
+	if (avg < old && old <= thresh)
+		avg += (old - avg) >> 4;
+
+	bdi->dirty_threshold = max(avg, min);
+	bdi->old_dirty_threshold = thresh;
+}
+
+/*
+ * ref_bw typically fluctuates within a small range, with large isolated points
+ * from time to time. The smoothed reference_bandwidth can effectively filter
+ * out 1 such standalone point. When there comes 2+ isolated points together --
+ * observed in ext4 on sudden redirty -- reference_bandwidth may surge high and
+ * take long time to return to normal, which can mostly be counteracted by
+ * xref_bw and other update restrictions in bdi_update_throttle_bandwidth().
+ */
+static void bdi_update_reference_bandwidth(struct backing_dev_info *bdi,
+					   unsigned long ref_bw)
+{
+	unsigned long old = bdi->old_ref_bandwidth;
+	unsigned long avg = bdi->reference_bandwidth;
+
+	if (avg > old && old >= ref_bw && avg - old >= old - ref_bw)
+		avg -= (avg - old) >> 3;
+
+	if (avg < old && old <= ref_bw && old - avg >= ref_bw - old)
+		avg += (old - avg) >> 3;
+
+	bdi->reference_bandwidth = avg;
+	bdi->old_ref_bandwidth = ref_bw;
+}
+
+/*
+ * Base throttle bandwidth.
+ */
+static void bdi_update_throttle_bandwidth(struct backing_dev_info *bdi,
+					  unsigned long thresh,
+					  unsigned long dirty,
+					  unsigned long bdi_dirty,
+					  unsigned long dirtied,
+					  unsigned long elapsed)
+{
+	unsigned long limit = default_backing_dev_info.dirty_threshold;
+	unsigned long margin = limit / DIRTY_MARGIN;
+	unsigned long goal = thresh - thresh / DIRTY_SCOPE;
+	unsigned long bdi_thresh = bdi->dirty_threshold;
+	unsigned long bdi_goal = bdi_thresh - bdi_thresh / DIRTY_SCOPE;
+	unsigned long long bw = bdi->throttle_bandwidth;
+	unsigned long long dirty_bw;
+	unsigned long long pos_bw;
+	unsigned long long delta;
+	unsigned long long ref_bw = 0;
+	unsigned long long xref_bw;
+	unsigned long pos_ratio;
+	unsigned long spread;
+
+	if (dirty > limit - margin)
+		bdi->dirty_exceed_time = jiffies;
+
+	if (dirty < thresh - thresh / (DIRTY_SCOPE/2) + margin)
+		bdi->dirty_free_run = jiffies;
+
+	/*
+	 * The dirty rate should match the writeback rate exactly, except when
+	 * dirty pages are truncated before IO submission. The mismatches are
+	 * hopefully small and hence ignored. So a continuous stream of dirty
+	 * page trucates will result in errors in ref_bw, fortunately pos_bw
+	 * can effectively stop the base bw from being driven away endlessly
+	 * by the errors.
+	 *
+	 * It'd be nicer for the filesystems to not redirty too much pages
+	 * either on IO or lock contention, or on sub-page writes.  ext4 is
+	 * known to redirty pages in big bursts, leading to
+	 *   - surges of dirty_bw, which can be mostly safeguarded by the
+	 *     min/max'ed xref_bw
+	 *   - the temporary drop of task weight and hence surge of task bw
+	 * It could possibly be fixed in the FS.
+	 */
+	dirty_bw = (dirtied - bdi->dirtied_stamp) * HZ / elapsed;
+
+	pos_ratio = dirty_throttle_bandwidth(bdi, thresh, dirty,
+					     bdi_dirty, NULL);
+	/*
+	 * pos_bw = task_bw, assuming 100% task dirty weight
+	 *
+	 * (pos_bw > bw) means the position of the number of dirty pages is
+	 * lower than the global and/or bdi setpoints. It does not necessarily
+	 * mean the base throttle bandwidth is larger than its balanced value.
+	 * The latter is likely only when
+	 * - (position) the dirty pages are at some distance from the setpoint,
+	 * - (speed) and either stands still or is departing from the setpoint.
+	 */
+	pos_bw = (bw >> (BASE_BW_SHIFT/2)) * pos_ratio >>
+			(BASE_BW_SHIFT/2);
+
+	/*
+	 * A typical desktop has only 1 task writing to 1 disk, in which case
+	 * the dirtier task should be throttled at the disk's write bandwidth.
+	 * Note that we ignore minor dirty/writeback mismatches such as
+	 * redirties and truncated dirty pages.
+	 */
+	if (bdi_thresh > thresh - thresh / 16) {
+		unsigned long numerator, denominator;
+
+		task_dirties_fraction(current, &numerator, &denominator);
+		if (numerator > denominator - denominator / 16)
+			ref_bw = bdi->avg_bandwidth << BASE_BW_SHIFT;
+	}
+	/*
+	 * Otherwise there may be
+	 * 1) N dd tasks writing to the current disk, or
+	 * 2) X dd tasks and Y "rsync --bwlimit" tasks.
+	 * The below estimation is accurate enough for (1). For (2), where not
+	 * all task's dirty rate can be changed proportionally by adjusting the
+	 * base throttle bandwidth, it would require multiple adjust-reestimate
+	 * cycles to approach the rate matching point. Which is not a big
+	 * concern as we always do small steps to approach the target. The
+	 * un-controllable tasks may only slow down the progress.
+	 */
+	if (!ref_bw) {
+		ref_bw = pos_ratio * bdi->avg_bandwidth;
+		do_div(ref_bw, dirty_bw | 1);
+		ref_bw = (bw >> (BASE_BW_SHIFT/2)) * (unsigned long)ref_bw >>
+				(BASE_BW_SHIFT/2);
+	}
+
+	/*
+	 * The average dirty pages typically fluctuates within this scope.
+	 */
+	spread = min(bdi->write_bandwidth / 8, bdi_thresh / DIRTY_MARGIN);
+
+	/*
+	 * Update the base throttle bandwidth rigidly: eg. only try lowering it
+	 * when both the global/bdi dirty pages are away from their setpoints,
+	 * and are either standing still or continue departing away.
+	 *
+	 * The "+ avg_dirty / 256" tricks mainly help btrfs, which behaves
+	 * amazingly smoothly.  Its average dirty pages simply tracks more and
+	 * more close to the number of dirty pages without any overshooting,
+	 * thus its dirty pages may be ever moving towards the setpoint and
+	 * @avg_dirty ever approaching @dirty, slower and slower, but very hard
+	 * to cross it to trigger a base bandwidth update. What the trick does
+	 * is "when @avg_dirty is _close enough_ to @dirty, it indicates slowed
+	 * down @dirty change rate, hence the other inequalities are now a good
+	 * indication of something unbalanced in the current bdi".
+	 *
+	 * In the cases of hitting the upper/lower margins, it's obviously
+	 * necessary to adjust the (possibly very unbalanced) base bandwidth,
+	 * unless the opposite margin was also been hit recently, which
+	 * indicates that the dirty control scope may be smaller than the bdi
+	 * write bandwidth and hence the dirty pages are quickly fluctuating
+	 * between the upper/lower margins.
+	 */
+	if (bw < pos_bw) {
+		if (dirty < goal &&
+		    dirty <= default_backing_dev_info.avg_dirty +
+			     (default_backing_dev_info.avg_dirty >> 8) &&
+		    bdi->avg_dirty + spread < bdi_goal &&
+		    bdi_dirty <= bdi->avg_dirty + (bdi->avg_dirty >> 8) &&
+		    bdi_dirty <= bdi->old_dirty)
+			goto adjust;
+		if (dirty < thresh - thresh / (DIRTY_SCOPE/2) + margin &&
+		    !dirty_exceeded_recently(bdi, HZ))
+			goto adjust;
+	}
+
+	if (bw > pos_bw) {
+		if (dirty > goal &&
+		    dirty >= default_backing_dev_info.avg_dirty -
+			     (default_backing_dev_info.avg_dirty >> 8) &&
+		    bdi->avg_dirty > bdi_goal + spread &&
+		    bdi_dirty >= bdi->avg_dirty - (bdi->avg_dirty >> 8) &&
+		    bdi_dirty >= bdi->old_dirty)
+			goto adjust;
+		if (dirty > limit - margin &&
+		    !dirty_free_run_recently(bdi, HZ))
+			goto adjust;
+	}
+
+	goto out;
+
+adjust:
+	/*
+	 * The min/max'ed xref_bw is an effective safeguard. The most dangerous
+	 * case that could unnecessarily disturb the base bandwith is: when the
+	 * control scope is roughly equal to the write bandwidth, the dirty
+	 * pages may rush into the upper/lower margins regularly. It typically
+	 * hits the upper margin in a blink, making a sudden drop of pos_bw and
+	 * ref_bw. Assume 5 points A, b, c, D, E, where b, c have the dropped
+	 * down number of pages, and A, D, E are at normal level.  At point b,
+	 * the xref_bw will be the good A; at c, the xref_bw will be the
+	 * dragged-down-by-b reference_bandwidth which is bad; at D and E, the
+	 * still-low reference_bandwidth will no longer bring the base
+	 * bandwidth down, as xref_bw will take the larger values from D and E.
+	 */
+	if (pos_bw > bw) {
+		xref_bw = min(ref_bw, bdi->old_ref_bandwidth);
+		xref_bw = min(xref_bw, bdi->reference_bandwidth);
+		if (xref_bw > bw)
+			delta = xref_bw - bw;
+		else
+			delta = 0;
+	} else {
+		xref_bw = max(ref_bw, bdi->reference_bandwidth);
+		xref_bw = max(xref_bw, bdi->reference_bandwidth);
+		if (xref_bw < bw)
+			delta = bw - xref_bw;
+		else
+			delta = 0;
+	}
+
+	/*
+	 * Don't pursue 100% rate matching. It's impossible since the balanced
+	 * rate itself is constantly fluctuating. So decrease the track speed
+	 * when it gets close to the target. Also limit the step size in
+	 * various ways to avoid overshooting.
+	 */
+	{
+		unsigned long long bw1 = bw;
+		do_div(bw1, 2 * delta + 1);
+		delta >>= bw1;
+	}
+	delta = min(delta, (u64)abs64(pos_bw - bw));
+	delta >>= 1;
+	delta = min(delta, bw >> 3);
+
+	if (pos_bw > bw)
+		bw += delta;
+	else
+		bw -= delta;
+
+	bdi->throttle_bandwidth = bw;
+out:
+	bdi_update_reference_bandwidth(bdi, ref_bw);
+	trace_dirty_throttle_bandwidth(bdi, dirty_bw, pos_bw, ref_bw);
+}
+
+void bdi_update_bandwidth(struct backing_dev_info *bdi,
+			  unsigned long thresh,
+			  unsigned long dirty,
+			  unsigned long bdi_dirty,
+			  unsigned long start_time)
+{
+	static DEFINE_SPINLOCK(dirty_lock);
+	unsigned long now = jiffies;
+	unsigned long elapsed;
+	unsigned long dirtied;
+	unsigned long written;
+
+	if (!spin_trylock(&dirty_lock))
+		return;
+
+	elapsed = now - bdi->bw_time_stamp;
+	dirtied = percpu_counter_read(&bdi->bdi_stat[BDI_DIRTIED]);
+	written = percpu_counter_read(&bdi->bdi_stat[BDI_WRITTEN]);
+
+	/* skip quiet periods when disk bandwidth is under-utilized */
+	if (elapsed > HZ/2 &&
+	    elapsed > now - start_time)
+		goto snapshot;
+
+	/*
+	 * rate-limit, only update once every 100ms. Demand higher threshold
+	 * on the flusher so that the throttled task(s) can do most updates.
+	 */
+	if (!thresh && elapsed <= HZ/4)
+		goto unlock;
+	if (elapsed <= HZ/10)
+		goto unlock;
+
+	if (thresh) {
+		update_dirty_limit(thresh, dirty);
+		bdi_update_dirty_threshold(bdi, thresh, dirty);
+		bdi_update_throttle_bandwidth(bdi, thresh, dirty,
+					      bdi_dirty, dirtied, elapsed);
+	}
+	__bdi_update_write_bandwidth(bdi, elapsed, written);
+	if (thresh) {
+		bdi_update_dirty_smooth(bdi, bdi_dirty);
+		bdi_update_dirty_smooth(&default_backing_dev_info, dirty);
+	}
+
+snapshot:
+	bdi->dirtied_stamp = dirtied;
+	bdi->written_stamp = written;
+	bdi->bw_time_stamp = now;
+unlock:
+	spin_unlock(&dirty_lock);
+}
+
+/*
+ * Limit pause time for small memory systems. If sleeping for too long time,
+ * the small pool of dirty/writeback pages may go empty and disk go idle.
+ */
+static unsigned long max_pause(struct backing_dev_info *bdi,
+			       unsigned long bdi_dirty)
+{
+	unsigned long t;  /* jiffies */
+
+	/* 1ms for every 1MB; may further consider bdi bandwidth */
+	t = bdi_dirty >> (30 - PAGE_CACHE_SHIFT - ilog2(HZ));
+	t += 2;
+
+	return min_t(unsigned long, t, MAX_PAUSE);
+}
+
+/*
+ * Scale up pause time for concurrent dirtiers in order to reduce CPU overheads.
+ * But ensure reasonably large [min_pause, max_pause] range size, so that
+ * nr_dirtied_pause (and hence future pause time) can stay reasonably stable.
+ */
+static unsigned long min_pause(struct backing_dev_info *bdi,
+			       unsigned long max)
+{
+	unsigned long hi = ilog2(bdi->write_bandwidth);
+	unsigned long lo = ilog2(bdi->throttle_bandwidth) - BASE_BW_SHIFT;
+	unsigned long t = 1 + max / 8;  /* jiffies */
+
+	if (lo >= hi)
+		return t;
+
+	/* (N * 10ms) on 2^N concurrent tasks */
+	t += (hi - lo) * (10 * HZ) / 1024;
+
+	return min(t, max / 2);
+}
+
+/*
  * balance_dirty_pages() must be called by processes which are generating dirty
  * data.  It looks at the number of dirty pages in the machine and will force
  * the caller to perform writeback if the system is over `vm_dirty_ratio'.
@@ -476,43 +1176,32 @@ unsigned long bdi_dirty_limit(struct backing_dev_info *bdi, unsigned long dirty)
  * perform some writeout.
  */
 static void balance_dirty_pages(struct address_space *mapping,
-				unsigned long write_chunk)
+				unsigned long pages_dirtied)
 {
-	long nr_reclaimable, bdi_nr_reclaimable;
-	long nr_writeback, bdi_nr_writeback;
+	unsigned long nr_reclaimable;
+	unsigned long nr_dirty;
+	unsigned long bdi_dirty;  /* = file_dirty + writeback + unstable_nfs */
 	unsigned long background_thresh;
 	unsigned long dirty_thresh;
-	unsigned long bdi_thresh;
-	unsigned long pages_written = 0;
-	unsigned long pause = 1;
-	bool dirty_exceeded = false;
+	unsigned long bw;
+	unsigned long period;
+	unsigned long pause = 0;
+	unsigned long pause_max;
 	struct backing_dev_info *bdi = mapping->backing_dev_info;
+	unsigned long start_time = jiffies;
 
 	for (;;) {
-		struct writeback_control wbc = {
-			.sync_mode	= WB_SYNC_NONE,
-			.older_than_this = NULL,
-			.nr_to_write	= write_chunk,
-			.range_cyclic	= 1,
-		};
-
+		/*
+		 * Unstable writes are a feature of certain networked
+		 * filesystems (i.e. NFS) in which data may have been
+		 * written to the server's write cache, but has not yet
+		 * been flushed to permanent storage.
+		 */
 		nr_reclaimable = global_page_state(NR_FILE_DIRTY) +
 					global_page_state(NR_UNSTABLE_NFS);
-		nr_writeback = global_page_state(NR_WRITEBACK);
+		nr_dirty = nr_reclaimable + global_page_state(NR_WRITEBACK);
 
 		global_dirty_limits(&background_thresh, &dirty_thresh);
-
-		/*
-		 * Throttle it only when the background writeback cannot
-		 * catch-up. This avoids (excessively) small writeouts
-		 * when the bdi limits are ramping up.
-		 */
-		if (nr_reclaimable + nr_writeback <=
-				(background_thresh + dirty_thresh) / 2)
-			break;
-
-		bdi_thresh = bdi_dirty_limit(bdi, dirty_thresh);
-		bdi_thresh = task_dirty_limit(current, bdi_thresh);
 
 		/*
 		 * In order to avoid the stacked BDI deadlock we need
@@ -524,62 +1213,107 @@ static void balance_dirty_pages(struct address_space *mapping,
 		 * actually dirty; with m+n sitting in the percpu
 		 * deltas.
 		 */
-		if (bdi_thresh < 2*bdi_stat_error(bdi)) {
-			bdi_nr_reclaimable = bdi_stat_sum(bdi, BDI_RECLAIMABLE);
-			bdi_nr_writeback = bdi_stat_sum(bdi, BDI_WRITEBACK);
+		if (bdi->dirty_threshold < 2*bdi_stat_error(bdi)) {
+			bdi_dirty = bdi_stat_sum(bdi, BDI_RECLAIMABLE) +
+				    bdi_stat_sum(bdi, BDI_WRITEBACK);
 		} else {
-			bdi_nr_reclaimable = bdi_stat(bdi, BDI_RECLAIMABLE);
-			bdi_nr_writeback = bdi_stat(bdi, BDI_WRITEBACK);
+			bdi_dirty = bdi_stat(bdi, BDI_RECLAIMABLE) +
+				    bdi_stat(bdi, BDI_WRITEBACK);
 		}
 
 		/*
-		 * The bdi thresh is somehow "soft" limit derived from the
-		 * global "hard" limit. The former helps to prevent heavy IO
-		 * bdi or process from holding back light ones; The latter is
-		 * the last resort safeguard.
+		 * Throttle it only when the background writeback cannot
+		 * catch-up. This avoids (excessively) small writeouts
+		 * when the bdi limits are ramping up.
 		 */
-		dirty_exceeded =
-			(bdi_nr_reclaimable + bdi_nr_writeback > bdi_thresh)
-			|| (nr_reclaimable + nr_writeback > dirty_thresh);
-
-		if (!dirty_exceeded)
+		if (nr_dirty <= (background_thresh + dirty_thresh) / 2) {
+			current->paused_when = jiffies;
+			current->nr_dirtied = 0;
 			break;
-
-		if (!bdi->dirty_exceeded)
-			bdi->dirty_exceeded = 1;
-
-		/* Note: nr_reclaimable denotes nr_dirty + nr_unstable.
-		 * Unstable writes are a feature of certain networked
-		 * filesystems (i.e. NFS) in which data may have been
-		 * written to the server's write cache, but has not yet
-		 * been flushed to permanent storage.
-		 * Only move pages to writeback if this bdi is over its
-		 * threshold otherwise wait until the disk writes catch
-		 * up.
-		 */
-		trace_wbc_balance_dirty_start(&wbc, bdi);
-		if (bdi_nr_reclaimable > bdi_thresh) {
-			writeback_inodes_wb(&bdi->wb, &wbc);
-			pages_written += write_chunk - wbc.nr_to_write;
-			trace_wbc_balance_dirty_written(&wbc, bdi);
-			if (pages_written >= write_chunk)
-				break;		/* We've done our duty */
 		}
-		trace_wbc_balance_dirty_wait(&wbc, bdi);
+
+		bdi_update_bandwidth(bdi, dirty_thresh, nr_dirty,
+				     bdi_dirty, start_time);
+
+		if (unlikely(!writeback_in_progress(bdi)))
+			bdi_start_background_writeback(bdi);
+
+		pause_max = max_pause(bdi, bdi_dirty);
+
+		bw = dirty_throttle_bandwidth(bdi, dirty_thresh, nr_dirty,
+					      bdi_dirty, current);
+		if (unlikely(bw == 0)) {
+			period = pause_max;
+			pause = pause_max;
+			goto pause;
+		}
+		period = (HZ * pages_dirtied + bw / 2) / bw;
+		pause = current->paused_when + period - jiffies;
+		/*
+		 * Take it as long think time if pause falls into (-10s, 0).
+		 * If it's less than 500ms (ext2 blocks the dirtier task for
+		 * up to 400ms from time to time on 1-HDD; so does xfs, however
+		 * at much less frequency), try to compensate it in future by
+		 * updating the virtual time; otherwise just reset the time, as
+		 * it may be a light dirtier.
+		 */
+		if (unlikely(-pause < HZ*10)) {
+			trace_balance_dirty_pages(bdi,
+						  dirty_thresh,
+						  nr_dirty,
+						  bdi_dirty,
+						  bw,
+						  pages_dirtied,
+						  period,
+						  pause,
+						  start_time);
+			if (-pause > HZ/2) {
+				current->paused_when = jiffies;
+				current->nr_dirtied = 0;
+				pause = 0;
+			} else if (period) {
+				current->paused_when += period;
+				current->nr_dirtied = 0;
+				pause = 1;
+			} else
+				current->nr_dirtied_pause <<= 1;
+			break;
+		}
+		if (pause > pause_max)
+			pause = pause_max;
+
+pause:
+		trace_balance_dirty_pages(bdi,
+					  dirty_thresh,
+					  nr_dirty,
+					  bdi_dirty,
+					  bw,
+					  pages_dirtied,
+					  period,
+					  pause,
+					  start_time);
+		current->paused_when = jiffies;
 		__set_current_state(TASK_UNINTERRUPTIBLE);
 		io_schedule_timeout(pause);
+		current->paused_when += pause;
+		current->nr_dirtied = 0;
 
-		/*
-		 * Increase the delay for each loop, up to our previous
-		 * default of taking a 100ms nap.
-		 */
-		pause <<= 1;
-		if (pause > HZ / 10)
-			pause = HZ / 10;
+		if (nr_dirty < default_backing_dev_info.dirty_threshold +
+		    default_backing_dev_info.dirty_threshold / DIRTY_MARGIN)
+			break;
 	}
 
-	if (!dirty_exceeded && bdi->dirty_exceeded)
-		bdi->dirty_exceeded = 0;
+	if (pause == 0)
+		current->nr_dirtied_pause =
+				ratelimit_pages(nr_dirty, dirty_thresh);
+	else if (pause <= min_pause(bdi, pause_max))
+		current->nr_dirtied_pause += current->nr_dirtied_pause / 32 + 1;
+	else if (pause >= pause_max)
+		/*
+		 * when repeated, writing 1 page per 100ms on slow devices,
+		 * i-(i+2)/4 will be able to reach 1 but never reduce to 0.
+		 */
+		current->nr_dirtied_pause -= (current->nr_dirtied_pause+2) >> 2;
 
 	if (writeback_in_progress(bdi))
 		return;
@@ -592,8 +1326,10 @@ static void balance_dirty_pages(struct address_space *mapping,
 	 * In normal mode, we start background writeout at the lower
 	 * background_thresh, to keep the amount of dirty memory low.
 	 */
-	if ((laptop_mode && pages_written) ||
-	    (!laptop_mode && (nr_reclaimable > background_thresh)))
+	if (laptop_mode)
+		return;
+
+	if (nr_reclaimable > background_thresh)
 		bdi_start_background_writeback(bdi);
 }
 
@@ -607,8 +1343,6 @@ void set_page_dirty_balance(struct page *page, int page_mkwrite)
 	}
 }
 
-static DEFINE_PER_CPU(unsigned long, bdp_ratelimits) = 0;
-
 /**
  * balance_dirty_pages_ratelimited_nr - balance dirty memory state
  * @mapping: address_space which was dirtied
@@ -618,36 +1352,35 @@ static DEFINE_PER_CPU(unsigned long, bdp_ratelimits) = 0;
  * which was newly dirtied.  The function will periodically check the system's
  * dirty state and will initiate writeback if needed.
  *
- * On really big machines, get_writeback_state is expensive, so try to avoid
+ * On really big machines, global_page_state() is expensive, so try to avoid
  * calling it too often (ratelimiting).  But once we're over the dirty memory
- * limit we decrease the ratelimiting by a lot, to prevent individual processes
- * from overshooting the limit by (ratelimit_pages) each.
+ * limit we disable the ratelimiting, to prevent individual processes from
+ * overshooting the limit by (ratelimit_pages) each.
  */
 void balance_dirty_pages_ratelimited_nr(struct address_space *mapping,
 					unsigned long nr_pages_dirtied)
 {
-	unsigned long ratelimit;
-	unsigned long *p;
+	struct backing_dev_info *bdi = mapping->backing_dev_info;
 
-	ratelimit = ratelimit_pages;
-	if (mapping->backing_dev_info->dirty_exceeded)
-		ratelimit = 8;
+	if (!bdi_cap_account_dirty(bdi))
+		return;
+
+	current->nr_dirtied += nr_pages_dirtied;
+
+	if (dirty_exceeded_recently(bdi, MAX_PAUSE)) {
+		unsigned long max = current->nr_dirtied +
+						(128 >> (PAGE_SHIFT - 10));
+
+		if (current->nr_dirtied_pause > max)
+			current->nr_dirtied_pause = max;
+	}
 
 	/*
 	 * Check the rate limiting. Also, we do not want to throttle real-time
 	 * tasks in balance_dirty_pages(). Period.
 	 */
-	preempt_disable();
-	p =  &__get_cpu_var(bdp_ratelimits);
-	*p += nr_pages_dirtied;
-	if (unlikely(*p >= ratelimit)) {
-		ratelimit = sync_writeback_pages(*p);
-		*p = 0;
-		preempt_enable();
-		balance_dirty_pages(mapping, ratelimit);
-		return;
-	}
-	preempt_enable();
+	if (unlikely(current->nr_dirtied >= current->nr_dirtied_pause))
+		balance_dirty_pages(mapping, current->nr_dirtied);
 }
 EXPORT_SYMBOL(balance_dirty_pages_ratelimited_nr);
 
@@ -735,44 +1468,6 @@ void laptop_sync_completion(void)
 #endif
 
 /*
- * If ratelimit_pages is too high then we can get into dirty-data overload
- * if a large number of processes all perform writes at the same time.
- * If it is too low then SMP machines will call the (expensive)
- * get_writeback_state too often.
- *
- * Here we set ratelimit_pages to a level which ensures that when all CPUs are
- * dirtying in parallel, we cannot go more than 3% (1/32) over the dirty memory
- * thresholds before writeback cuts in.
- *
- * But the limit should not be set too high.  Because it also controls the
- * amount of memory which the balance_dirty_pages() caller has to write back.
- * If this is too large then the caller will block on the IO queue all the
- * time.  So limit it to four megabytes - the balance_dirty_pages() caller
- * will write six megabyte chunks, max.
- */
-
-void writeback_set_ratelimit(void)
-{
-	ratelimit_pages = vm_total_pages / (num_online_cpus() * 32);
-	if (ratelimit_pages < 16)
-		ratelimit_pages = 16;
-	if (ratelimit_pages * PAGE_CACHE_SIZE > 4096 * 1024)
-		ratelimit_pages = (4096 * 1024) / PAGE_CACHE_SIZE;
-}
-
-static int __cpuinit
-ratelimit_handler(struct notifier_block *self, unsigned long u, void *v)
-{
-	writeback_set_ratelimit();
-	return NOTIFY_DONE;
-}
-
-static struct notifier_block __cpuinitdata ratelimit_nb = {
-	.notifier_call	= ratelimit_handler,
-	.next		= NULL,
-};
-
-/*
  * Called early on to tune the page writeback dirty limits.
  *
  * We used to scale dirty pages according to how total memory
@@ -793,9 +1488,6 @@ static struct notifier_block __cpuinitdata ratelimit_nb = {
 void __init page_writeback_init(void)
 {
 	int shift;
-
-	writeback_set_ratelimit();
-	register_cpu_notifier(&ratelimit_nb);
 
 	shift = calc_period_shift();
 	prop_descriptor_init(&vm_completions, shift);
@@ -1120,6 +1812,7 @@ void account_page_dirtied(struct page *page, struct address_space *mapping)
 		__inc_zone_page_state(page, NR_FILE_DIRTY);
 		__inc_zone_page_state(page, NR_DIRTIED);
 		__inc_bdi_stat(mapping->backing_dev_info, BDI_RECLAIMABLE);
+		__inc_bdi_stat(mapping->backing_dev_info, BDI_DIRTIED);
 		task_dirty_inc(current);
 		task_io_account_write(PAGE_CACHE_SIZE);
 	}
@@ -1211,6 +1904,17 @@ int set_page_dirty(struct page *page)
 
 	if (likely(mapping)) {
 		int (*spd)(struct page *) = mapping->a_ops->set_page_dirty;
+		/*
+		 * readahead/lru_deactivate_page could remain
+		 * PG_readahead/PG_reclaim due to race with end_page_writeback
+		 * About readahead, if the page is written, the flags would be
+		 * reset. So no problem.
+		 * About lru_deactivate_page, if the page is redirty, the flag
+		 * will be reset. So no problem. but if the page is used by readahead
+		 * it will confuse readahead and make it restart the size rampup
+		 * process. But it's a trivial problem.
+		 */
+		ClearPageReclaim(page);
 #ifdef CONFIG_BLOCK
 		if (!spd)
 			spd = __set_page_dirty_buffers;
@@ -1266,7 +1970,6 @@ int clear_page_dirty_for_io(struct page *page)
 
 	BUG_ON(!PageLocked(page));
 
-	ClearPageReclaim(page);
 	if (mapping && mapping_cap_account_dirty(mapping)) {
 		/*
 		 * Yes, Virginia, this is indeed insane.
