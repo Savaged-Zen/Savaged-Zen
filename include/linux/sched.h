@@ -1275,6 +1275,9 @@ struct task_struct {
 #endif
 
 	struct mm_struct *mm, *active_mm;
+#ifdef CONFIG_COMPAT_BRK
+	unsigned brk_randomized:1;
+#endif
 #if defined(SPLIT_RSS_COUNTING)
 	struct task_rss_stat	rss_stat;
 #endif
@@ -1578,7 +1581,7 @@ static inline void tsk_cpus_current(struct task_struct *p)
 
 static inline void print_scheduler_version(void)
 {
-	printk(KERN_INFO"BFS CPU scheduler v0.400 by Con Kolivas.\n");
+	printk(KERN_INFO"BFS CPU scheduler v0.401 by Con Kolivas.\n");
 }
 
 static inline int iso_task(struct task_struct *p)

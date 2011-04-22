@@ -149,7 +149,7 @@ static int prio_ratios[PRIO_RANGE] __read_mostly;
  * The quota handed out to tasks of all priority levels when refilling their
  * time_slice.
  */
-static inline unsigned long timeslice(void)
+static inline int timeslice(void)
 {
 	return MS_TO_US(rr_interval);
 }
@@ -1413,8 +1413,8 @@ static void try_preempt(struct task_struct *p, struct rq *this_rq)
 		if (rq_prio < highest_prio)
 			continue;
 
-		if (rq_prio > highest_prio || (rq_prio == highest_prio &&
-		    deadline_after(rq->rq_deadline, latest_deadline))) {
+		if (rq_prio > highest_prio ||
+		    deadline_after(rq->rq_deadline, latest_deadline)) {
 			latest_deadline = rq->rq_deadline;
 			highest_prio = rq_prio;
 			highest_prio_rq = rq;
@@ -2928,7 +2928,7 @@ static inline void set_rq_task(struct rq *rq, struct task_struct *p)
 {
 	rq->rq_time_slice = p->time_slice;
 	rq->rq_deadline = p->deadline;
-	rq->rq_last_ran = p->last_ran;
+	rq->rq_last_ran = p->last_ran = rq->clock;
 	rq->rq_policy = p->policy;
 	rq->rq_prio = p->prio;
 	if (p != rq->idle)
