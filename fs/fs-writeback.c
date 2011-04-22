@@ -413,6 +413,8 @@ static int
 writeback_single_inode(struct inode *inode, struct writeback_control *wbc)
 {
 	struct address_space *mapping = inode->i_mapping;
+	long per_file_limit = wbc->per_file_limit;
+	long nr_to_write = wbc->nr_to_write;
 	unsigned dirty;
 	int ret;
 
@@ -422,7 +424,8 @@ writeback_single_inode(struct inode *inode, struct writeback_control *wbc)
 		 * completed a full scan of b_io.
 		 */
 		requeue_io(inode);
-		return 0;
+			ret = 0;
+			goto out;
 	}
 
 	spin_unlock(&inode_lock);
@@ -490,6 +493,7 @@ writeback_single_inode(struct inode *inode, struct writeback_control *wbc)
 			redirty_tail(inode);
 		}
 	}
+
 out:
 	trace_writeback_single_inode(inode, wbc,
 				     nr_to_write - wbc->nr_to_write);
@@ -711,6 +715,7 @@ static long wb_writeback(struct bdi_writeback *wb,
 	};
 	unsigned long oldest_jif;
 	long wrote = 0;
+	long write_chunk;
 	struct inode *inode;
 
 	if (wbc.for_kupdate) {
@@ -733,6 +738,16 @@ static long wb_writeback(struct bdi_writeback *wb,
 			break;
 
 		/*
+		 * Background writeout and kupdate-style writeback may
+		 * run forever. Stop them if there is other work to do
+		 * so that e.g. sync can proceed. They'll be restarted
+		 * after the other works are all done.
+		 */
+		if ((work->for_background || work->for_kupdate) &&
+		    !list_empty(&wb->bdi->work_list))
+			break;
+
+		/*
 		 * For background writeout, stop when we are below the
 		 * background dirty threshold
 		 */
@@ -741,7 +756,7 @@ static long wb_writeback(struct bdi_writeback *wb,
 
 		wbc.more_io = 0;
 		write_chunk = writeback_chunk_size(wb->bdi, wbc.sync_mode);
-		wbc.nr_to_write = MAX_WRITEBACK_PAGES;
+		wbc.nr_to_write = write_chunk;
 		wbc.per_file_limit = write_chunk;
 		wbc.pages_skipped = 0;
 
@@ -754,8 +769,8 @@ static long wb_writeback(struct bdi_writeback *wb,
 
 		bdi_update_write_bandwidth(wb->bdi, wbc.wb_start);
 
-		work->nr_pages -= MAX_WRITEBACK_PAGES - wbc.nr_to_write;
-		wrote += MAX_WRITEBACK_PAGES - wbc.nr_to_write;
+		work->nr_pages -= write_chunk - wbc.nr_to_write;
+		wrote += write_chunk - wbc.nr_to_write;
 
 		/*
 		 * If we consumed everything, see if we have more
@@ -770,7 +785,7 @@ static long wb_writeback(struct bdi_writeback *wb,
 		/*
 		 * Did we write something? Try for more
 		 */
-		if (wbc.nr_to_write < MAX_WRITEBACK_PAGES)
+		if (wbc.nr_to_write < write_chunk)
 			continue;
 		/*
 		 * Nothing written. Wait for some inode to
@@ -1355,7 +1370,6 @@ EXPORT_SYMBOL(sync_inode);
  */
 int sync_inode_metadata(struct inode *inode, int datasync, int wait)
 {
-	struct address_space *mapping = inode->i_mapping;
 	struct writeback_control wbc = {
 		.sync_mode = wait ? WB_SYNC_ALL : WB_SYNC_NONE,
 		.nr_to_write = 0, /* metadata-only */
