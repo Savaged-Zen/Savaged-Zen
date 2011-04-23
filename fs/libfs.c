@@ -912,7 +912,12 @@ int generic_file_fsync(struct file *file, int datasync)
 	int ret;
 
 	ret = sync_mapping_buffers(inode->i_mapping);
-	err = sync_inode_metadata(inode, datasync, 1);
+	if (!(inode->i_state & I_DIRTY))
+		return ret;
+	if (datasync && !(inode->i_state & I_DIRTY_DATASYNC))
+		return ret;
+
+	err = sync_inode_metadata(inode, 1);
 	if (ret == 0)
 		ret = err;
 	return ret;
