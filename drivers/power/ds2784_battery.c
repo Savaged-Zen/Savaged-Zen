@@ -1059,7 +1059,7 @@ static int ds2784_battery_probe(struct platform_device *pdev)
 
 
 	INIT_WORK(&di->monitor_work, ds2784_battery_work);
-	di->monitor_wqueue = create_freezeable_workqueue(dev_name(&pdev->dev));
+	di->monitor_wqueue = create_freezable_workqueue(dev_name(&pdev->dev));
 
 	/* init to something sane */
 	di->last_poll = alarm_get_elapsed_realtime();
