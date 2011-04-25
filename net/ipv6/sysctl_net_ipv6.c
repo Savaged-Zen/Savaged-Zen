@@ -17,16 +17,6 @@
 
 static struct ctl_table empty[1];
 
-static ctl_table ipv6_static_skeleton[] = {
-	{
-		.procname	= "neigh",
-		.maxlen		= 0,
-		.mode		= 0555,
-		.child		= empty,
-	},
-	{ }
-};
-
 static ctl_table ipv6_table_template[] = {
 	{
 		.procname	= "route",
@@ -46,6 +36,12 @@ static ctl_table ipv6_table_template[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec
+	},
+	{
+		.procname	= "neigh",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= empty,
 	},
 	{ }
 };
@@ -164,7 +160,7 @@ static struct ctl_table_header *ip6_base;
 
 int ipv6_static_sysctl_register(void)
 {
-	ip6_base = register_sysctl_paths(net_ipv6_ctl_path, ipv6_static_skeleton);
+	ip6_base = register_sysctl_paths(net_ipv6_ctl_path, empty);
 	if (ip6_base == NULL)
 		return -ENOMEM;
 	return 0;

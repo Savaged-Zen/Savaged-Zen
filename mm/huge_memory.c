@@ -244,28 +244,24 @@ static ssize_t single_flag_show(struct kobject *kobj,
 				struct kobj_attribute *attr, char *buf,
 				enum transparent_hugepage_flag flag)
 {
-	return sprintf(buf, "%d\n",
-		       !!test_bit(flag, &transparent_hugepage_flags));
+	if (test_bit(flag, &transparent_hugepage_flags))
+		return sprintf(buf, "[yes] no\n");
+	else
+		return sprintf(buf, "yes [no]\n");
 }
-
 static ssize_t single_flag_store(struct kobject *kobj,
 				 struct kobj_attribute *attr,
 				 const char *buf, size_t count,
 				 enum transparent_hugepage_flag flag)
 {
-	unsigned long value;
-	int ret;
-
-	ret = kstrtoul(buf, 10, &value);
-	if (ret < 0)
-		return ret;
-	if (value > 1)
-		return -EINVAL;
-
-	if (value)
+	if (!memcmp("yes", buf,
+		    min(sizeof("yes")-1, count))) {
 		set_bit(flag, &transparent_hugepage_flags);
-	else
+	} else if (!memcmp("no", buf,
+			   min(sizeof("no")-1, count))) {
 		clear_bit(flag, &transparent_hugepage_flags);
+	} else
+		return -EINVAL;
 
 	return count;
 }

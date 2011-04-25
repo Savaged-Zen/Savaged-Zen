@@ -2062,20 +2062,21 @@ balance_tasks(struct rq *this_rq, int this_cpu, struct rq *busiest,
 	      enum cpu_idle_type idle, int *all_pinned,
 	      int *this_best_prio, struct cfs_rq *busiest_cfs_rq)
 {
-	int loops = 0, pulled = 0;
+	int loops = 0, pulled = 0, pinned = 0;
 	long rem_load_move = max_load_move;
 	struct task_struct *p, *n;
 
 	if (max_load_move == 0)
 		goto out;
 
+	pinned = 1;
+
 	list_for_each_entry_safe(p, n, &busiest_cfs_rq->tasks, se.group_node) {
 		if (loops++ > sysctl_sched_nr_migrate)
 			break;
 
 		if ((p->se.load.weight >> 1) > rem_load_move ||
-		    !can_migrate_task(p, busiest, this_cpu, sd, idle,
-				      all_pinned))
+		    !can_migrate_task(p, busiest, this_cpu, sd, idle, &pinned))
 			continue;
 
 		pull_task(busiest, p, this_rq, this_cpu);
@@ -2109,6 +2110,9 @@ out:
 	 * inside pull_task().
 	 */
 	schedstat_add(sd, lb_gained[idle], pulled);
+
+	if (all_pinned)
+		*all_pinned = pinned;
 
 	return max_load_move - rem_load_move;
 }
@@ -3312,7 +3316,6 @@ redo:
 		 * still unbalanced. ld_moved simply stays zero, so it is
 		 * correctly treated as an imbalance.
 		 */
-		all_pinned = 1;
 		local_irq_save(flags);
 		double_rq_lock(this_rq, busiest);
 		ld_moved = move_tasks(this_rq, this_cpu, busiest,

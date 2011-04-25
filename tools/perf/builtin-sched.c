@@ -369,6 +369,11 @@ static void
 process_sched_event(struct task_desc *this_task __used, struct sched_atom *atom)
 {
 	int ret = 0;
+	u64 now;
+	long long delta;
+
+	now = get_nsecs();
+	delta = start_time + atom->timestamp - now;
 
 	switch (atom->type) {
 		case SCHED_EVENT_RUN:
@@ -557,7 +562,7 @@ static void wait_for_tasks(void)
 
 static void run_one_test(void)
 {
-	u64 T0, T1, delta, avg_delta, fluct;
+	u64 T0, T1, delta, avg_delta, fluct, std_dev;
 
 	T0 = get_nsecs();
 	wait_for_tasks();
@@ -573,6 +578,7 @@ static void run_one_test(void)
 	else
 		fluct = delta - avg_delta;
 	sum_fluct += fluct;
+	std_dev = sum_fluct / nr_runs / sqrt(nr_runs);
 	if (!run_avg)
 		run_avg = delta;
 	run_avg = (run_avg*9 + delta)/10;
@@ -793,7 +799,7 @@ replay_switch_event(struct trace_switch_event *switch_event,
 		    u64 timestamp,
 		    struct thread *thread __used)
 {
-	struct task_desc *prev, __used *next;
+	struct task_desc *prev, *next;
 	u64 timestamp0;
 	s64 delta;
 
@@ -1398,7 +1404,7 @@ map_switch_event(struct trace_switch_event *switch_event,
 		 u64 timestamp,
 		 struct thread *thread __used)
 {
-	struct thread *sched_out __used, *sched_in;
+	struct thread *sched_out, *sched_in;
 	int new_shortname;
 	u64 timestamp0;
 	s64 delta;

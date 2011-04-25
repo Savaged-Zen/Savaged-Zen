@@ -81,7 +81,7 @@ static void n2_pcr_write(u64 val)
 	unsigned long ret;
 
 	ret = sun4v_niagara2_setperf(HV_N2_PERF_SPARC_CTL, val);
-	if (ret != HV_EOK)
+	if (val != HV_EOK)
 		write_pcr(val);
 }
 

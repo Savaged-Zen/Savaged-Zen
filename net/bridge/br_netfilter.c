@@ -249,9 +249,11 @@ static int br_parse_ip_options(struct sk_buff *skb)
 		goto drop;
 	}
 
-	memset(IPCB(skb), 0, sizeof(struct inet_skb_parm));
-	if (iph->ihl == 5)
+	/* Zero out the CB buffer if no options present */
+	if (iph->ihl == 5) {
+		memset(IPCB(skb), 0, sizeof(struct inet_skb_parm));
 		return 0;
+	}
 
 	opt->optlen = iph->ihl*4 - sizeof(struct iphdr);
 	if (ip_options_compile(dev_net(dev), opt, skb))
@@ -738,9 +740,6 @@ static unsigned int br_nf_forward_ip(unsigned int hook, struct sk_buff *skb,
 		skb->pkt_type = PACKET_HOST;
 		nf_bridge->mask |= BRNF_PKT_TYPE;
 	}
-
-	if (br_parse_ip_options(skb))
-		return NF_DROP;
 
 	/* The physdev module checks on this */
 	nf_bridge->mask |= BRNF_BRIDGED;

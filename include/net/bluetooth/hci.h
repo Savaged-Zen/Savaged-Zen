@@ -76,8 +76,6 @@ enum {
 	HCI_INQUIRY,
 
 	HCI_RAW,
-
-	HCI_RESET,
 };
 
 /* HCI ioctl defines */

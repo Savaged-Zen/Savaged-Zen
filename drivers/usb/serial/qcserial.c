@@ -111,7 +111,7 @@ static int qcprobe(struct usb_serial *serial, const struct usb_device_id *id)
 	ifnum = intf->desc.bInterfaceNumber;
 	dbg("This Interface = %d", ifnum);
 
-	data = kzalloc(sizeof(struct usb_wwan_intf_private),
+	data = serial->private = kzalloc(sizeof(struct usb_wwan_intf_private),
 					 GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
@@ -134,10 +134,8 @@ static int qcprobe(struct usb_serial *serial, const struct usb_device_id *id)
 		    usb_endpoint_is_bulk_out(&intf->endpoint[1].desc)) {
 			dbg("QDL port found");
 
-			if (serial->interface->num_altsetting == 1) {
-				retval = 0; /* Success */
-				break;
-			}
+			if (serial->interface->num_altsetting == 1)
+				return 0;
 
 			retval = usb_set_interface(serial->dev, ifnum, 1);
 			if (retval < 0) {
@@ -147,6 +145,7 @@ static int qcprobe(struct usb_serial *serial, const struct usb_device_id *id)
 				retval = -ENODEV;
 				kfree(data);
 			}
+			return retval;
 		}
 		break;
 
@@ -167,7 +166,6 @@ static int qcprobe(struct usb_serial *serial, const struct usb_device_id *id)
 					"Could not set interface, error %d\n",
 					retval);
 				retval = -ENODEV;
-				kfree(data);
 			}
 		} else if (ifnum == 2) {
 			dbg("Modem port found");
@@ -179,6 +177,7 @@ static int qcprobe(struct usb_serial *serial, const struct usb_device_id *id)
 				retval = -ENODEV;
 				kfree(data);
 			}
+			return retval;
 		} else if (ifnum==3) {
 			/*
 			 * NMEA (serial line 9600 8N1)
@@ -192,7 +191,6 @@ static int qcprobe(struct usb_serial *serial, const struct usb_device_id *id)
 					"Could not set interface, error %d\n",
 					retval);
 				retval = -ENODEV;
-				kfree(data);
 			}
 		}
 		break;
@@ -201,25 +199,10 @@ static int qcprobe(struct usb_serial *serial, const struct usb_device_id *id)
 		dev_err(&serial->dev->dev,
 			"unknown number of interfaces: %d\n", nintf);
 		kfree(data);
-		retval = -ENODEV;
+		return -ENODEV;
 	}
 
-	/* Set serial->private if not returning -ENODEV */
-	if (retval != -ENODEV)
-		usb_set_serial_data(serial, data);
 	return retval;
-}
-
-static void qc_release(struct usb_serial *serial)
-{
-	struct usb_wwan_intf_private *priv = usb_get_serial_data(serial);
-
-	dbg("%s", __func__);
-
-	/* Call usb_wwan release & free the private data allocated in qcprobe */
-	usb_wwan_release(serial);
-	usb_set_serial_data(serial, NULL);
-	kfree(priv);
 }
 
 static struct usb_serial_driver qcdevice = {
@@ -239,7 +222,7 @@ static struct usb_serial_driver qcdevice = {
 	.chars_in_buffer     = usb_wwan_chars_in_buffer,
 	.attach		     = usb_wwan_startup,
 	.disconnect	     = usb_wwan_disconnect,
-	.release	     = qc_release,
+	.release	     = usb_wwan_release,
 #ifdef CONFIG_PM
 	.suspend	     = usb_wwan_suspend,
 	.resume		     = usb_wwan_resume,
