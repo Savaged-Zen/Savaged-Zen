@@ -145,7 +145,6 @@ static unsigned long max_cpu_load;
 #define DEFAULT_MIN_CPU_LOAD 25
 static unsigned long min_cpu_load;
 
-
 static int cpufreq_governor_smartass(struct cpufreq_policy *policy,
                 unsigned int event);
 
