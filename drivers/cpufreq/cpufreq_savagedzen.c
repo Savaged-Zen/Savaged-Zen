@@ -112,7 +112,7 @@ static unsigned int sleep_wakeup_freq;
  * go below this frequency.
  * Set awake_min_freq=0 to disable this behavior.
  */
-#define DEFAULT_AWAKE_MIN_FREQ 245000
+#define DEFAULT_AWAKE_MIN_FREQ 0
 static unsigned int awake_min_freq;
 
 /*
@@ -125,14 +125,14 @@ static unsigned int sample_rate_jiffies;
  * Freqeuncy delta when ramping up.
  * zero disables and causes to always jump straight to max frequency.
  */
-#define DEFAULT_RAMP_UP_STEP 128000
+#define DEFAULT_RAMP_UP_STEP 50
 static unsigned int ramp_up_step;
 
 /*
  * Freqeuncy delta when ramping down.
  * zero disables and will calculate ramp down according to load heuristic.
  */
-#define DEFAULT_RAMP_DOWN_STEP 128000
+#define DEFAULT_RAMP_DOWN_STEP 0
 static unsigned int ramp_down_step;
 
 /*
