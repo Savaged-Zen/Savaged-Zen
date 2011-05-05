@@ -22,6 +22,7 @@
 #include <linux/tick.h>
 #include <linux/ktime.h>
 #include <linux/sched.h>
+#include <linux/earlysuspend.h>
 
 /*
  * dbs is used in this file as a shortform for demandbased switching
@@ -118,7 +119,38 @@ struct cpu_dbs_info_s {
 };
 static DEFINE_PER_CPU(struct cpu_dbs_info_s, od_cpu_dbs_info);
 
-static unsigned int dbs_enable;	/* number of CPUs using this policy */
+static unsigned int dbs_enable=0;	/* number of CPUs using this policy */
+
+// used for imoseyon's mods
+static unsigned int suspended = 0;
+static void ondemand_suspend(int suspend)
+{
+        struct cpu_dbs_info_s *dbs_info = &per_cpu(od_cpu_dbs_info, smp_processor_id());
+        if (dbs_enable==0) return;
+        if (!suspend) { // resume at max speed:
+                suspended = 0;
+                __cpufreq_driver_target(dbs_info->cur_policy, dbs_info->cur_policy->max, 
+			CPUFREQ_RELATION_L);
+        } else {
+                suspended = 1;
+		// let's give it a little breathing room
+                __cpufreq_driver_target(dbs_info->cur_policy, 368640, CPUFREQ_RELATION_L);
+        }
+}
+
+static void ondemand_early_suspend(struct early_suspend *handler) {
+       ondemand_suspend(1);
+}
+
+static void ondemand_late_resume(struct early_suspend *handler) {
+       ondemand_suspend(0);
+}
+
+static struct early_suspend ondemand_power_suspend = {
+        .suspend = ondemand_early_suspend,
+        .resume = ondemand_late_resume,
+        .level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 1,
+};
 
 /*
  * dbs_mutex protects data in dbs_tuners_ins from concurrent changes on
@@ -518,8 +550,8 @@ static void dbs_freq_increase(struct cpufreq_policy *p, unsigned int freq)
 		freq = powersave_bias_target(p, freq, CPUFREQ_RELATION_H);
 	else if (p->cur == p->max)
 		return;
-
-	__cpufreq_driver_target(p, freq, dbs_tuners_ins.powersave_bias ?
+	if (!suspended)
+		__cpufreq_driver_target(p, freq, dbs_tuners_ins.powersave_bias ?
 			CPUFREQ_RELATION_L : CPUFREQ_RELATION_H);
 }
 
@@ -686,6 +718,7 @@ static void do_dbs_timer(struct work_struct *work)
 			delay = dbs_info->freq_hi_jiffies;
 		}
 	} else {
+		if (!suspended)
 		__cpufreq_driver_target(dbs_info->cur_policy,
 			dbs_info->freq_lo, CPUFREQ_RELATION_H);
 	}
@@ -802,12 +835,14 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 
 		mutex_init(&this_dbs_info->timer_mutex);
 		dbs_timer_init(this_dbs_info);
+		register_early_suspend(&ondemand_power_suspend);
 		break;
 
 	case CPUFREQ_GOV_STOP:
 		dbs_timer_exit(this_dbs_info);
 
 		mutex_lock(&dbs_mutex);
+		unregister_early_suspend(&ondemand_power_suspend);
 		sysfs_remove_group(&policy->kobj, &dbs_attr_group_old);
 		mutex_destroy(&this_dbs_info->timer_mutex);
 		dbs_enable--;
