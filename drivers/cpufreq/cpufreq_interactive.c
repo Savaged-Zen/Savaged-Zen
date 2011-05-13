@@ -58,7 +58,7 @@ static cpumask_t down_cpumask;
 static spinlock_t down_cpumask_lock;
 
 /* Go to max speed when CPU load at or above this value. */
-#define DEFAULT_GO_MAXSPEED_LOAD 60
+#define DEFAULT_GO_MAXSPEED_LOAD 75
 static unsigned long go_maxspeed_load;
 
 /*
