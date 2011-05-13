@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux/x86_64 2.6.38.6 Kernel Configuration
-# Fri May 13 09:40:52 2011
+# Fri May 13 09:45:39 2011
 #
 CONFIG_64BIT=y
 # CONFIG_X86_32 is not set
@@ -824,7 +824,7 @@ CONFIG_WEXT_CORE=y
 CONFIG_WEXT_PROC=y
 CONFIG_WEXT_PRIV=y
 # CONFIG_CFG80211 is not set
-# CONFIG_WIRELESS_EXT_SYSFS is not set
+CONFIG_WIRELESS_EXT_SYSFS=y
 # CONFIG_LIB80211 is not set
 
 #
@@ -1123,7 +1123,7 @@ CONFIG_SLHC=y
 # CONFIG_NETPOLL is not set
 # CONFIG_NET_POLL_CONTROLLER is not set
 # CONFIG_VMXNET3 is not set
-# CONFIG_GAN_ETH is not set
+CONFIG_GAN_ETH=m
 # CONFIG_ISDN is not set
 # CONFIG_PHONE is not set
 
@@ -1765,7 +1765,6 @@ CONFIG_USB_GADGET_DUALSPEED=y
 # CONFIG_USB_G_SERIAL is not set
 # CONFIG_USB_MIDI_GADGET is not set
 # CONFIG_USB_G_PRINTER is not set
-# CONFIG_USB_ANDROID is not set
 # CONFIG_USB_CDC_COMPOSITE is not set
 # CONFIG_USB_G_MULTI is not set
 # CONFIG_USB_G_HID is not set
