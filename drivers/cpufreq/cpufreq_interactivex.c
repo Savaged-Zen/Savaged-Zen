@@ -71,7 +71,11 @@ static
 struct cpufreq_governor cpufreq_gov_interactivex = {
 	.name = "interactiveX",
 	.governor = cpufreq_governor_interactivex,
+#if defined(CONFIG_ARCH_MSM_SCORPION)
+	.max_transition_latency = 8000000,
+#else
 	.max_transition_latency = 10000000,
+#endif
 	.owner = THIS_MODULE,
 };
 
@@ -356,7 +360,7 @@ static int __init cpufreq_interactivex_init(void)
 }
 
 #ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_INTERACTIVEX
-pure_initcall(cpufreq_interactivex_init);
+fs_initcall(cpufreq_interactivex_init);
 #else
 module_init(cpufreq_interactivex_init);
 #endif
