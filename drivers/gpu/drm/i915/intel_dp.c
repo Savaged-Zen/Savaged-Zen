@@ -1427,7 +1427,8 @@ intel_dp_link_down(struct intel_dp *intel_dp)
 
 	if (!HAS_PCH_CPT(dev) &&
 	    I915_READ(intel_dp->output_reg) & DP_PIPEB_SELECT) {
-		struct intel_crtc *intel_crtc = to_intel_crtc(intel_dp->base.base.crtc);
+		struct drm_crtc *crtc = intel_dp->base.base.crtc;
+
 		/* Hardware workaround: leaving our transcoder select
 		 * set to transcoder B while it's off will prevent the
 		 * corresponding HDMI output on transcoder A.
