@@ -227,6 +227,7 @@ struct rq {
 	u64 timekeep_clock;
 	unsigned long user_pc, nice_pc, irq_pc, softirq_pc, system_pc,
 		iowait_pc, idle_pc;
+	long account_pc;
 	atomic_t nr_iowait;
 
 #ifdef CONFIG_SMP
@@ -1073,8 +1074,8 @@ swap_sticky(struct rq *rq, unsigned long cpu, struct task_struct *p)
 			p->sticky = 1;
 			return;
 		}
-		if (rq->sticky_task->sticky) {
-			rq->sticky_task->sticky = 0;
+		if (task_sticky(rq->sticky_task)) {
+			clear_sticky(rq->sticky_task);
 			resched_closest_idle(rq, cpu, rq->sticky_task);
 		}
 	}
@@ -1342,8 +1343,7 @@ EXPORT_SYMBOL_GPL(kick_process);
  * prio PRIO_LIMIT so it is always preempted.
  */
 static inline int
-can_preempt(struct task_struct *p, int prio, u64 deadline,
-	    unsigned int policy)
+can_preempt(struct task_struct *p, int prio, u64 deadline)
 {
 	/* Better static priority RT task or better policy preemption */
 	if (p->prio < prio)
@@ -1438,8 +1438,7 @@ static void try_preempt(struct task_struct *p, struct rq *this_rq)
 		}
 	}
 
-	if (!can_preempt(p, highest_prio, highest_prio_rq->rq_deadline,
-	    highest_prio_rq->rq_policy))
+	if (!can_preempt(p, highest_prio, highest_prio_rq->rq_deadline))
 		return;
 
 	resched_task(highest_prio_rq->curr);
@@ -1454,8 +1453,7 @@ static void try_preempt(struct task_struct *p, struct rq *this_rq)
 {
 	if (p->policy == SCHED_IDLEPRIO)
 		return;
-	if (can_preempt(p, uprq->rq_prio, uprq->rq_deadline,
-	    uprq->rq_policy))
+	if (can_preempt(p, uprq->rq_prio, uprq->rq_deadline))
 		resched_task(uprq->curr);
 }
 #endif /* CONFIG_SMP */
@@ -1988,7 +1986,7 @@ unsigned long long nr_context_switches(void)
 	/* This is of course impossible */
 	if (unlikely(ns < 0))
 		ns = 1;
-	return (long long)ns;
+	return (unsigned long long)ns;
 }
 
 unsigned long nr_iowait(void)
@@ -2229,13 +2227,13 @@ static void pc_idle_time(struct rq *rq, unsigned long pc)
 	if (atomic_read(&rq->nr_iowait) > 0) {
 		rq->iowait_pc += pc;
 		if (rq->iowait_pc >= 100) {
-			rq->iowait_pc %= 100;
+			rq->iowait_pc -= 100;
 			cpustat->iowait = cputime64_add(cpustat->iowait, tmp);
 		}
 	} else {
 		rq->idle_pc += pc;
 		if (rq->idle_pc >= 100) {
-			rq->idle_pc %= 100;
+			rq->idle_pc -= 100;
 			cpustat->idle = cputime64_add(cpustat->idle, tmp);
 		}
 	}
@@ -2262,19 +2260,19 @@ pc_system_time(struct rq *rq, struct task_struct *p, int hardirq_offset,
 	if (hardirq_count() - hardirq_offset) {
 		rq->irq_pc += pc;
 		if (rq->irq_pc >= 100) {
-			rq->irq_pc %= 100;
+			rq->irq_pc -= 100;
 			cpustat->irq = cputime64_add(cpustat->irq, tmp);
 		}
 	} else if (in_serving_softirq()) {
 		rq->softirq_pc += pc;
 		if (rq->softirq_pc >= 100) {
-			rq->softirq_pc %= 100;
+			rq->softirq_pc -= 100;
 			cpustat->softirq = cputime64_add(cpustat->softirq, tmp);
 		}
 	} else {
 		rq->system_pc += pc;
 		if (rq->system_pc >= 100) {
-			rq->system_pc %= 100;
+			rq->system_pc -= 100;
 			cpustat->system = cputime64_add(cpustat->system, tmp);
 		}
 	}
@@ -2336,6 +2334,16 @@ update_cpu_clock(struct rq *rq, struct task_struct *p, int tick)
 		int user_tick = user_mode(get_irq_regs());
 
 		/* Accurate tick timekeeping */
+		rq->account_pc += account_pc - 100;
+		if (rq->account_pc < 0) {
+			/*
+			 * Small errors in micro accounting may not make the
+			 * accounting add up to 100% each tick so we keep track
+			 * of the percentage and round it up when less than 100
+			 */
+			account_pc += -rq->account_pc;
+			rq->account_pc = 0;
+		}
 		if (user_tick)
 			pc_user_time(rq, p, account_pc, account_ns);
 		else if (p != idle || (irq_count() != HARDIRQ_OFFSET))
@@ -2345,6 +2353,7 @@ update_cpu_clock(struct rq *rq, struct task_struct *p, int tick)
 			pc_idle_time(rq, account_pc);
 	} else {
 		/* Accurate subtick timekeeping */
+		rq->account_pc += account_pc;
 		if (p == idle)
 			pc_idle_time(rq, account_pc);
 		else
@@ -2845,15 +2854,25 @@ retry:
 	if (idx >= PRIO_LIMIT)
 		goto out;
 	queue = grq.queue + idx;
+
+	if (idx < MAX_RT_PRIO) {
+		/* We found an rt task */
+		list_for_each_entry(p, queue, run_list) {
+			/* Make sure cpu affinity is ok */
+			if (needs_other_cpu(p, cpu))
+				continue;
+			edt = p;
+			goto out_take;
+		}
+		/* None of the RT tasks at this priority can run on this cpu */
+		++idx;
+		goto retry;
+	}
+
 	list_for_each_entry(p, queue, run_list) {
 		/* Make sure cpu affinity is ok */
 		if (needs_other_cpu(p, cpu))
 			continue;
-		if (idx < MAX_RT_PRIO) {
-			/* We found an rt task */
-			edt = p;
-			goto out_take;
-		}
 
 		/*
 		 * Soft affinity happens here by not scheduling a task with
@@ -4361,11 +4380,10 @@ SYSCALL_DEFINE3(sched_getaffinity, pid_t, pid, unsigned int, len,
 SYSCALL_DEFINE0(sched_yield)
 {
 	struct task_struct *p;
-	struct rq *rq;
 
 	p = current;
-	rq = task_grq_lock_irq(p);
-	schedstat_inc(rq, yld_count);
+	grq_lock_irq();
+	schedstat_inc(task_rq(p), yld_count);
 	requeue_task(p);
 
 	/*
