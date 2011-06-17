@@ -1246,7 +1246,7 @@ retry_rq:
 		 * if the runqueue has changed and p is actually now
 		 * running somewhere else!
 		 */
-		while (task_running(p) && p == rq->curr) {
+		while (task_running(p)) {
 			if (match_state && unlikely(p->state != match_state))
 				return 0;
 			cpu_relax();
@@ -4310,7 +4310,6 @@ long sched_getaffinity(pid_t pid, cpumask_t *mask)
 {
 	struct task_struct *p;
 	unsigned long flags;
-	struct rq *rq;
 	int retval;
 
 	get_online_cpus();
@@ -4325,9 +4324,9 @@ long sched_getaffinity(pid_t pid, cpumask_t *mask)
 	if (retval)
 		goto out_unlock;
 
-	rq = task_grq_lock(p, &flags);
+	grq_lock_irqsave(&flags);
 	cpumask_and(mask, &p->cpus_allowed, cpu_online_mask);
-	task_grq_unlock(&flags);
+	grq_unlock_irqrestore(&flags);
 
 out_unlock:
 	rcu_read_unlock();
@@ -4583,7 +4582,6 @@ SYSCALL_DEFINE2(sched_rr_get_interval, pid_t, pid,
 	struct task_struct *p;
 	unsigned int time_slice;
 	unsigned long flags;
-	struct rq *rq;
 	int retval;
 	struct timespec t;
 
@@ -4600,9 +4598,9 @@ SYSCALL_DEFINE2(sched_rr_get_interval, pid_t, pid,
 	if (retval)
 		goto out_unlock;
 
-	rq = task_grq_lock(p, &flags);
+	grq_lock_irqsave(&flags);
 	time_slice = p->policy == SCHED_FIFO ? 0 : MS_TO_NS(task_timeslice(p));
-	task_grq_unlock(&flags);
+	grq_unlock_irqrestore(&flags);
 
 	rcu_read_unlock();
 	t = ns_to_timespec(time_slice);
