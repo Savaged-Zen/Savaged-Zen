@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 38
-EXTRAVERSION = .7
+EXTRAVERSION = .8
 NAME = Flesh-Eating Bats with Fangs
 
 # *DOCUMENTATION*
@@ -1332,10 +1332,11 @@ clean: rm-files := $(KBUILD_EXTMOD)/Module.symvers \
 clean: $(clean-dirs)
 	$(call cmd,rmdirs)
 	$(call cmd,rmfiles)
-	@find $(KBUILD_EXTMOD) $(RCS_FIND_IGNORE) \
+	@find $(if $(KBUILD_EXTMOD), $(KBUILD_EXTMOD), .) $(RCS_FIND_IGNORE) \
 		\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \
 		-o -name '.*.d' -o -name '.*.tmp' -o -name '*.mod.c' \
-		-o -name '*.gcno' \) -type f -print | xargs rm -f
+		-o -name '*.symtypes' -o -name 'modules.order' \
+
 
 help:
 	@echo  '  Building external modules.'
