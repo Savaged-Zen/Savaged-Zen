@@ -303,6 +303,10 @@
 #include <linux/usb/android_composite.h>
 #include <linux/platform_device.h>
 
+static ulong fsg_nofua = 1;
+module_param(fsg_nofua, ulong, S_IRUGO);
+MODULE_PARM_DESC(fsg_nofua, "FUA Flag state in SCSI WRITE");
+
 #define FUNCTION_NAME		"usb_mass_storage"
 #endif
 
@@ -1538,7 +1542,7 @@ static int do_prevent_allow(struct fsg_common *common)
 		return -EINVAL;
 	}
 
-	if (curlun->prevent_medium_removal && !prevent)
+	if (!curlun->nofua && curlun->prevent_medium_removal && !prevent)
 		fsg_lun_fsync_sub(curlun);
 	curlun->prevent_medium_removal = prevent;
 	return 0;
@@ -2827,6 +2831,7 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 		curlun->ro = lcfg->cdrom || lcfg->ro;
 		curlun->removable = lcfg->removable;
 		curlun->dev.release = fsg_lun_release;
+		curlun->nofua = lcfg->nofua;
 
 #ifdef CONFIG_USB_ANDROID_MASS_STORAGE
 		/* use "usb_mass_storage" platform device as parent */
@@ -3280,9 +3285,10 @@ static int fsg_probe(struct platform_device *pdev)
 	if (nluns > FSG_MAX_LUNS)
 		nluns = FSG_MAX_LUNS;
 	fsg_cfg.nluns = nluns;
-	for (i = 0; i < nluns; i++)
+	for (i = 0; i < nluns; i++) {
 		fsg_cfg.luns[i].removable = 1;
-
+		fsg_cfg.luns[i].nofua = fsg_nofua;
+	}
 	fsg_cfg.vendor_name = pdata->vendor;
 	fsg_cfg.product_name = pdata->product;
 	fsg_cfg.release = pdata->release;
